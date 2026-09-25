@@ -47,3 +47,30 @@ def test_gateway_guard_timer_rechecks_clock_membership_and_interrupted_changes()
     m=importlib.import_module('gateway_runtime')
     assert 'gateway_entry.py guard' in m.guard_unit()
     assert 'OnUnitActiveSec=5s' in m.guard_timer()
+
+
+def test_clock_checkpoint_serializes_startup_and_guard(tmp_path,monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    m=importlib.import_module('gateway_runtime')
+    from gateway_store import Store
+    _,own,_=agreement();store=Store(tmp_path/'gateway');store.initialize(profile(),own)
+    writing=Event();release=Event();second_read=Event();original=m.private_write
+    reads=[]
+    def clock():
+        reads.append(1800000000+len(reads))
+        if len(reads)>1:second_read.set()
+        return reads[-1]
+    def write(path,raw,**kwargs):
+        if not writing.is_set():
+            writing.set();assert release.wait(3)
+        return original(path,raw,**kwargs)
+    monkeypatch.setattr(m.time,'time',clock);monkeypatch.setattr(m,'private_write',write)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first=pool.submit(m.policy_time,store);assert writing.wait(3)
+        second=pool.submit(m.policy_time,store)
+        try:assert not second_read.wait(.1),'Concurrent guard read an unlocked old checkpoint'
+        finally:release.set()
+        assert first.result()==1800000000
+        assert second.result()==1800000001
+    assert json.loads((store.base/'clock.json').read_text())['latest_utc']==1800000001

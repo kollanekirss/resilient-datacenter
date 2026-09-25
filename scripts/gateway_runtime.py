@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """Root-owned single-membership gateway runtime with closed interrupted changes."""
 import hashlib
+import fcntl
 import ipaddress
 import json
 import os
@@ -93,15 +94,24 @@ def verify_image():
 
 def policy_time(store):
     """Never extend expired permission by silently accepting a backwards clock."""
-    now=int(time.time());path=store.base/'clock.json'
-    if path.exists() or path.is_symlink():
-        data=decode(private_read(path))
-        if not isinstance(data,dict) or set(data)!={'schema_version','latest_utc'} or type(data['schema_version']) is not int or data['schema_version']!=1 or type(data['latest_utc']) is not int or data['latest_utc']<0:raise ValueError('Invalid gateway clock checkpoint')
-        if now<data['latest_utc']:raise ValueError('Gateway clock moved backwards; synchronize time before reopening partnerships')
-    elif store.state()['generation']!=0:
-        raise ValueError('Gateway clock history is missing; keep access closed pending recovery review')
-    private_write(path,json.dumps({'schema_version':1,'latest_utc':now}).encode(),replace=True)
-    return now
+    # Startup is invoked while its parent operation holds operation.lock. Use
+    # a separate short-lived lock, shared with the periodic guard, for the
+    # checkpoint read/update; never reacquire the parent's operation lock here.
+    store.check()
+    descriptor=os.open(store.base/'clock.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+    with os.fdopen(descriptor,'a') as stream:
+        info=os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode&0o077:raise ValueError('Unsafe gateway clock lock')
+        fcntl.flock(stream,fcntl.LOCK_EX)
+        now=int(time.time());path=store.base/'clock.json'
+        if path.exists() or path.is_symlink():
+            data=decode(private_read(path))
+            if not isinstance(data,dict) or set(data)!={'schema_version','latest_utc'} or type(data['schema_version']) is not int or data['schema_version']!=1 or type(data['latest_utc']) is not int or data['latest_utc']<0:raise ValueError('Invalid gateway clock checkpoint')
+            if now<data['latest_utc']:raise ValueError('Gateway clock moved backwards; synchronize time before reopening partnerships')
+        elif store.state()['generation']!=0:
+            raise ValueError('Gateway clock history is missing; keep access closed pending recovery review')
+        private_write(path,json.dumps({'schema_version':1,'latest_utc':now}).encode(),replace=True)
+        return now
 
 
 class Runtime:

@@ -79,7 +79,11 @@ def directory_exists():
 
 def configured(settings):
     if not directory_exists():return None
-    config=json.loads(read(BASE/'configuration.json'));validate(config,settings);return config
+    path=BASE/'configuration.json'
+    # A crash immediately after first mkdir has not installed a connector.
+    # Preserve internal service operation and allow explicit attach to resume.
+    if not (path.exists() or path.is_symlink()):return None
+    config=json.loads(read(path));validate(config,settings);return config
 
 
 def active(settings):

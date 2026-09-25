@@ -76,3 +76,13 @@ def test_interrupted_connector_preparation_keeps_home_service_configuration(tmp_
     assert m.active(settings) is None
     m.materialize(settings,'internal configuration')
     assert not (base/'Caddyfile').exists()
+
+
+def test_empty_directory_after_interrupted_first_attach_preserves_internal_service(tmp_path,monkeypatch):
+    m=importlib.import_module('service_regional');base=tmp_path/'connector';base.mkdir(mode=0o750)
+    monkeypatch.setattr(m,'BASE',base);monkeypatch.setattr(m,'RESTORE',tmp_path/'absent')
+    settings={'ownership':configuration()['application_owner']}
+    assert m.configured(settings) is None
+    assert m.active(settings) is None
+    m.materialize(settings,'internal configuration')
+    assert not (base/'Caddyfile').exists()
