@@ -31,3 +31,16 @@ def test_resume_rejects_unknown_unit_overrides(tmp_path,monkeypatch):
         m.check_overrides([folder],{})
     (folder/'unexpected.conf').unlink();folder.rmdir();folder.symlink_to(tmp_path/'elsewhere')
     with pytest.raises(ValueError):m.check_overrides([folder],{})
+
+
+def test_bootstrap_secrets_removed_before_code_becomes_readable(tmp_path,monkeypatch):
+    m=importlib.import_module('nextcloud_operations');root=tmp_path/'code';root.mkdir()
+    (root/'config').mkdir();secret=root/'config/config.php';secret.write_text('private bootstrap credential')
+    (root/'index.php').write_text('pinned code');seen=[]
+    monkeypatch.setattr(m.os,'chown',lambda *args,**kwargs:None)
+    def chmod(path,mode):
+        assert not secret.exists()
+        seen.append((path,mode))
+    monkeypatch.setattr(Path,'chmod',chmod)
+    m.freeze_code(root)
+    assert seen and (root/'index.php',0o644) in seen

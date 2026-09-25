@@ -23,7 +23,7 @@ def configuration_values(profile,identity):
                 config_is_read_only=True,appstoreenabled=False,upgrade_disable_web=True,updatechecker=False,has_internet_connection=False,
                 log_type='file',logfile='/var/www/data/nextcloud.log',loglevel=2,maintenance=False,
                 **{'memcache.local':'\\OC\\Memcache\\APCu','maintenance_window_start':2,
-                   'sharing.enable_share_mail':False,'sharing.allow_links':False,'allow_local_remote_servers':False,
+                   'sharing.enable_share_mail':False,'allow_local_remote_servers':False,
                    'apps_paths':[{'path':'/var/www/html/apps','url':'/apps','writable':False}],
                    'filelocking.enabled':True})
 

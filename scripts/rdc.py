@@ -186,6 +186,7 @@ def dispatch(args) -> ActionResult:
         except ValueError as error:
             print('File-service action blocked: '+str(error));return result_for_state('blocked')
         print(json.dumps(outcome,indent=2))
+        if any(outcome.get(key)=='configuration-changed' for key in ('federation','public_links')):return result_for_state('blocked')
         if outcome.get('expires_within_14_days') or outcome.get('serving_verified') is False or outcome.get('state') in ('issuance-failed','renewal-failed'):return result_for_state('blocked')
         return result_for_state({'prepared':'prepared','cancelled':'cancelled'}.get(outcome.get('state'),'checks-passed'))
     if args.command=='services':

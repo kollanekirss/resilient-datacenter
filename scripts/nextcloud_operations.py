@@ -138,10 +138,18 @@ def bootstrap(settings,profile,admin_user,admin_password,database_password):
     write(runtime.BASE/'config/config.php',application_config(profile,identity),mode=0o400,uid=33,gid=33)
     # Code is recreated from the pinned image on a replacement, not a writable
     # application volume. Config and uploaded files have separate mounts.
-    for entry in code_entries(runtime.APP):
+    freeze_code(runtime.APP)
+
+
+def freeze_code(root):
+    root=Path(root)
+    code_entries(root)  # Reject escaping links before touching the owned tree.
+    # The private identity/config copy is durable before this call. Remove the
+    # bootstrap copy before making any application code world-readable.
+    (root/'config/config.php').unlink(missing_ok=True)
+    for entry in code_entries(root):
         os.chown(entry,0,0,follow_symlinks=False)
         if not entry.is_symlink():entry.chmod(0o755 if entry.is_dir() else 0o644)
-    (runtime.APP/'config/config.php').unlink(missing_ok=True)
 
 
 def cron_unit():
@@ -192,11 +200,12 @@ def install_or_resume(profile,network,address,admin_user,admin_password):
     activate_certificate(settings,cert,key,initial=True)
     subprocess.run(['/bin/systemctl','start','rdc-nextcloud.service'],check=True,timeout=180)
     # Disable external federation before exposing the application to users.
-    for app in ('federation','updatenotification'):
+    for app in ('federation','updatenotification','sharebymail'):
         runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','app:disable',app,timeout=60)
     for control in FEDERATION_CONTROLS:
         runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:set','files_sharing',control,'--value=no',timeout=60)
-    if federation_status()!='disabled':raise ValueError('External sharing controls did not take effect')
+    runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:set','core','shareapi_allow_links','--value=no',timeout=60)
+    if federation_status()!='disabled' or public_links_status()!='disabled':raise ValueError('External sharing controls did not take effect')
     runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','background:cron',timeout=60)
     subprocess.run(['/bin/systemctl','enable','--now','rdc-nextcloud.target','rdc-nextcloud-cron.timer'],check=True,timeout=180)
     subprocess.run(['/bin/systemctl','start','rdc-nextcloud-proxy.service'],check=True,timeout=180)
@@ -213,11 +222,16 @@ def federation_status():
     return 'disabled' if all(value=='no' for value in values) else 'configuration-changed'
 
 
+def public_links_status():
+    value=runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:get','core','shareapi_allow_links',timeout=30).strip()
+    return 'disabled' if value=='no' else 'configuration-changed'
+
+
 def status():
     settings=runtime.read_settings()
     for name in runtime.UNITS:runtime.verify_image(name,settings);runtime.ready(name,settings,attempts=1)
     return {'state':'file-service-listeners-verified','nextcloud_url':'https://'+settings['ownership']['nextcloud_hostname'],
-            'application_login_test':'not-run','application_backup':backup_status(),'federation':federation_status()}
+            'application_login_test':'not-run','application_backup':backup_status(),'federation':federation_status(),'public_links':public_links_status()}
 
 
 def action(args):
