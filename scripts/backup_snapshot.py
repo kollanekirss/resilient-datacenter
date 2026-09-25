@@ -18,8 +18,14 @@ class ServiceRecoveryError(OSError): pass
 class Services:
     def is_active(self,name):
         result=subprocess.run(['/bin/systemctl','is-active',name],capture_output=True,text=True,timeout=15)
-        if result.returncode not in (0,3): raise ValueError('Cannot determine managed service state')
+        if result.returncode not in (0,3) or result.stdout.strip() not in ('active','inactive','failed'): raise ValueError('Cannot determine managed service state')
         return result.returncode==0
+    def verify_binary(self,name,expected):
+        result=subprocess.run(['/bin/systemctl','show','--property=MainPID','--value',name],check=True,capture_output=True,text=True,timeout=15)
+        pid=result.stdout.strip()
+        if not pid.isdigit() or int(pid)<=0: raise ValueError('Cannot establish the running service executable')
+        with (Path('/proc')/pid/'exe').open('rb') as stream: actual=hashlib.file_digest(stream,'sha256').hexdigest()
+        if actual!=expected: raise ValueError('Running service differs from its installed binary; resolve the pending upgrade before snapshotting')
     def stop(self,name): subprocess.run(['/bin/systemctl','stop',name],check=True,timeout=60)
     def start(self,name): subprocess.run(['/bin/systemctl','start',name],check=True,timeout=60)
 
@@ -95,6 +101,10 @@ def _capture(root,destination,owner,*,services=None):
         raise ValueError('Insufficient free space for a consistent local snapshot')
     components=component_hashes(root,owner)
     original={name:services.is_active(name) for name in catalogue.services}
+    daemon={'controller':'usr/bin/headscale','relay':'usr/local/bin/sc-derper','peer':'usr/local/bin/tailscaled'}[owner['role']]
+    if hasattr(services,'verify_binary'):
+        for name,active in original.items():
+            if active: services.verify_binary(name,components[daemon])
     recovery=[]
     try:
         for name,active in original.items():

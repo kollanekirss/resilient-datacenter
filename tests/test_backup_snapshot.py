@@ -95,3 +95,10 @@ def test_insufficient_staging_space_blocks_before_service_changes(tmp_path,monke
     monkeypatch.setattr(api().shutil,'disk_usage',lambda _:usage(100,100,0))
     with pytest.raises(ValueError): api().capture(root,tmp_path/'stage',{'role':'controller'},services=services)
     assert services.events==[]
+
+
+def test_transitional_service_state_is_not_treated_as_stopped(monkeypatch):
+    import subprocess
+    def run(*args,**kwargs): return subprocess.CompletedProcess(args[0],3,stdout='deactivating\n')
+    monkeypatch.setattr(api().subprocess,'run',run)
+    with pytest.raises(ValueError): api().Services().is_active('headscale')

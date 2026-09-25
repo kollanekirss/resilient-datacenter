@@ -73,10 +73,14 @@ def main():
         # Source identity must not be present as plaintext in encrypted repository files.
         for path in (backup_target.STORAGE/'data').rglob('*'):
             if path.is_file(): assert secret not in path.read_bytes()
-        saved=(credentials/'known_hosts').read_text();(credentials/'known_hosts').write_text(saved.replace(profile['backup_host_key'].split()[1],'AAAA'))
-        try: transport.snapshots()
+        saved=(credentials/'known_hosts').read_text()
+        run(['ssh-keygen','-q','-t','ed25519','-N','','-C','wrong-host','-f',str(folder/'wrong-host')])
+        wrong_profile=dict(profile,backup_host_key=backup_target.public_key((folder/'wrong-host.pub').read_text()))
+        wrong_transport=Restic(wrong_profile,base=credentials,binary=binary)
+        (credentials/'known_hosts').write_text(wrong_transport.known_hosts())
+        try: wrong_transport.snapshots()
         except ValueError: pass
-        else: raise AssertionError('Unpinned/changed SSH host key was accepted')
+        else: raise AssertionError('An actual SSH host-key mismatch was accepted')
         (credentials/'known_hosts').write_text(saved)
         (credentials/'password').write_text('wrong repository password\n')
         try: transport.snapshots()

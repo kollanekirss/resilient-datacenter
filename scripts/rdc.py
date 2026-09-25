@@ -58,9 +58,15 @@ def parser():
     doctor.add_argument('--report',type=Path)
     backup=commands.add_parser('backup',help='Encrypted backups and isolated restore staging on the managed Ubuntu server')
     backup_commands=backup.add_subparsers(dest='action',required=True)
-    backup_commands.add_parser('configure',help='Create local backup credentials; never replace existing keys').add_argument('profile',type=Path)
-    for action in ('initialize','run','status'): backup_commands.add_parser(action)
+    backup_commands.add_parser('setup',help='Prepare a backup connection profile without changing servers').add_argument('--output-file',type=Path,required=True)
+    configure=backup_commands.add_parser('configure',help='Create local backup credentials or import saved recovery access')
+    configure.add_argument('profile',type=Path)
+    configure.add_argument('--recovery-password-file',type=Path)
+    configure.add_argument('--recovery-ssh-key-file',type=Path)
+    for action in ('initialize','run','status','restore-recover'): backup_commands.add_parser(action)
     backup_commands.add_parser('restore-stage',help='Decrypt a specific snapshot into private staging; never promote').add_argument('snapshot')
+    for action in ('restore-plan','restore-apply'):
+        backup_commands.add_parser(action,help='Review or explicitly promote an already staged snapshot').add_argument('snapshot')
     target=backup_commands.add_parser('target',help='Prepare dedicated SFTP storage over the private overlay')
     targets=target.add_subparsers(dest='target_action',required=True)
     targets.add_parser('prepare').add_argument('manifest',type=Path)
@@ -131,7 +137,7 @@ def dispatch(args) -> ActionResult:
             print('Backup action blocked: '+str(error))
             return result_for_state('blocked')
         print(json.dumps(outcome,indent=2))
-        return result_for_state('blocked' if outcome.get('state')=='no-backup' else 'checks-passed')
+        return result_for_state({'no-backup':'blocked','cancelled':'cancelled','prepared':'prepared'}.get(outcome.get('state'),'checks-passed'))
     if args.command=='release':
         try: fetch_release(args.version,args.commit,args.output_dir)
         except ValueError as error:

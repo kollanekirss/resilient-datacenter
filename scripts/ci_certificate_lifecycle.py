@@ -74,7 +74,7 @@ def main():
             package=temporary/'headscale.deb'
             download('https://github.com/juanfont/headscale/releases/download/v0.29.4/headscale_0.29.4_linux_amd64.deb',package,'1f65364716ae1fcc3845b1a65a47583469022e9c6f194dfdfeb25403f89f0841')
             run(['dpkg-deb','--extract',str(package),str(temporary/'package')])
-            binary=Path('/usr/local/bin/rdc-ci-headscale'); shutil.copyfile(temporary/'package/usr/bin/headscale',binary); binary.chmod(0o755)
+            binary=Path('/usr/bin/headscale'); shutil.copyfile(temporary/'package/usr/bin/headscale',binary); binary.chmod(0o755)
             configuration=Path('/etc/headscale'); configuration.mkdir(mode=0o750); os.chown(configuration,0,gid)
             for name,content in {'config.yaml':environment.get_template('controller/templates/config.yaml.j2').render(headscale_hostname=HOST,tls_mode='managed-acme'),
                                  'policy.json':environment.get_template('controller/templates/policy.json.j2').render(profile_policy={'tagOwners':{'tag:ci-service':['lab-admin@']},'grants':[]}),
@@ -106,6 +106,8 @@ def main():
         else: raise AssertionError('Injected service failure did not fail activation')
         lifecycle.Runtime().verify(HOST,successful['fingerprint'])
         assert (base/'active/tls.crt').read_bytes()==cert2
+        from ci_restore_lifecycle import exercise
+        exercise(role)
         run(['systemctl','stop',service])
     print(role+': actual service initial TLS, certificate replacement, failed restart and verified rollback PASS. Public ACME issuance NOT RUN.')
 

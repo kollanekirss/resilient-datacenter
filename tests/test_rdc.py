@@ -122,3 +122,8 @@ def test_backup_routing_preserves_explicit_actions_without_install_passthrough(m
     monkeypatch.setattr(m,'backup_action',lambda args:calls.append(args) or {'state':'snapshot-present'})
     assert m.main(['backup','status'])==0 and calls[0].action=='status'
     assert m.main(['backup','run','--extra-vars','unsafe'])==2
+
+
+def test_cancelled_backup_preparation_is_not_reported_as_success(monkeypatch,tmp_path):
+    m=api();monkeypatch.setattr(m,'backup_action',lambda args:{'state':'cancelled'})
+    assert m.main(['backup','setup','--output-file',str(tmp_path/'profile.json')])==4

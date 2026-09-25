@@ -108,32 +108,60 @@ def install_binary(path):
     binary=bz2.decompress(compressed)
     if len(binary)>256*1024*1024 or binary[:4]!=b'\x7fELF' or binary[18:20]!=b'\x3e\x00': raise ValueError('Unexpected Restic target executable')
     fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o755)
-    with os.fdopen(fd,'wb') as stream: stream.write(binary)
+    try:
+        with os.fdopen(fd,'wb') as stream: stream.write(binary)
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
     return hashlib.sha256(binary).hexdigest()
 
 
-def configure(profile):
+def recovery_material(password_file,ssh_key_file):
+    if (password_file is None)!=(ssh_key_file is None): raise ValueError('Recovery requires both the saved repository password and SSH private key')
+    if password_file is None: return None
+    paths=[Path(password_file),Path(ssh_key_file)]
+    for path in paths:
+        info=path.lstat()
+        if not path.is_absolute() or not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_mode & 0o077 or info.st_size>16384:
+            raise ValueError('Recovery access files must be small, private, root-owned regular files')
+    password=paths[0].read_text()
+    if not re.fullmatch(r'[A-Za-z0-9_-]{43}\n?',password): raise ValueError('Use the saved project-generated repository password')
+    public=subprocess.run(['/usr/bin/ssh-keygen','-y','-P','','-f',str(paths[1])],check=True,capture_output=True,text=True,timeout=15).stdout.strip()
+    from backup_contracts import valid_host_key
+    if not valid_host_key(' '.join(public.split()[:2])): raise ValueError('Recovery requires the saved unencrypted Ed25519 access key')
+    return password,paths[1].read_text(),public+'\n'
+
+
+def configure(profile,*,password_file=None,ssh_key_file=None):
     require_platform()
     owner=root_json(Path('/etc/server-connectivity-profile.json'));match_owner(profile,owner)
     if BASE.exists() or BASE.is_symlink() or BINARY.exists() or BINARY.is_symlink():
         raise ValueError('Existing backup installation requires review; configuration does not replace identities or secrets')
+    recovered=recovery_material(password_file,ssh_key_file)
     BASE.mkdir(mode=0o700)
     installed=False
     try:
-        private_write(BASE/'password',secrets.token_urlsafe(32)+'\n')
-        subprocess.run(['/usr/bin/ssh-keygen','-q','-t','ed25519','-N','','-C','rdc-backup-writer','-f',str(BASE/'ssh_key')],check=True,timeout=30)
-        (BASE/'ssh_key').chmod(0o600)
+        if recovered:
+            for name,content in zip(('password','ssh_key','ssh_key.pub'),recovered): private_write(BASE/name,content)
+        else:
+            private_write(BASE/'password',secrets.token_urlsafe(32)+'\n')
+            subprocess.run(['/usr/bin/ssh-keygen','-q','-t','ed25519','-N','','-C','rdc-backup-writer','-f',str(BASE/'ssh_key')],check=True,timeout=30)
+            (BASE/'ssh_key').chmod(0o600)
         transport=Restic(profile)
         private_write(BASE/'known_hosts',transport.known_hosts())
         digest=install_binary(BINARY);installed=True
+        from restore_runtime import install_guards
+        install_guards(owner)
         private_write(BASE/'configuration.json',json.dumps({'schema_version':1,'profile':profile,'ownership':owner,'restic_version':RESTIC_VERSION,'binary_sha256':digest},indent=2)+'\n')
     except BaseException:
         shutil.rmtree(BASE)
         if installed: BINARY.unlink()
         raise
-    print('Backup credentials created on this server. No repository was initialized and no backup was taken.')
+    print('Backup credentials prepared on this server. No repository was initialized and no backup was taken.')
     print('Authorize the public key in /etc/rdc-backup/ssh_key.pub on the backup destination.')
     print('Keep the repository password in /etc/rdc-backup/password and an emergency access method in an independent recovery store before initialization.')
+    if recovered: print('Recovery access imported. Inspect backup status; do not initialize an existing repository.')
+    return {'state':'configured-recovery-access' if recovered else 'configured-not-initialized'}
 
 
 def configured():
@@ -186,11 +214,14 @@ def action(args):
     import fcntl
     import sys
     from profile_config import load_profile
+    if args.action=='setup':
+        from backup_setup import wizard
+        return wizard(args.output_file)
     if args.action=='target':
         from backup_target import prepare,authorize
         return prepare(load_profile(str(args.manifest))) if args.target_action=='prepare' else authorize(args.public_key)
     if args.action=='configure':
-        configure(load_profile(str(args.profile)));return {'state':'configured-not-initialized'}
+        return configure(load_profile(str(args.profile)),password_file=args.recovery_password_file,ssh_key_file=args.recovery_ssh_key_file)
     data,transport=configured()
     if args.action=='status': return status_summary(transport.snapshots())
     fd=os.open(BASE/'operation.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
@@ -206,4 +237,24 @@ def action(args):
             print('Taking a consistent snapshot briefly pauses the owned service. It is restarted before encrypted upload.')
             return backup_now()
         if args.action=='restore-stage': return stage_restore(args.snapshot)
+        if args.action=='restore-recover':
+            from restore_transaction import recover
+            return recover(data['ownership'])
+        if args.action in ('restore-plan','restore-apply'):
+            from backup_transport import SNAPSHOT
+            from restore_transaction import plan,apply
+            if not SNAPSHOT.fullmatch(args.snapshot): raise ValueError('Supply a complete snapshot ID')
+            stage=WORK/'restores'/args.snapshot
+            for path in (WORK,WORK/'restores',stage):
+                info=path.lstat()
+                if not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or info.st_mode&0o077: raise ValueError('Unsafe restore staging directory')
+            review=plan(stage,data['ownership'])
+            if args.action=='restore-plan': return dict(review,state='restore-plan-no-changes')
+            print(json.dumps(review,indent=2))
+            print('This replaces local service data with the selected snapshot. Later changes will be lost. Shut down or independently isolate the OLD instance first; failed reachability is not proof of fencing.')
+            phrase='FENCED AND REPLACE '+data['profile']['node_name']
+            if not sys.stdin.isatty() or input('Type '+phrase+' to proceed: ').strip()!=phrase: return {'state':'cancelled'}
+            try: return apply(stage,data['ownership'])
+            except KeyboardInterrupt:
+                raise ValueError('Restore interrupted. Inspect the pending transaction and run backup restore-recover; automatic service startup remains guarded.') from None
     raise ValueError('Unsupported backup action')
