@@ -113,6 +113,7 @@ def timer_text(frequency):
 
 
 def owned_schedule():
+    if any(Path(str(p)+'.d').exists() for p in (UNIT,TIMER)): raise ValueError('Unreviewed scheduler drop-ins require explicit administration review')
     data=read_private(BASE/'schedule.json')
     if set(data)!={'schema_version','frequency','ownership'} or data['schema_version']!=1 or data['frequency'] not in CALENDARS: raise ValueError('Unknown backup schedule')
     from backup_operations import root_json
@@ -136,9 +137,9 @@ def enable(frequency):
     if (BASE/'schedule.json').exists():
         existing=owned_schedule()
         if existing['frequency']!=frequency: raise ValueError('Disable and review an existing schedule before changing its frequency; automatic replacement is not supported')
-        systemctl('enable','--now','rdc-backup.timer')
+        systemctl('daemon-reload');systemctl('enable','--now','rdc-backup.timer')
         return {'state':'schedule-enabled','frequency':frequency}
-    if any(p.exists() or p.is_symlink() for p in (RUNTIME,UNIT,TIMER,BASE/'schedule.json')): raise ValueError('Unknown scheduler files exist; automatic adoption is blocked')
+    if any(p.exists() or p.is_symlink() for p in (RUNTIME,UNIT,TIMER,Path(str(UNIT)+'.d'),Path(str(TIMER)+'.d'),BASE/'schedule.json')): raise ValueError('Unknown scheduler files exist; automatic adoption is blocked')
     # Only library packages are installed, not a new network service.
     probe=subprocess.run(['/usr/bin/python3','-I','-c','import yaml; import cryptography'],capture_output=True,timeout=15)
     if probe.returncode:
@@ -180,6 +181,8 @@ def run_scheduled():
         try:
             result=backup_now();record_attempt(BASE/'last-attempt.json',result)
             print('Encrypted scheduled backup completed. Check backup status for age and recovery evidence.');return 0
-        except Exception:
+        except BaseException as error:
             record_attempt(BASE/'last-attempt.json',None)
-            print('Scheduled backup failed. Previous success is retained; inspect storage reachability, credentials, disk space and owned service state.');return 1
+            print('Scheduled backup failed. Previous success is retained; inspect storage reachability, credentials, disk space and owned service state.')
+            if not isinstance(error,Exception): raise
+            return 1

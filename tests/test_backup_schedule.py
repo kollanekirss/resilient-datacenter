@@ -35,3 +35,16 @@ def test_frozen_runtime_detects_changed_code_and_rejects_symlinks(tmp_path):
     m.verify_runtime(destination,require_root=False)
     (destination/'backup_snapshot.py').write_text('modified')
     with pytest.raises(ValueError):m.verify_runtime(destination,require_root=False)
+
+
+def test_termination_runs_cleanup_instead_of_abandoning_paused_service(tmp_path):
+    import subprocess
+    marker=tmp_path/'cleanup';scripts=Path(__file__).resolve().parents[1]/'scripts'
+    program='import sys,time\nsys.path.insert(0,'+repr(str(scripts))+')\nfrom backup_runner import install_signal_handlers\ninstall_signal_handlers()\ntry:\n print("ready",flush=True)\n time.sleep(30)\nfinally:\n open('+repr(str(marker))+',"w").write("cleanup ran")\n'
+    process=subprocess.Popen([sys.executable,'-c',program],stdout=subprocess.PIPE,text=True)
+    try:
+        assert process.stdout.readline().strip()=='ready'
+        process.terminate();assert process.wait(timeout=5)!=0
+        assert marker.read_text()=='cleanup ran'
+    finally:
+        if process.poll() is None: process.kill();process.wait()

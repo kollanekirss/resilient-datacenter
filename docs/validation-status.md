@@ -97,3 +97,9 @@ The [real controller and relay recovery run](https://github.com/kollanekirss/res
 No application backup, automatic retention, unattended update, storage immutability or zero-downtime recovery is claimed. Follow the [backup guide](backups.md) for the supported commands and topology limits. Later changes must retain passing checks; consult the current commit's CI rather than treating this historical result as proof of untested changes.
 
 The strengthened [recovery run](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36127740610) verifies actual non-loopback ingress denial during isolation and restored Headscale user records. It caught an nftables command that created a table without its nested rules; the runtime now uses explicit commands in one atomic batch and checks the installed rule structure. Local checks subsequently pass **356 tests** and all **16 playbook syntax checks**. Backup timestamps now represent quiesced data capture, not the later upload start.
+
+## Opt-in scheduled-backup increment
+
+The installed systemd backup entry point passed against the actual controller and encrypted SFTP storage in the [disposable scheduler run](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36128533462). It verifies successful capture/upload, a failed attempt preserving the last success, and a successful retry. The timer executes a root-managed code copy and performs no automatic upgrades or pruning. Physical offsite operation and alert delivery are not established by this test.
+
+Subsequent local checks pass **362 tests** and all **16 playbook syntax checks**, including overdue exit status and graceful termination that runs cleanup. Combining recovery and scheduling also added rejection of an existing shared recovery-journal parent. Actual scheduled runs use the same serialized backup path and refuse a pending restore.
