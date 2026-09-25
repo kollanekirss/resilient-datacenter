@@ -70,6 +70,8 @@ def main():
              'tls_mode':'supplied','tls_certificate':str(cert),'tls_private_key':str(key)}
     result=install_or_resume(profile,network,ADDRESS)
     assert result['state']=='service-listeners-verified'
+    from ci_service_ingress import check as ingress_check
+    ingress_check(ADDRESS,MATRIX,'/_matrix/client/versions','rdc-service-proxy')
     from service_runtime import read_settings,inspect_container,UNITS
     settings=read_settings()
     for component in UNITS:

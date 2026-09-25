@@ -165,9 +165,9 @@ def install_or_resume(profile,network,address,admin_user,admin_password):
     if marker.exists() or marker.is_symlink():
         if root_json(marker)!=owner:raise ValueError('Cannot resume another file-service installation')
     elif any(p.exists() or p.is_symlink() for p in reserved_paths()):raise ValueError('File-service paths must be fresh or exactly owned')
-    if not Path('/usr/bin/podman').exists() or not Path('/usr/bin/runc').exists():
+    if any(not Path(path).exists() for path in ('/usr/bin/podman','/usr/bin/runc','/usr/sbin/nft')):
         subprocess.run(['/usr/bin/apt-get','update','-qq'],check=True,capture_output=True,timeout=300)
-        subprocess.run(['/usr/bin/apt-get','install','-y','podman','runc'],check=True,capture_output=True,timeout=600)
+        subprocess.run(['/usr/bin/apt-get','install','-y','podman','runc','nftables'],check=True,capture_output=True,timeout=600)
     pins=pull_images(image_pins());settings={'schema_version':1,'ownership':owner,'bind_address':address,'components':pins}
     for name in pins:runtime.verify_image(name,settings)
     directory(runtime.BASE);write(marker,json.dumps(owner))
@@ -192,6 +192,7 @@ def install_or_resume(profile,network,address,admin_user,admin_password):
     for name,unitname in runtime.UNITS.items():write(Path('/etc/systemd/system',unitname+'.service'),runtime.unit(name),mode=0o644)
     write(TARGET,'[Unit]\nDescription=RDC Nextcloud services\nAfter=tailscaled.service\nWants=rdc-nextcloud-proxy.service\n[Install]\nWantedBy=multi-user.target\n',mode=0o644)
     write(CRON,cron_unit(),mode=0o644);write(TIMER,cron_timer(),mode=0o644)
+    runtime.application_ingress(settings,create=True)
     subprocess.run(['/bin/systemctl','daemon-reload'],check=True,timeout=30)
     subprocess.run(['/bin/systemctl','start','rdc-nextcloud-postgres.service'],check=True,timeout=180)
     bootstrap(settings,profile,admin_user,admin_password,password)
