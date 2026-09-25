@@ -14,6 +14,7 @@ def test_steady_application_cannot_rewrite_code_or_expose_database():
     m=importlib.import_module('nextcloud_runtime');data=settings()
     command=m.container_command('nextcloud',data)
     assert '--user=33:33' in command and '--read-only' in command
+    assert '--rm' not in command
     assert '--entrypoint=apache2-foreground' in command
     assert '/opt/rdc-nextcloud-app:/var/www/html:ro' in command
     assert '/etc/rdc-nextcloud/config:/var/www/html/config:ro' in command

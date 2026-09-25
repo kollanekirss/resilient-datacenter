@@ -105,6 +105,23 @@ def main():
         page.wait_for_url('**/apps/**')
         page.goto('https://'+HOST+'/index.php/apps/files/')
         expect(page.get_by_text('proof.txt',exact=True).first).to_be_visible()
+
+    from certificate_lifecycle import activate,ActivationError
+    from nextcloud_certificates import Runtime as CertificateRuntime,BASE as CERTBASE
+    selected_certificate=(runtime.TLS/'tls.crt').read_bytes()
+    class FailedActivation(CertificateRuntime):
+        def __init__(self,settings):super().__init__(settings);self.first=True
+        def verify(self,hostname,fingerprint):
+            super().verify(hostname,fingerprint)
+            if self.first:self.first=False;raise ValueError('Injected failure after new file-service HTTPS verification')
+    replacement_cert,replacement_key=certificate_fixture.certificates()
+    try:
+        activate(CERTBASE,HOST,'nextcloud',replacement_cert.read_bytes(),replacement_key.read_bytes(),gid=0,runtime=FailedActivation(settings))
+    except ActivationError as error:assert error.recovered
+    else:raise AssertionError('Failed file-service TLS activation was reported as success')
+    assert (runtime.TLS/'tls.crt').read_bytes()==selected_certificate
+    runtime.verify_https(settings)
+    print('Actual file-service TLS activation failure restored and verified the previous live certificate PASS.',flush=True)
     from ci_service_issuer import exercise as issuer_exercise
     issuer_exercise(certificate_fixture.certificates,package='nextcloud')
     print('Actual Nextcloud browser login and uploaded file visibility PASS. Real VPN/home NAT and physical offsite placement NOT RUN.',flush=True)

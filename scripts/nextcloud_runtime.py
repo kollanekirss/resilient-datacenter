@@ -55,7 +55,7 @@ def common(settings):
 
 def container_command(name,settings):
     if name not in UNITS:raise ValueError('Unknown file-service component')
-    command=common(settings)+['--rm','--name',UNITS[name],'--label','org.rdc.owner='+owner_digest(settings),
+    command=common(settings)+['--name',UNITS[name],'--label','org.rdc.owner='+owner_digest(settings),
                               '--label','org.rdc.component='+name]
     image=settings['components'][name]['image']
     if name=='postgres':
