@@ -40,10 +40,12 @@ class Parser(argparse.ArgumentParser):
 def parser():
     result=Parser(prog='rdc',description=__doc__)
     commands=result.add_subparsers(dest='command',required=True)
-    portable=commands.add_parser('portable',help='Preview a portable Proxmox site; changes no servers')
-    portable.add_argument('portable_action',choices=('preview',))
+    portable=commands.add_parser('portable',help='Preview/check a portable site or explicitly allocate stopped VM shells')
+    portable.add_argument('portable_action',choices=('preview','check','allocate-shells'))
     portable.add_argument('plan',type=Path)
     portable.add_argument('--json',action='store_true')
+    portable.add_argument('--token-file',type=Path)
+    portable.add_argument('--ca-file',type=Path)
     commands.add_parser('status',help='Read separate local operational evidence').add_argument('--json',action='store_true')
     upgrade=commands.add_parser('upgrade',help='Check, apply or recover a reviewed local application upgrade')
     upgrade.add_argument('upgrade_action',choices=('check','apply','recover'))
@@ -244,10 +246,19 @@ def dispatch(args) -> ActionResult:
     if args.command=='portable':
         from portable_plan import load, preview, render
         try:
-            outcome=preview(load(args.plan))
+            if args.portable_action=='preview':
+                outcome=preview(load(args.plan))
+            else:
+                from portable_plan import validate
+                from proxmox_api import Client, credentials
+                from proxmox_provision import check, allocate
+                if not args.token_file:raise ValueError('Supply --token-file pointing to a private API credential file.')
+                plan=validate(load(args.plan))
+                api=Client(plan['proxmox']['endpoint'],credentials(args.token_file),args.ca_file)
+                outcome=(check if args.portable_action=='check' else allocate)(plan,api)
         except ValueError as error:
             print('Site plan rejected: '+str(error));return result_for_state('blocked')
-        print(json.dumps(outcome,indent=2) if args.json else render(outcome))
+        print(json.dumps(outcome,indent=2) if args.json or args.portable_action!='preview' else render(outcome))
         return result_for_state('checks-passed')
     if args.command=='upgrade':
         from upgrade_runtime import action

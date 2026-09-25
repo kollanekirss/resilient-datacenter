@@ -43,7 +43,7 @@ The proposed domestic design therefore needs several independently reachable ren
 
 The agreed reference deployment is **Proxmox on the physical host, with separate OPNsense, Unbound, NGINX, Synapse/Element, Nextcloud and partner-connector VMs**. Service guests retain their own operating systems; Proxmox does not replace Linux inside those VMs. Prepare services, accounts and certificates during normal operation so local use does not require outside services during a crisis.
 
-This is a planned profile, not a capability of the current installer. Read the [reference architecture](docs/architecture/portable-proxmox.md) and [delivery roadmap](docs/architecture/portable-proxmox-roadmap.md). A [validated site-plan preview](docs/portable-site-plan.md) is available with `./rdc portable preview examples/portable-site.json`. It changes no servers. Provisioning and disconnected local access remain planned. The existing Ubuntu deployment remains available.
+This is a planned profile, not a capability of the current installer. Read the [reference architecture](docs/architecture/portable-proxmox.md) and [delivery roadmap](docs/architecture/portable-proxmox-roadmap.md). A [validated site-plan preview](docs/portable-site-plan.md) is available with `./rdc portable preview examples/portable-site.json`. It changes no servers. An [experimental Proxmox adapter](docs/proxmox-provisioning.md) can check an API and explicitly allocate stopped, disconnected VM shells. Guest OS installation, live Proxmox acceptance and disconnected local access remain outstanding. The existing Ubuntu deployment remains available.
 
 ## Example hardware for a small institutional pilot
 

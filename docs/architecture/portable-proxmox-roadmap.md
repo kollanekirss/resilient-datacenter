@@ -19,6 +19,8 @@ Exit: a colleague can describe their intended node and understand exactly what t
 
 ## 2. Proxmox provisioning adapter
 
+An initial [API checker and stopped VM shell allocator](../proxmox-provisioning.md) is implemented with simulated API tests. It uses existing bridges, allocates blank disks and leaves every guest NIC disconnected. Verified guest artifacts, operating-system installation and real Proxmox acceptance remain outstanding; this stage is not complete.
+
 Consume the validated plan. Select supported Proxmox/OPNsense versions and immutable installation artifacts at implementation time, verify upstream requirements and record an explicit compatibility matrix.
 
 - Read host storage, bridges and VM allocation using certificate-verified API access with minimum documented privileges.
