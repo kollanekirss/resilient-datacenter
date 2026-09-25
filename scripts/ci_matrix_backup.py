@@ -56,6 +56,10 @@ def snapshot(network_snapshot):
     assert status(0)['attempts']['last_attempt']['outcome']=='succeeded'
     snapshots=transport.snapshots();assert len(snapshots)==1 and snapshots[0]['id']!=network_snapshot
     assert 'rdc-'+package(application)+'-v1' in snapshots[0]['tags']
+    from backup_operations import status_summary
+    evidence=status_summary(snapshots)
+    assert evidence['state']=='snapshot-present' and evidence['backup_age_seconds']>=0
+    print('Captured '+package(application)+' snapshot age at acceptance check seconds: '+str(round(evidence['backup_age_seconds'],2)),flush=True)
     return snapshots[0]['id']
 
 
