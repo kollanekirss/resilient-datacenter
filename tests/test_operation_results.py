@@ -46,3 +46,16 @@ def test_invalid_local_action_never_inspects_machine(tmp_path,monkeypatch):
     with pytest.raises(api().OperationError) as caught:
         local_node.execute_local('PRIVATE_ACTION',tmp_path/'missing')
     assert caught.value.exit_code==2
+
+
+def test_new_status_never_requests_sudo(tmp_path,monkeypatch):
+    import local_node, local_enrollment
+    path=tmp_path/'node.json'; path.write_text(json.dumps(manifest()))
+    monkeypatch.setattr(local_node,'inspect_local_checks',lambda *a,**kw:[])
+    monkeypatch.setattr(local_enrollment.os,'geteuid',lambda:1000)
+    def action(m,r,*,start_requested):
+        assert not start_requested
+        assert r._prefix()==[]
+        return {'status':'awaiting_enrollment'}
+    monkeypatch.setattr(local_enrollment,'enrollment_action',action)
+    assert local_node.execute_local('status',path).exit_code==4

@@ -51,3 +51,12 @@ def test_interrupted_bundle_has_no_completion_record(tmp_path,monkeypatch):
     monkeypatch.setattr(m.os,'link',fail_second)
     with pytest.raises(OSError): m.write_bundle(tmp_path,{'one.yml':'one','two.yml':'two'})
     assert not (tmp_path/'BUNDLE.json').exists()
+
+
+def test_generated_next_steps_use_common_interface():
+    from test_setup_contracts import infrastructure
+    text=files_api().prepare_outputs('independent',infrastructure())['NEXT-STEPS.md']
+    assert './rdc infrastructure check ' in text
+    assert './rdc infrastructure apply ' in text
+    assert './rdc node check ' in text
+    assert './rdc node enroll ' in text

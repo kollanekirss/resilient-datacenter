@@ -55,7 +55,7 @@ def execute_local(action: str, manifest_path: Path) -> ActionResult:
         elif action=='check': result={'status':'checks-passed','clock_sync':'not-verified'}
         else:
             from local_enrollment import NativeRuntime, enrollment_action
-            result=enrollment_action(manifest,NativeRuntime(),start_requested=action=='enroll')
+            result=enrollment_action(manifest,NativeRuntime(allow_sudo=action=='enroll'),start_requested=action=='enroll')
         return result_for_state(result['status'],details=result)
     except ValueError:
         raise OperationError('client.state_mismatch',Exit.BLOCKED) from None
