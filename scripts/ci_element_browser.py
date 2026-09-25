@@ -27,7 +27,7 @@ def exercise(username,password,room):
             expect(page.get_by_text('Disposable RDC application proof',exact=True)).to_be_visible()
             composer=page.locator('.mx_MessageComposer').get_by_role('textbox')
             composer.fill('Message sent from the actual Element browser')
-            page.get_by_test_id('sendmessagebtn').click()
+            composer.press('Enter')
             expect(page.get_by_text('Message sent from the actual Element browser',exact=True)).to_be_visible()
             print('Actual Element browser: trusted certificate, password login, restored history display and message composer PASS.',flush=True)
         except Exception:

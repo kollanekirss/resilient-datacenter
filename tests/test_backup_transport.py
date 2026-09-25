@@ -9,6 +9,21 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 def api(): return importlib.import_module('backup_transport')
 
 
+def test_storage_readiness_tolerates_transport_restart_without_retrying_writes(monkeypatch):
+    module=api();attempts=[]
+    class Connection:
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+    def connect(address,timeout):
+        attempts.append(address)
+        if len(attempts)<3:raise ConnectionRefusedError()
+        return Connection()
+    monkeypatch.setattr(module.socket,'create_connection',connect)
+    monkeypatch.setattr(module.time,'sleep',lambda _:None)
+    module.Restic(profile()).wait_ready()
+    assert len(attempts)==3
+
+
 def test_ssh_arguments_pin_identity_and_do_not_use_user_config(tmp_path):
     m=api().Restic(profile(),base=tmp_path)
     args=m.command(['snapshots'])

@@ -196,6 +196,7 @@ def backup_now():
     with tempfile.TemporaryDirectory(prefix='snapshot-',dir=WORK) as temporary:
         stage=Path(temporary)/'snapshot'
         capture(Path('/'),stage,data['ownership'])
+        transport.wait_ready()
         identifier=transport.backup(stage)
     return {'state':'snapshot-created','snapshot_id':identifier,'restore_test':'not-run'}
 

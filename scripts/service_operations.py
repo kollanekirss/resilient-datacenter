@@ -164,8 +164,13 @@ def install_or_resume(profile,network,address):
     write(runtime.BASE/'element.json',element(profile),mode=0o644)
     write(runtime.BASE/'element-nginx.conf',element_nginx(),mode=0o644)
     write(runtime.BASE/'Caddyfile',proxy(profile,address),mode=0o644)
-    directory(runtime.TLS)
-    write(runtime.TLS/'tls.crt',cert,mode=0o644);write(runtime.TLS/'tls.key',key)
+    from service_certificates import activate_pair
+    if runtime.TLS.exists() or runtime.TLS.is_symlink():
+        from certificate_lifecycle import generation
+        generation(TLSBASE,'active')
+        if (runtime.TLS/'tls.crt').read_bytes()!=cert or (runtime.TLS/'tls.key').read_bytes()!=key:
+            raise ValueError('Use services certificate to replace an existing TLS identity')
+    activate_pair(TLSBASE,settings,cert,key,initial=True)
     hashes={}
     for name in ('service_runtime.py','service_images.json'):
         content=(SOURCE/name).read_bytes();write(runtime.INSTALLED/name,content,mode=0o644);hashes[name]=hashlib.sha256(content).hexdigest()
@@ -209,6 +214,9 @@ def action(args):
         from service_setup import wizard
         return wizard(args.output_file)
     require_platform()
+    if args.action=='certificate':
+        from service_certificates import replace
+        return replace(args.certificate,args.private_key)
     if args.action=='status':return status()
     if args.action=='check':return dict(preflight(load_profile(str(args.profile))),state='checks-passed')
     if args.action=='account':

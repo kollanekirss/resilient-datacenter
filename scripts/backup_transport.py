@@ -7,8 +7,10 @@ import re
 import shlex
 import shutil
 import stat
+import socket
 import subprocess
 import tempfile
+import time
 from backup_contracts import validate,repository
 
 SNAPSHOT=re.compile('[a-f0-9]{64}')
@@ -20,6 +22,17 @@ class Restic:
         if scope not in ('network','matrix'): raise ValueError('Unknown backup scope')
         self.scope=scope
         self.profile=profile; self.base=Path(base); self.binary=Path(binary)
+
+    def wait_ready(self):
+        # A peer snapshot restarts its network daemon before upload. This probe
+        # only waits for transport; SSH still verifies the pinned host key.
+        # No repository write is retried.
+        for attempt in range(10):
+            try:
+                with socket.create_connection((self.profile['backup_host'],self.profile['backup_port']),timeout=3):return
+            except OSError:
+                if attempt==9:raise ValueError('Backup storage did not become reachable after service restart') from None
+                time.sleep(1)
 
     def known_hosts(self):
         host=self.profile['backup_host'];port=self.profile['backup_port']

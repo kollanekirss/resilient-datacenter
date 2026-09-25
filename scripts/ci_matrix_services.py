@@ -24,6 +24,7 @@ ELEMENT='chat.ci.test'
 
 
 def certificates():
+    folder=Path('/root/rdc-application-ci');folder.mkdir(mode=0o700,exist_ok=True)
     now=datetime.now(timezone.utc);key=rsa.generate_private_key(public_exponent=65537,key_size=2048)
     subject=x509.Name([x509.NameAttribute(NameOID.COMMON_NAME,'Disposable RDC application CA')])
     root=(x509.CertificateBuilder().subject_name(subject).issuer_name(subject).public_key(key.public_key())
@@ -31,8 +32,14 @@ def certificates():
           .add_extension(x509.BasicConstraints(ca=True,path_length=0),critical=True)
           .add_extension(x509.KeyUsage(digital_signature=True,content_commitment=False,key_encipherment=False,data_encipherment=False,key_agreement=False,key_cert_sign=True,crl_sign=True,encipher_only=False,decipher_only=False),critical=True)
           .sign(key,hashes.SHA256()))
-    ca=Path('/usr/local/share/ca-certificates/rdc-application-ci.crt');ca.write_bytes(root.public_bytes(serialization.Encoding.PEM))
-    subprocess.run(['update-ca-certificates'],check=True,stdout=subprocess.DEVNULL,timeout=30)
+    ca=Path('/usr/local/share/ca-certificates/rdc-application-ci.crt');ca_key=folder/'ca.key'
+    if ca.exists():
+        root=x509.load_pem_x509_certificate(ca.read_bytes());key=serialization.load_pem_private_key(ca_key.read_bytes(),password=None)
+        subject=root.subject
+    else:
+        ca.write_bytes(root.public_bytes(serialization.Encoding.PEM))
+        ca_key.write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()));ca_key.chmod(0o600)
+        subprocess.run(['update-ca-certificates'],check=True,stdout=subprocess.DEVNULL,timeout=30)
     leafkey=rsa.generate_private_key(public_exponent=65537,key_size=2048)
     leaf=(x509.CertificateBuilder().subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME,MATRIX)]))
           .issuer_name(subject).public_key(leafkey.public_key()).serial_number(x509.random_serial_number())
@@ -40,7 +47,6 @@ def certificates():
           .add_extension(x509.BasicConstraints(ca=False,path_length=None),critical=True)
           .add_extension(x509.SubjectAlternativeName([x509.DNSName(MATRIX),x509.DNSName(ELEMENT)]),critical=False)
           .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),critical=False).sign(key,hashes.SHA256()))
-    folder=Path('/root/rdc-application-ci');folder.mkdir(mode=0o700)
     cert=folder/'tls.crt';private=folder/'tls.key'
     cert.write_bytes(leaf.public_bytes(serialization.Encoding.PEM)+root.public_bytes(serialization.Encoding.PEM))
     private.write_bytes(leafkey.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()));private.chmod(0o600)
@@ -113,8 +119,26 @@ def main():
     signing=Path('/var/lib/rdc-services/synapse/server.signing.key')
     signing_hash=hashlib.sha256(signing.read_bytes()).hexdigest()
     selected=snapshot(network_snapshot)
+    from service_certificates import replace,activate_pair,Runtime as CertificateRuntime,BASE as CERTBASE
+    from certificate_lifecycle import ActivationError
+    old_certificate=Path('/etc/rdc-service-tls/active/tls.crt').read_bytes()
+    cert,key=certificates();assert replace(cert,key)['state']=='active'
+    selected_certificate=cert.read_bytes();selected_key=key.read_bytes()
+    assert selected_certificate!=old_certificate
+    cert,key=certificates()
+    class FailedActivation(CertificateRuntime):
+        def __init__(self,settings):super().__init__(settings);self.first=True
+        def verify(self,hostname,fingerprint):
+            super().verify(hostname,fingerprint)
+            if self.first:self.first=False;raise ValueError('Synthetic failure after actual new certificate verification')
+    try:activate_pair(CERTBASE,settings,cert.read_bytes(),key.read_bytes(),runtime=FailedActivation(settings))
+    except ActivationError as error:assert error.recovered
+    else:raise AssertionError('Failed certificate activation was reported as success')
+    cert.write_bytes(selected_certificate);key.write_bytes(selected_key)
+    assert Path('/etc/rdc-service-tls/active/tls.crt').read_bytes()==selected_certificate
     later=request('PUT','/_matrix/client/v3/rooms/'+encoded+'/send/m.room.message/ci-after-backup',{'msgtype':'m.text','body':'This later change must not survive restoration'},token=alice)['event_id']
     restore(selected)
+    assert Path('/etc/rdc-service-tls/active/tls.crt').read_bytes()==selected_certificate
     assert request('GET',event_path,token=bob)['content']['body']=='Disposable RDC application proof'
     assert request('GET','/_matrix/client/v1/media/download/'+server+'/'+identifier,token=alice,raw=True)==media
     denied('/_matrix/client/v3/rooms/'+encoded+'/event/'+urllib.parse.quote(later,safe=''),token=alice,statuses=(404,))
@@ -124,6 +148,8 @@ def main():
     print('Actual encrypted SFTP scheduled application backup, scope transition, selected snapshot restore, account tokens/message/media/signing identity preservation and installation resume PASS.',flush=True)
     from ci_element_browser import exercise
     exercise('@cialice:'+MATRIX,alice_password,room)
+    history=request('GET','/_matrix/client/v3/rooms/'+encoded+'/messages?dir=b&limit=10',token=bob)
+    assert any(e.get('content',{}).get('body')=='Message sent from the actual Element browser' for e in history['chunk'])
     print('Real Tailscale enrollment, end-to-end encryption recovery and institutional acceptance NOT RUN by this package slice.')
 
 if __name__=='__main__':main()
