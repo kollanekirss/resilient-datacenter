@@ -28,7 +28,7 @@ python3 -m venv .venv
 
 The relay helper selects **Go 1.26.6** and **tailscale.com v1.102.4**, cross-builds for Linux/amd64, and records the SHA256 in `artifacts/derper-build.json`. Module downloads use Go's checksum database; the resolved module checksums are retained in `artifacts/derper-go.sum`. It does not install Go or binaries globally. Keep the build metadata alongside an archived deployment release. Rebuilds after a toolchain or source change are a new release to test, not an automatic upgrade.
 
-A relay artifact was already built in this working copy. It is ignored by Git; colleagues cloning this repository must build their own or receive a verified release artifact.
+Build artifacts are ignored by Git. A fresh clone must build the relay or obtain a verified release artifact.
 
 ## Prepare deployment inputs
 

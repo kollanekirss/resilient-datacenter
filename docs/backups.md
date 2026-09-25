@@ -72,6 +72,8 @@ A successful upload is not evidence that an application can be recovered; perfor
 
 ## 4. Prepare a replacement and stage recovery
 
+For a fresh chat, file or gateway machine, first follow [fresh replacement bootstrap](#a-fresh-application-or-gateway-replacement) below. Recover the original network identity before installing the application; installing it on the temporary replacement identity creates a different owner. Return to the full application restore only after that bootstrap and installation.
+
 Deploy the **same supported role, institution identity, hostname and exact component binaries** on a replacement. Keep it isolated from normal users while preparing it. Arrange fresh, valid certificates and its own current routing settings. Managed recovery retains the replacement's ACME account and certificate generations. It restores persistent identity/data and authorization policy, while retaining the replacement's service configuration and relay map. This supports the kit's generated configuration; custom service configurations require a separate migration review.
 
 Make the saved password and private SSH key available as absolute, root-owned, mode 0600 files through your independent recovery procedure. Import them on the replacement:
