@@ -188,7 +188,15 @@ def finish(root,journal,runtime):
     runtime.finish_validation()
     runtime.release()
     clean_workspaces(root,journal)
+    from restore_evidence import record
+    record(root,journal)
     (root/PENDING).unlink(missing_ok=True)
+
+
+def start_candidate(services,runtime,owner):
+    for service in reversed(services):
+        if service=='rdc-synapse':runtime.prepare_restored_application(owner)
+        runtime.start(service)
 
 
 def rollback(root,journal,runtime):
@@ -223,7 +231,8 @@ def apply(stage,owner,*,root=Path('/'),runtime=None,permissions=set_permissions)
     if directory.is_symlink() or directory.stat().st_mode & 0o077: raise ValueError('Unsafe restore journal directory')
     runtime_state=runtime.prepare(owner) if hasattr(runtime,'prepare') else {}
     journal={'schema_version':1,'id':uuid.uuid4().hex,'ownership':owner,'paths':review['paths'],
-             'binary_sha256':review['binary_sha256'],'original_active':original,'phase':'preparing','runtime_state':runtime_state}
+             'binary_sha256':review['binary_sha256'],'original_active':original,'phase':'preparing','runtime_state':runtime_state,
+             'source':{'captured_at':review['captured_at'],'snapshot_id':stage.name if re.fullmatch('[a-f0-9]{64}',stage.name) else None}}
     try:
         save(root,journal);atomic_json(root/PENDING,{'schema_version':1,'transaction_id':journal['id']})
     except BaseException:
@@ -251,7 +260,7 @@ def apply(stage,owner,*,root=Path('/'),runtime=None,permissions=set_permissions)
         journal['phase']='validating';save(root,journal)
         if component_hashes(root,owner)!=journal['binary_sha256']: raise ValueError('Components changed during restoration')
         runtime.allow_validation()
-        for service in reversed(services): runtime.start(service)
+        start_candidate(services,runtime,owner)
         runtime.verify(owner)
         journal['phase']='committed';save(root,journal)
         finish(root,journal,runtime)
@@ -278,12 +287,16 @@ def recover(owner,*,root=Path('/'),runtime=None):
     if not isinstance(marker,dict) or set(marker)!={'schema_version','transaction_id'} or marker['schema_version']!=1 or not re.fullmatch('[a-f0-9]{32}',str(marker['transaction_id'])):
         raise ValueError('Invalid restore recovery marker')
     journal=read_journal(root/TRANSACTIONS/(marker['transaction_id']+'.json'))
-    if (not isinstance(journal,dict) or set(journal)!={'schema_version','id','ownership','paths','binary_sha256','original_active','phase','runtime_state'} or
+    fields={'schema_version','id','ownership','paths','binary_sha256','original_active','phase','runtime_state'}
+    if (not isinstance(journal,dict) or set(journal) not in (fields,fields|{'source'}) or
         journal['schema_version']!=1 or journal['id']!=marker['transaction_id'] or journal['ownership']!=owner or journal['paths']!=restoration_paths(owner) or
         journal['phase'] not in ('preparing','validating','committed','rolled-back') or
         not isinstance(journal['original_active'],dict) or set(journal['original_active'])!=set(resources(owner).services) or
         any(type(v) is not bool for v in journal['original_active'].values()) or component_hashes(root,owner)!=journal['binary_sha256']):
         raise ValueError('Recovery journal does not match this owned installation')
+    if 'source' in journal:
+        from restore_evidence import validate_source
+        validate_source(journal['source'])
     if hasattr(runtime,'prepare'): runtime.prepare(owner,state=journal['runtime_state'])
     runtime.isolate(owner)
     runtime.finish_validation()

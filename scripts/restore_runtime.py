@@ -81,6 +81,22 @@ def rules_digest(data,identifier):
 
 
 class Runtime(Services):
+    def prepare_restored_application(self,owner):
+        from backup_scope import package
+        if owner!=self.owner or 'applications' not in owner or package(owner['applications'])!='matrix':
+            raise ValueError('Unexpected restored application identity')
+        if self.is_active('rdc-synapse'):raise ValueError('Restored one-time keys must be cleared before Synapse starts')
+        import service_runtime
+        settings=service_runtime.read_settings()
+        if settings['ownership']!=owner['applications']:raise ValueError('Restored Matrix ownership changed')
+        service_runtime.ready('postgres',settings,attempts=1)
+        # A physical database backup also contains keys used after its capture.
+        # Never issue those keys again. Device keys and encrypted key backups
+        # remain intact; clients upload fresh one-time keys after recovery.
+        service_runtime.podman('exec','--user','999:999',service_runtime.UNITS['postgres'],
+            'psql','-X','-v','ON_ERROR_STOP=1','-U','synapse','-d','synapse','-p','5433',
+            '-c','TRUNCATE TABLE e2e_one_time_keys_json;',timeout=30)
+
     def close_gateway(self):
         import gateway_runtime
         from gateway_store import Store

@@ -1,10 +1,18 @@
 # Validation status — 2026-09-25
 
+## Current guided-product evidence
+
+Implementation source `049fb3e` passed 595 local tests and all disposable workflows. `rdc start` saves private intent and role cards; `rdc guide` delegates allowlisted tasks to the existing operations. `rdc status` reports network, applications, certificates, backup, recovery and partners separately. File/probe tests cover missing, malformed and mixed ownership, stopped services, unavailable storage, retained historical success, failed renewal, unknown/time-limited probes and partner recovery review. None of these marks a whole installation resilient.
+
+Actual Matrix [run 36158678655](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678655), Nextcloud [run 36158678627](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678627) and gateway [run 36158678699](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678699) verified the new status probes and private restore evidence after encrypted recovery. The Matrix test additionally uploaded a one-time encryption key, captured it, consumed it, restored the older database and verified that the key could not be issued again. A fresh Element browser still recovered encrypted history using the independently held recovery key. Technical restore evidence deliberately records no user-operation proof; those user checks are separate CI assertions.
+
+The same source passed actual regional [Matrix exchange](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678622), [file exchange](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678585), [infrastructure certificates/recovery](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678604), [encrypted backup transport](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678668) and [local checks](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678433). Application recovery fixtures use synthetic network state; the independent-network workflows use actual clients. This is disposable acceptance, not real independent sites, public provider issuance or beginner usability. Controlled upgrades and extended controller/relay/home-network acceptance remain in progress.
+
 **Legacy/profile workflows, guided local installation and unified operations: implemented and locally checked. Live deployment: NOT RUN.**
 
 | Check | Status | Evidence / boundary |
 |---|---|---|
-| Python unit and local integration tests | PASS | 356 tests: legacy/profile coverage plus common CLI, structured diagnostics, private reports, source identity, snapshots, wizard and enrollment boundaries |
+| Earlier foundation unit and local integration tests | HISTORICAL PASS | 356 tests: legacy/profile coverage plus common CLI, structured diagnostics, private reports, source identity, snapshots, wizard and enrollment boundaries |
 | Ansible syntax | PASS | All 16 playbooks; infrastructure-only and both original profiles passed host/task listing without target connections |
 | Example inventory refuses deployment validation | PASS | CLI exits 1; no connections attempted |
 | DERP cross-build | PASS | Linux/amd64 ELF, source v1.102.4, Go 1.26.6, artifact SHA256 recorded in provenance.md |

@@ -40,3 +40,30 @@ def test_rule_generation_uses_fixed_role_ports_and_overlay_interface():
     assert 'udp dport 3478 drop' in m.isolation_rules('relay',identifier)
     assert 'iifname "tailscale0" drop' in m.isolation_rules('peer',identifier)
     with pytest.raises(ValueError): m.isolation_rules('unknown',identifier)
+
+
+def test_matrix_restore_clears_one_time_keys_only_while_chat_is_stopped(monkeypatch):
+    import service_runtime
+    m=api();owner={'applications':{'packages':['matrix']}}
+    runtime=m.Runtime(owner);calls=[]
+    monkeypatch.setattr(runtime,'is_active',lambda _:False)
+    monkeypatch.setattr(service_runtime,'read_settings',lambda:{'ownership':owner['applications']})
+    monkeypatch.setattr(service_runtime,'ready',lambda *args,**kwargs:calls.append(('ready',args[0])))
+    monkeypatch.setattr(service_runtime,'podman',lambda *args,**kwargs:calls.append(('sql',args)))
+    runtime.prepare_restored_application(owner)
+    assert calls[0]==('ready','postgres')
+    assert calls[1][1][-1]=='TRUNCATE TABLE e2e_one_time_keys_json;'
+    assert 'ON_ERROR_STOP=1' in calls[1][1]
+    calls.clear();monkeypatch.setattr(runtime,'is_active',lambda _:True)
+    with pytest.raises(ValueError):runtime.prepare_restored_application(owner)
+    assert calls==[]
+
+
+def test_restored_database_cleanup_failure_prevents_synapse_start():
+    import restore_transaction as transaction
+    events=[]
+    class Runtime:
+        def start(self,name):events.append(name)
+        def prepare_restored_application(self,owner):events.append('cleanup');raise ValueError('database unavailable')
+    with pytest.raises(ValueError):transaction.start_candidate(('rdc-service-proxy','rdc-element','rdc-synapse','rdc-postgres','tailscaled'),Runtime(),{})
+    assert events==['tailscaled','rdc-postgres','cleanup']
