@@ -112,7 +112,7 @@ Internet separation can delay partner delivery and offsite backups. Restoration 
 6. Operator status, lifecycle automation and additional infrastructure resilience.
 7. Public experimental release after installation tests; a supported release only after all advertised journeys pass usability and recovery acceptance.
 
-Each service, local-install and gateway milestone needs its own implementation specification and tests. The original profile plan covered milestone 1. Subsequent plans cover guided installation, verified releases, certificate lifecycle and guarded backups/recovery. Matrix/Element, Nextcloud, regional gateways and all journey acceptance remain outstanding.
+Each service, local-install and gateway milestone needs its own implementation specification and tests. The original profile plan covered milestone 1. Subsequent plans cover guided installation, verified releases, certificate lifecycle and guarded backups/recovery. Implementation and bounded acceptance have progressed beyond this original roadmap; consult the current completion ledger and validation record. Real-site/provider and unfamiliar-user acceptance remain distinct requirements.
 
 ## Relationship to earlier documents
 

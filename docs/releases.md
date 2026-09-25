@@ -28,7 +28,7 @@ Keep the notices with any redistributed relay. Fetch does not extract archives, 
 
 ## Maintainer publication
 
-1. Review and merge changes, pass CI, and set `project-version.json` to a specific `alpha.N`, `beta.N` or `rc.N` version with channel `prerelease`.
+1. Review and merge changes, pass CI, and prepare matching reviewed notes in `docs/release-notes/VERSION.md` and set `project-version.json` to a specific `alpha.N`, `beta.N` or `rc.N` version with channel `prerelease`.
 2. Review the pinned Go/Tailscale inputs in `build/derper/`, `scripts/build_derper.py` and the dependency license report. The build blocks new/unclassified license families instead of silently omitting them. The initial approved families are MIT, BSD-2-Clause, BSD-3-Clause, ISC and Apache-2.0; all license and notice files must remain in the distribution. Assembly scanner warnings are retained for review; CGO is disabled.
 3. Create and push the corresponding `vVERSION` tag at the reviewed commit. Do not retarget a published tag.
 4. Manually run **Experimental release** using that tag. Ordinary pushes/PRs cannot publish. The workflow must exist on the default branch for dispatch to be available.

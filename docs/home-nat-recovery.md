@@ -18,4 +18,4 @@ All VMs, namespaces and controller/backup fixtures share one disposable physical
 
 Matrix's fresh-guest proof uses authenticated API data. Browser login and user-held-key recovery of encrypted chat history are independently tested by the Matrix application workflow. There is no claim that server backups alone decrypt encrypted messages, that a backup destination is immutable, or that an unreachable primary is safely fenced.
 
-Use [the product guide](product-start.md), [backup bootstrap and restore instructions](backups.md#a-fresh-application-or-gateway-replacement) for your own deployment.
+Use [the product guide](product-start.md), [backup bootstrap and restore instructions](backups.md#a-fresh-application-or-gateway-replacement) and [the real-site worksheet](site-acceptance.md) for your own deployment.

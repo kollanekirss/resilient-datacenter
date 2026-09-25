@@ -2,7 +2,7 @@
 
 Run your own private network, chat and files, keep an encrypted recovery copy elsewhere, and optionally exchange approved services with other organisations. This project provides a guided command-line installer and checked operating procedures for **fresh Ubuntu 24.04 amd64 machines with systemd**. Use existing VMs, physical machines or VPSs; no custom ISO or Proxmox requirement.
 
-**Experimental, not a supported production release.** Real applications, separate networks, federation, encrypted recovery and selected upgrades have disposable Ubuntu acceptance evidence. Physical sites, public certificate-provider issuance and an unfamiliar colleague's complete installation/recovery exercise still need acceptance. There is no automatic failover or promise of uninterrupted relocation.
+**Experimental, not a supported production release.** Real applications, separate networks, federation, encrypted recovery and selected upgrades have disposable Ubuntu acceptance evidence. Fresh Ubuntu guest installation and recovery behind simulated home NAT also pass; [see the measured boundaries](docs/home-nat-recovery.md). Physical sites, public certificate-provider issuance and an unfamiliar colleague's complete installation/recovery exercise still need acceptance. There is no automatic failover or promise of uninterrupted relocation.
 
 ## Choose your use
 

@@ -9,8 +9,8 @@
 | Regional federation | Actual separate internal/regional networks, approved chat/file exchange, denial and revocation |
 | Additional relays/controller recovery | Actual pinned services and enrolled clients; prepared-host recovery and forced-relay outage |
 | Controlled upgrades | Explicit predecessor-to-current paths, migration failure, interruption, post-commit writes and new-version backup/restore |
-| Home NAT and fresh guest recovery | Candidate acceptance in PR #12; not yet counted as passed |
-| Interface-bound private application HTTPS | Candidate acceptance in PR #13; not yet counted as passed |
+| Home NAT and fresh guest recovery | Both fresh-guest paths passed run 36165726657; combined-source regression checks required before release |
+| Interface-bound private application HTTPS | PR #13 merged after actual packet, application, upgrade and regional regressions passed |
 | Physical independent sites, public DNS-provider issuance, unfamiliar-colleague completion | NOT RUN; see the site acceptance worksheet |
 | Independent security/code review | NOT RUN; reviews performed by the implementing author |
 
@@ -214,3 +214,9 @@ Source `596e4aa` passed both packages in [run 36165726657](https://github.com/ko
 Matrix's snapshot age at fencing was 13.13 seconds and recovery elapsed 149.58 seconds. Nextcloud's values were 10.22 and 237.15 seconds. Recovery includes guest preparation from a cached base image; it excludes provider provisioning, base-image download and new public certificates. All roles share a disposable physical runner. This is not physical site or unfamiliar-user acceptance. See [full boundaries](home-nat-recovery.md).
 
 The test exposed a mismatch between the installed daemon path and backup verification, plus a restored-client readiness race. The catalogue now matches `/usr/local/sbin/tailscaled`; restoration waits under isolation for strict enrolled identity verification. Unit checks reject wrong/permanently unverified identities. Inline author review covered actual-versus-synthetic network boundaries, fresh disks, fencing, independent credentials, daemon ownership/path consistency and bounded readiness. The combined upgrade/ingress source requires its current checks before merge.
+
+## Interface-bound application HTTPS
+
+Source `e10133b` passed [Matrix run 36165160998](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36165160998) and [Nextcloud run 36165160885](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36165160885). Separate-port routing proofs established that ordinary LAN and spoofed overlay-source packets could reach the host, while private HTTPS rejected both. Intended interface access and restart passed, alongside the full application/browser/TLS/encrypted recovery exercises. Both upgrade paths passed [run 36165161228](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36165161228); actual regional exchange also passed. The small packet fixture names a synthetic interface tailscale0, while separate workflows exercise actual VPN clients.
+
+The runtime creates only its own narrowly scoped nftables table and refuses unexpected existing rules. Backed-up application configuration and other firewall tables are unchanged. Author review checked atomic creation, exact rule validation, frozen dependency closure and recovery compatibility. This is not independent security review.
