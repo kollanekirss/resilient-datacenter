@@ -49,6 +49,20 @@ def normalize(value):
     return value
 
 
+def canonical_rules(entries):
+    # nft lists declarations before rules; metadata placement is not semantic.
+    # Stable sorting preserves rule order within each chain, including duplicates.
+    def key(item):
+        if len(item)!=1:return (3,json.dumps(item,sort_keys=True),'','')
+        kind,value=next(iter(item.items()))
+        if kind not in ('table','chain','rule') or not isinstance(value,dict):
+            return (3,json.dumps(item,sort_keys=True),'','')
+        return (('table','chain','rule').index(kind),value.get('family',''),
+                value.get('table',value.get('name','')),
+                value.get('chain',value.get('name','')))
+    return sorted((normalize(item) for item in entries),key=key)
+
+
 def ingress(c,*,create=False):
     wanted=contract.firewall(c)
     tables=nft('-j','list','tables')
@@ -58,7 +72,7 @@ def ingress(c,*,create=False):
         nft('-j','-f','-',input=json.dumps({'nftables':[{'create':wanted[0]},*({'add':item} for item in wanted[1:])]}))
     actual=nft('-j','list','table','inet','rdc_frontend')
     actual=[normalize(item) for item in actual['nftables'] if 'metainfo' not in item]
-    if actual!=wanted:raise ValueError('Frontend firewall differs; no rules were overwritten')
+    if canonical_rules(actual)!=canonical_rules(wanted):raise ValueError('Frontend firewall differs; no rules were overwritten')
 
 
 def verify(c):

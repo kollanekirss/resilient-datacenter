@@ -1,0 +1,437 @@
+{
+  "configuration": {
+    "schema_version": 1,
+    "site_sha256": "0c0c6367ef97a095e2fdfaee981424a249c86f9f50050c280c5c2928988857ba",
+    "settings_sha256": "cb10ae243d9adf6ebcb0bc51bba2ae978b308e923b99ba1c94946a1faea28894",
+    "address": "10.76.30.11",
+    "administrator_address": "10.76.10.20",
+    "staff_cidr": "10.76.20.0/24",
+    "dns_address": "10.76.30.10",
+    "certificate_days": 28,
+    "services": {
+      "chat": {
+        "hostname": "matrix.ci.test",
+        "address": "10.76.40.10"
+      },
+      "element": {
+        "hostname": "element.ci.test",
+        "address": "10.76.40.10"
+      },
+      "files": {
+        "hostname": "files.ci.test",
+        "address": "10.76.40.11"
+      }
+    }
+  },
+  "nftables": [
+    {
+      "table": {
+        "family": "inet",
+        "name": "rdc_frontend",
+        "comment": "rdc-frontend:e069b6e02e98133b881fde245f92fdbae981b32e950e599ef5d7da5565d3e61c"
+      }
+    },
+    {
+      "chain": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "name": "input",
+        "type": "filter",
+        "hook": "input",
+        "prio": -160,
+        "policy": "drop"
+      }
+    },
+    {
+      "chain": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "name": "output",
+        "type": "filter",
+        "hook": "output",
+        "prio": -160,
+        "policy": "drop"
+      }
+    },
+    {
+      "chain": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "name": "forward",
+        "type": "filter",
+        "hook": "forward",
+        "prio": -160,
+        "policy": "drop"
+      }
+    },
+    {
+      "rule": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "chain": "input",
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "meta": {
+                  "key": "iifname"
+                }
+              },
+              "right": "lo"
+            }
+          },
+          {
+            "accept": null
+          }
+        ]
+      }
+    },
+    {
+      "rule": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "chain": "input",
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "ct": {
+                  "key": "state"
+                }
+              },
+              "right": {
+                "set": [
+                  "established",
+                  "related"
+                ]
+              }
+            }
+          },
+          {
+            "accept": null
+          }
+        ]
+      }
+    },
+    {
+      "rule": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "chain": "input",
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "ip",
+                  "field": "saddr"
+                }
+              },
+              "right": {
+                "prefix": {
+                  "addr": "10.76.20.0",
+                  "len": 24
+                }
+              }
+            }
+          },
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "tcp",
+                  "field": "dport"
+                }
+              },
+              "right": 443
+            }
+          },
+          {
+            "accept": null
+          }
+        ]
+      }
+    },
+    {
+      "rule": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "chain": "input",
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "ip",
+                  "field": "saddr"
+                }
+              },
+              "right": "10.76.10.20"
+            }
+          },
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "tcp",
+                  "field": "dport"
+                }
+              },
+              "right": {
+                "set": [
+                  22,
+                  443
+                ]
+              }
+            }
+          },
+          {
+            "accept": null
+          }
+        ]
+      }
+    },
+    {
+      "rule": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "chain": "input",
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "ip",
+                  "field": "saddr"
+                }
+              },
+              "right": "10.76.10.20"
+            }
+          },
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "icmp",
+                  "field": "type"
+                }
+              },
+              "right": "echo-request"
+            }
+          },
+          {
+            "accept": null
+          }
+        ]
+      }
+    },
+    {
+      "rule": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "chain": "output",
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "meta": {
+                  "key": "oifname"
+                }
+              },
+              "right": "lo"
+            }
+          },
+          {
+            "accept": null
+          }
+        ]
+      }
+    },
+    {
+      "rule": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "chain": "output",
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "ct": {
+                  "key": "state"
+                }
+              },
+              "right": {
+                "set": [
+                  "established",
+                  "related"
+                ]
+              }
+            }
+          },
+          {
+            "accept": null
+          }
+        ]
+      }
+    },
+    {
+      "rule": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "chain": "output",
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "ip",
+                  "field": "daddr"
+                }
+              },
+              "right": "10.76.40.10"
+            }
+          },
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "tcp",
+                  "field": "dport"
+                }
+              },
+              "right": 443
+            }
+          },
+          {
+            "accept": null
+          }
+        ]
+      }
+    },
+    {
+      "rule": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "chain": "output",
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "ip",
+                  "field": "daddr"
+                }
+              },
+              "right": "10.76.40.11"
+            }
+          },
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "tcp",
+                  "field": "dport"
+                }
+              },
+              "right": 443
+            }
+          },
+          {
+            "accept": null
+          }
+        ]
+      }
+    },
+    {
+      "rule": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "chain": "output",
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "ip",
+                  "field": "daddr"
+                }
+              },
+              "right": "10.76.30.10"
+            }
+          },
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "udp",
+                  "field": "dport"
+                }
+              },
+              "right": {
+                "set": [
+                  53,
+                  123
+                ]
+              }
+            }
+          },
+          {
+            "accept": null
+          }
+        ]
+      }
+    },
+    {
+      "rule": {
+        "family": "inet",
+        "table": "rdc_frontend",
+        "chain": "output",
+        "expr": [
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "ip",
+                  "field": "daddr"
+                }
+              },
+              "right": "10.76.30.10"
+            }
+          },
+          {
+            "match": {
+              "op": "==",
+              "left": {
+                "payload": {
+                  "protocol": "tcp",
+                  "field": "dport"
+                }
+              },
+              "right": 53
+            }
+          },
+          {
+            "accept": null
+          }
+        ]
+      }
+    }
+  ]
+}

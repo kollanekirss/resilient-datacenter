@@ -93,3 +93,31 @@ def test_firewall_check_accepts_kernel_chain_grouping_but_rejects_rule_reorderin
     indices=[i for i,item in enumerate(reported) if item.get('rule',{}).get('chain')=='input']
     reported[indices[0]],reported[indices[-1]]=reported[indices[-1]],reported[indices[0]]
     with pytest.raises(ValueError):runtime.ingress(config)
+
+
+def test_cli_prepares_private_kit_without_server_credentials(tmp_path,capsys):
+    import rdc
+    plan,settings=fixture();tmp_path.chmod(0o700)
+    p=tmp_path/'site.json';n=tmp_path/'network.json'
+    p.write_text(json.dumps(plan));n.write_text(json.dumps(settings))
+    args=[str(p),'--settings',str(n),'--output-dir',str(tmp_path/'kit'),'--json']
+    assert rdc.main(['portable','applications-prepare',*args])==0
+    assert json.loads(capsys.readouterr().out)['deployment']=='not-performed'
+    assert rdc.main(['portable','applications-verify',*args])==0
+    assert json.loads(capsys.readouterr().out)['state']=='application-kit-verified'
+
+
+def test_wizard_step_uses_saved_network_and_resumes_verification(tmp_path):
+    from portable_state import write
+    from portable_application_commands import wizard_step
+    plan,settings=fixture();tmp_path.chmod(0o700);write(tmp_path/'network.json',settings)
+    messages=[]
+    assert wizard_step(plan,tmp_path,input_fn=lambda _: 'yes',output_fn=messages.append)['state']=='applications-prepared'
+    assert wizard_step(plan,tmp_path,input_fn=lambda _:pytest.fail('Resume must not ask again'),output_fn=messages.append)['state']=='application-kit-verified'
+
+
+def test_frontend_accepts_actual_ubuntu_nft_json_dump(monkeypatch):
+    import portable_frontend_runtime as runtime
+    observed=json.loads((ROOT/'tests/fixtures/portable/frontend-nft.json').read_text())
+    monkeypatch.setattr(runtime,'nft',lambda *args,**kwargs:{'nftables':observed['nftables']})
+    runtime.ingress(observed['configuration'])

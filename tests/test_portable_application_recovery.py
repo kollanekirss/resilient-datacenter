@@ -53,3 +53,26 @@ def test_portable_region_link_is_not_implicitly_enabled():
         _,owner=owners(role)
         with pytest.raises(ValueError,match='Portable'):
             module.validate({}, {'ownership':owner['applications']})
+
+
+@pytest.mark.parametrize('role', ['chat','files'])
+def test_portable_upgrade_journal_preserves_access_and_rejects_migration(tmp_path,role):
+    import copy
+    import upgrade_transaction as transaction
+    from test_upgrade_transaction import Backend
+    from application_catalogue import predecessor
+    from backup_contracts import binary_paths
+    network,current=owners(role)
+    package='matrix' if role=='chat' else 'nextcloud'
+    old=dict(current['applications'],images={k:v['image'] for k,v in predecessor(package).items()})
+    source=include(network,old)
+    plan={'source_owner':source,'target_owner':current,'source_hashes':{name:'a'*64 for name in binary_paths(source)}}
+    transaction.validate_plan(plan)
+    changed={key:copy.deepcopy(value) for key,value in plan.items()}
+    changed['target_owner']['access']['frontend_address']='10.76.30.99'
+    changed['target_owner']['applications']['network']['access']['frontend_address']='10.76.30.99'
+    with pytest.raises(ValueError):transaction.validate_plan(changed)
+    backend=Backend('verify-new')
+    with pytest.raises(transaction.UpgradeError) as error:transaction.apply(plan,backend,root=tmp_path)
+    assert error.value.recovered and not error.value.committed
+    assert transaction.last_result(tmp_path)['state']=='previous-version-restored'
