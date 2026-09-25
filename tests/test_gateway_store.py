@@ -40,3 +40,8 @@ def test_gateway_refuses_shared_state_or_symlink(tmp_path):
     with pytest.raises(ValueError):store.state()
     path.unlink();path.symlink_to(tmp_path/'elsewhere')
     with pytest.raises(ValueError):store.state()
+
+
+def test_missing_initialized_gateway_state_is_not_recreated_and_cannot_erase_revocations(tmp_path):
+    store,_=fixture(tmp_path);identity=store.identity();(store.base/'state.json').unlink()
+    with pytest.raises(ValueError):store.initialize(profile(),identity)

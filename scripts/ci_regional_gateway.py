@@ -91,6 +91,15 @@ def main():
     for host in ('unapproved.ci.test','169.254.169.254','10.203.1.10','100.64.0.11'):
         assert curl('rdc-service','/',proxy=True,host=host).returncode!=0
     assert curl('rdc-service','/',proxy=True,source='10.203.1.11',timeout=2).returncode!=0
+    original=json.loads((BASE/'envoy.json').read_text())
+    changed=json.loads(json.dumps(original))
+    changed['static_resources']['clusters'][0]['transport_socket']['typed_config']['common_tls_context']['validation_context']['match_typed_subject_alt_names'][0]['matcher']['exact']='wrong-upstream.ci.test'
+    (BASE/'envoy.json').write_text(json.dumps(changed));run('podman','restart','rdc-gateway-fixture');time.sleep(1)
+    result=curl('rdc-peer','/_matrix/federation/v1/version')
+    assert result.returncode==0 and 'fixture:' not in result.stdout and 'upstream' in result.stdout,result.stdout
+    (BASE/'envoy.json').write_text(json.dumps(original));run('podman','restart','rdc-gateway-fixture');time.sleep(1)
+    assert curl('rdc-peer','/_matrix/federation/v1/version').stdout=='fixture:/_matrix/federation/v1/version'
+    print('Actual gateway rejects an upstream certificate whose DNS identity differs from its fixed approved hostname PASS.',flush=True)
     print('Actual Envoy: native configuration validation, trusted upstream HTTPS, approved Matrix paths, denied client/admin paths, denied peer/source and fixed CONNECT destinations PASS. Namespace transport is a fixture, not a VPN.',flush=True)
     for mode in ('revocation','expiry'):
         current=[dict(peer,expires_at=int(time.time())+(5 if mode=='expiry' else 1800)) for peer in peers]

@@ -45,3 +45,10 @@ def test_empty_approval_still_denies_and_firewall_expires_existing_connections()
     assert m.firewall(p,peers,lan_interface='rdc-lan',now=NOW+3600,replace=True).startswith('delete table inet rdc_gateway\n')
     for name in ('eth0; flush ruleset','tailscale0','lo','x"'):
         with pytest.raises(ValueError):m.firewall(p,peers,lan_interface=name,now=NOW+2,replace=False)
+
+
+def test_regional_endpoints_cannot_fall_back_to_an_unrelated_interface():
+    m=importlib.import_module('gateway_rendering');p,own,peers=inputs()
+    text=m.firewall(p,peers,lan_interface='rdc-lan',now=NOW+2,replace=False)
+    for selector in ('tcp dport 443','tcp sport 443'):
+        assert 'output oifname != "tailscale0" ip daddr 100.64.0.0/10 '+selector+' drop' in text

@@ -129,3 +129,42 @@ def status():
     return {'state':'gateway-change-pending' if pending else 'gateway-configured','network_identity_verified':network,
             'proxy_running':bool(item and item.get('State',{}).get('Running')),'approved_peers':store.peers(),
             'application_federation':'not-verified','supported_transport':['matrix'],'nextcloud_transport':'not-implemented'}
+
+
+def action(args):
+    from profile_config import load_profile
+    from regional_operations import interactive
+    import sys
+    command=args.gateway_action
+    if command=='setup':
+        from gateway_setup import wizard
+        return wizard(imported(args.identity),args.identity,args.output_file)
+    if command in ('check','apply'):
+        profile=load_profile(str(args.profile))
+        if not isinstance(profile,dict) or not isinstance(profile.get('identity_file'),str) or not Path(profile['identity_file']).is_absolute():raise ValueError('Select a gateway profile with an absolute public identity file path')
+        identity=imported(profile['identity_file'])
+        preview=preflight(profile,identity)
+        if command=='check':return preview
+        interactive()
+        print(json.dumps({'scope':'this dedicated Ubuntu gateway','profile':profile,
+                          'changes':['pinned Envoy container','private LAN proxy','scoped firewall','disable general forwarding','owned systemd runtime'],
+                          'application_federation':'not-verified'},indent=2))
+        if input('Type INSTALL to install or resume this gateway: ').strip()!='INSTALL':return {'state':'cancelled'}
+        return install(profile,identity)
+    if command=='status':return status()
+    require_platform();interactive();runtime.verify_runtime();store=Store(runtime.BASE)
+    documents=None;revoked=None
+    if command=='policy':
+        documents=[imported(path) for path in args.agreement]
+        candidate=store.candidate(documents,[],now=int(time.time()))
+        print(json.dumps({'proposed_peers':store.peers(candidate),'note':'This replaces the active agreement selection; recorded revocations remain permanent.'},indent=2))
+    elif command=='revoke':
+        revoked=[args.agreement_id]
+        store.candidate(store.state()['agreements'],revoked,now=int(time.time()))
+        print('Record this agreement as revoked on THIS gateway and close its future traffic: '+args.agreement_id)
+    elif command=='resume':
+        if store.pending() is None:raise ValueError('No gateway change is pending')
+        print('Retry the exact pending gateway change. Access stays closed on failure.')
+    else:raise ValueError('Unsupported gateway operation')
+    if input('Type APPLY to change this gateway: ').strip()!='APPLY':return {'state':'cancelled'}
+    return change(documents,revoked,resume=command=='resume')

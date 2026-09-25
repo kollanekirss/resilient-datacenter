@@ -95,6 +95,13 @@ def parser():
     file_issuers.add_parser('setup').add_argument('--output-file',type=Path,required=True)
     file_issue=file_issuers.add_parser('issue');file_issue.add_argument('profile',type=Path);file_issue.add_argument('--token-file',type=Path)
     for action in ('enable','status'):file_issuers.add_parser(action)
+    gateway=commands.add_parser('gateway',help='Experimental dedicated regional transport; application federation acceptance remains pending')
+    gateway_actions=gateway.add_subparsers(dest='gateway_action',required=True)
+    guided_gateway=gateway_actions.add_parser('setup');guided_gateway.add_argument('--identity',type=Path,required=True);guided_gateway.add_argument('--output-file',type=Path,required=True)
+    for mode in ('check','apply'):gateway_actions.add_parser(mode).add_argument('profile',type=Path)
+    for mode in ('status','resume'):gateway_actions.add_parser(mode)
+    gateway_actions.add_parser('policy').add_argument('--agreement',type=Path,action='append',default=[])
+    gateway_actions.add_parser('revoke').add_argument('agreement_id')
     regional=commands.add_parser('regional',help='Prepare independent institutional approvals; transport remains separate')
     regional_actions=regional.add_subparsers(dest='regional_action',required=True)
     regional_actions.add_parser('setup').add_argument('--output-file',type=Path,required=True)
@@ -195,6 +202,14 @@ def dispatch(args) -> ActionResult:
     if args.command=='setup':
         state=run_wizard(args.output_dir,resume=args.resume,input_fn=input)
         return result_for_state(state)
+    if args.command=='gateway':
+        from gateway_operations import action
+        try:outcome=action(args)
+        except ValueError as error:
+            print('Gateway action blocked: '+str(error));return result_for_state('blocked')
+        print(json.dumps(outcome,indent=2))
+        if outcome.get('state')=='gateway-change-pending' or outcome.get('network_identity_verified') is False or outcome.get('proxy_running') is False:return result_for_state('blocked')
+        return result_for_state({'prepared':'prepared','cancelled':'cancelled'}.get(outcome.get('state'),'checks-passed'))
     if args.command=='regional':
         from regional_operations import action
         try:outcome=action(args)

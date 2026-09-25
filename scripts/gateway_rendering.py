@@ -97,7 +97,8 @@ def firewall(profile,peers,*,lan_interface,now,replace):
         lines+=['add rule inet rdc_gateway input iifname "tailscale0" '+selector+' ip saddr @peers accept',
                 'add rule inet rdc_gateway input iifname "tailscale0" '+selector+' drop',
                 'add rule inet rdc_gateway output oifname "tailscale0" '+selector+' ip daddr @peers accept',
-                'add rule inet rdc_gateway output oifname "tailscale0" '+selector+' drop']
+                'add rule inet rdc_gateway output oifname "tailscale0" '+selector+' drop',
+                'add rule inet rdc_gateway output oifname != "tailscale0" ip daddr 100.64.0.0/10 '+selector+' drop']
     # A packet addressed to the VPN endpoint must not enter through the LAN.
     lines+=['add rule inet rdc_gateway input iifname != "tailscale0" ip daddr 100.64.0.0/10 tcp dport 443 drop']
     if sources:

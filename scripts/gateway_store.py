@@ -34,8 +34,11 @@ class Store(Workspace):
             private_write(intent,agreements.canonical({'profile':profile,'identity':identity}))
             private_write(self.base/'identity.json',agreements.canonical(identity))
             private_write(self.base/'profile.json',agreements.canonical(profile))
-            if not (self.base/'state.json').exists():self._write('state.json',{'schema_version':1,'generation':0,'agreements':[],'revoked_ids':[]})
+            if not (self.base/'state.json').exists():
+                if (self.base/'initialized.json').exists() or (self.base/'initialized.json').is_symlink():raise ValueError('Initialized gateway state is missing; do not recreate or discard its revocation history')
+                self._write('state.json',{'schema_version':1,'generation':0,'agreements':[],'revoked_ids':[]})
             self.state()
+            private_write(self.base/'initialized.json',b'{"schema_version":1}')
 
     def profile(self):
         self.check();profile=agreements.decode(private_read(self.base/'profile.json'))

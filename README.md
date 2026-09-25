@@ -11,7 +11,7 @@ See [verified experimental releases](docs/releases.md) for relay downloads with 
 
 The [encrypted backup and recovery guide](docs/backups.md) covers owned network-service data, explicit fencing and guarded restore. The development source adds opt-in [Matrix/Element chat](docs/matrix-services.md) and [Nextcloud files](docs/nextcloud-services.md), each with application backup and recovery.
 
-The [deployment-profile operator guide](docs/deployment-profiles.md) remains available for the existing SSH-managed workflows. Matrix/Element and Nextcloud have disposable Ubuntu application and recovery evidence. Regional gateways and controlled application upgrades remain outstanding. The guided workflow requires operator-supplied servers and DNS; it accepts supplied certificates or an explicit [managed certificate mode](docs/managed-certificates.md) for fresh infrastructure. Beginner usability has not been validated.
+The [deployment-profile operator guide](docs/deployment-profiles.md) remains available for the existing SSH-managed workflows. Matrix/Element and Nextcloud have disposable Ubuntu application and recovery evidence. The experimental [regional gateway](docs/regional-gateway.md) has proxy/firewall and lifecycle evidence; actual regional application federation and controlled application upgrades remain outstanding. The guided workflow requires operator-supplied servers and DNS; it accepts supplied certificates or an explicit [managed certificate mode](docs/managed-certificates.md) for fresh infrastructure. Beginner usability has not been validated.
 
 The original four-VPS pilot and its existing commands are retained below as the **legacy workflow**. Use one workflow consistently; neither path automatically migrates the other's installations.
 
@@ -137,7 +137,7 @@ Successful live checks write separate per-server JSON reports under `artifacts/`
 
 - Real multi-site and home-NAT deployments, disconnected-operation acceptance and colleague usability. Disposable runtime tests are recorded in the validation guide.
 - Multiple controllers/relays, resilient bootstrap DNS, identity-service recovery and institutional trust governance.
-- Nextcloud, regional application federation, resilient DNS, optional institutional SSO and integration guidance for existing routers such as OPNsense.
+- Regional application federation, resilient DNS, optional institutional SSO and integration guidance for existing routers such as OPNsense.
 - A supported client-device installer and fleet lifecycle management.
 - Production security review, external monitoring/alerts, physical offsite acceptance, controlled application upgrades and measured availability commitments.
 

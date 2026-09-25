@@ -70,3 +70,5 @@ If an output write failed after acceptance was recorded, recover the existing pu
 This records a durable local revocation and refuses later re-import of the same agreement. It does not notify the other institution or change running traffic. Gateway enforcement remains pending until the transport package applies the updated policy. Previously delivered files and messages cannot be recalled by revocation.
 
 The workspace files are private to the current operating-system account. Use the same operator account for subsequent commands. Public exports are also created privately and never overwrite existing output files. No password, passphrase or signing-key argument is accepted on the command line.
+
+The experimental [dedicated gateway workflow](regional-gateway.md) now has separate local installation and policy commands. Preparing or revoking a document in the administrator workspace does not automatically contact a gateway. Apply the reviewed change on each intended gateway and verify it there.
