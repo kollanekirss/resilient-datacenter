@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guided networking operations. Preparation, installation and enrollment are separate."""
+"""Guided self-hosted services. Preparation, installation and verified recovery are separate."""
 import argparse
 from datetime import datetime, timezone
 import json
@@ -40,6 +40,11 @@ class Parser(argparse.ArgumentParser):
 def parser():
     result=Parser(prog='rdc',description=__doc__)
     commands=result.add_subparsers(dest='command',required=True)
+    commands.add_parser('status',help='Read separate local operational evidence').add_argument('--json',action='store_true')
+    start=commands.add_parser('start',help='Plan personal, institutional or regional services; changes no servers')
+    start.add_argument('--resume',type=Path)
+    start.add_argument('--output-dir',type=Path,default=ROOT/'inventories/lab/journey')
+    commands.add_parser('guide',help='Open checked tasks for a saved product journey').add_argument('journey',type=Path)
     setup=commands.add_parser('setup',help='Prepare private configuration; changes no servers')
     setup.add_argument('--resume',type=Path)
     setup.add_argument('--output-dir',type=Path,default=ROOT/'inventories/lab/setup')
@@ -172,7 +177,7 @@ def parser():
 
 
 def menu():
-    print('Networking pilot — choose an action:\n'
+    print('Self-hosted services — choose an action. New here? Start with 10.\n'
           '  1 Prepare configuration (no server changes)\n'
           '  2 Check remote controller/relay\n'
           '  3 Apply remote controller/relay\n'
@@ -182,11 +187,17 @@ def menu():
           '  7 Show this local node status\n'
           '  8 Diagnose this node/controller\n'
           '  9 Show project version\n'
+          ' 10 Plan personal, institutional or regional services\n'
+          ' 11 Continue a saved service journey\n'
+          ' 12 Show separate local operational evidence\n'
           '  0 Quit')
     choice=input('Choice: ').strip()
     if choice=='0': return None
     if choice=='1': return ['setup']
     if choice=='9': return ['version']
+    if choice=='12':return ['status']
+    if choice=='10':return ['start']
+    if choice=='11':return ['guide',input('Absolute saved journey.json path: ').strip()]
     commands={'2':['infrastructure','check'],'3':['infrastructure','apply'],
               '4':['node','check'],'5':['node','apply'],'6':['node','enroll'],
               '7':['node','status'],'8':['doctor']}
@@ -224,6 +235,19 @@ def backup_action(args):
 
 
 def dispatch(args) -> ActionResult:
+    if args.command=='status':
+        from product_status import collect,render,needs_attention
+        evidence=collect()
+        print(json.dumps(evidence,indent=2) if args.json else render(evidence))
+        return result_for_state('blocked' if needs_attention(evidence) else 'checks-passed')
+    if args.command=='start':
+        from product_journey import wizard
+        outcome=wizard(args.output_dir,resume=args.resume,input_fn=input)
+        print(json.dumps(outcome,indent=2));return result_for_state(outcome['state'])
+    if args.command=='guide':
+        from product_guide import choose
+        argv=choose(args.journey,input_fn=input)
+        return dispatch(parser().parse_args(argv)) if argv is not None else result_for_state('cancelled')
     if args.command=='access':
         from service_access import action
         try:outcome=action(args)
@@ -319,6 +343,7 @@ def main(argv=None) -> int:
             if argv is None: return int(Exit.PENDING)
         args=command.parse_args(argv)
         result=dispatch(args)
+        if args.command=='status' and args.json:return int(result.exit_code)
         show_checks(result.checks)
         text={
             'prepared':'Configuration prepared. No servers were changed.',

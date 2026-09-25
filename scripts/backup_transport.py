@@ -85,9 +85,9 @@ class Restic:
             raise ValueError('Backup did not return one complete snapshot identity')
         return summaries[0]['snapshot_id']
 
-    def snapshots(self):
+    def snapshots(self,*,timeout=120):
         tags='rdc-v1,rdc-'+self.scope+'-v1' if self.scope!='network' else 'rdc-v1'
-        data=json.loads(self.execute(['--no-lock','snapshots','--json','--host',self.profile['node_name'],'--tag',tags],timeout=120))
+        data=json.loads(self.execute(['--no-lock','snapshots','--json','--host',self.profile['node_name'],'--tag',tags],timeout=timeout))
         if not isinstance(data,list) or len(data)>10000: raise ValueError('Invalid snapshot listing')
         for item in data:
             if not isinstance(item,dict) or not isinstance(item.get('id'),str) or not SNAPSHOT.fullmatch(item['id']) or not isinstance(item.get('time'),str):

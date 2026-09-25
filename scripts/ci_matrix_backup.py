@@ -82,4 +82,15 @@ def restore(identifier,*,staged=False):
     result=apply(WORK/'restores'/identifier,data['ownership'],runtime=ApplicationRuntime(data['ownership']))
     assert result['state']=='restored-service-verified'
     assert not Path('/etc/rdc-restore-pending.json').exists()
+    from restore_evidence import latest
+    proof=latest(Path('/'),data['ownership'])
+    assert proof['state']=='service-verified' and proof['snapshot_id']==identifier
+    assert proof['user_operation']=='not-recorded'
+    from product_status import run_probe
+    assert run_probe('applications')['state']=='service-listeners-verified'
+    assert run_probe('recovery')['state']=='service-verified'
+    assert run_probe('backup')['state']=='backup-current'
+    certificate_evidence=run_probe('certificates')
+    assert certificate_evidence['state'] in ('certificate-valid','renewal-failed')
+    assert certificate_evidence['serving_verified'] is True
     print('Disposable application restore service verification elapsed seconds: '+str(round(time.monotonic()-started,2)),flush=True)
