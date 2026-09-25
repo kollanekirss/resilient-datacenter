@@ -8,6 +8,15 @@ from nextcloud_rendering import configuration_values,application_config,IDENTITY
 import nextcloud_runtime as runtime
 
 
+def verify_configuration_files(folder,baseline):
+    # Nextcloud's reviewed Updater::upgrade removes CAN_INSTALL on release
+    # builds. Require its absence, while still rejecting extra secret copies.
+    # https://github.com/nextcloud/server/blob/v35.0.1/lib/private/Updater.php
+    expected=(baseline-{'CAN_INSTALL'})|{'config.php'}
+    if {p.name for p in folder.iterdir()}!=expected or any(p.is_symlink() or not p.is_file() for p in folder.iterdir()):
+        raise ValueError('Unexpected generated configuration; keep candidate private')
+
+
 def migrate(settings):
     from backup_operations import require_platform,root_json
     from upgrade_runtime import command,write
@@ -41,7 +50,7 @@ def migrate(settings):
     configuration_values(profile,upgraded)
     if not upgraded['version'].startswith('35.0.1.') or {k:v for k,v in upgraded.items() if k!='version'}!={k:v for k,v in identity.items() if k!='version'}:
         raise ValueError('Migration changed a stable file-service identity or returned an unexpected version')
-    if {p.name for p in folder.iterdir()}!=baseline|{'config.php'}:raise ValueError('Unexpected generated configuration; keep candidate private')
+    verify_configuration_files(folder,baseline)
     write(runtime.BASE/'identity.json',json.dumps(upgraded))
     write(runtime.BASE/'config/config.php',application_config(profile,upgraded),mode=0o400,uid=33,gid=33)
     write(runtime.BASE/'code-seeded.json',json.dumps({'image':image}))
