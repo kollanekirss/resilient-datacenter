@@ -58,6 +58,8 @@ def attach(plan,role,medium,api,folder):
         require(record['phase'] in ('new','attach-requested','media-attached'),'Installer cannot be reattached after a start request.')
         cfg=api.request('GET',base+'/config')
         stage='attached' if cfg.get('description')==marker(binding,'attached') else 'shell'
+        require(stage!='attached' or record['phase'] in ('attach-requested','media-attached'),
+                'Remote installer progress exists without matching local intent. Restore the original journal; do not adopt or restart it.')
         cfg,power=observed(api,base,wanted,plan,medium,binding,stage)
         require(power=='stopped','Power off the guest through its console before attaching installation media.')
         if stage=='shell':

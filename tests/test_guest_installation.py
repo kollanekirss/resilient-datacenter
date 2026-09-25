@@ -126,3 +126,11 @@ def test_corrupt_journal_is_rejected_without_mutation(tmp_path):
     write(folder/'edge.json',{'binding':bind})
     with pytest.raises(ValueError):m.attach(plan(),'edge',media(),api,folder)
     assert not any(c[0]=='POST' for c in api.calls)
+
+
+def test_missing_guest_journal_does_not_adopt_a_previous_installer(tmp_path):
+    m=importlib.import_module('guest_installation');api=setup();folder=tmp_path/'state'
+    m.attach(plan(),'edge',media(),api,folder);m.start(plan(),'edge',media(),api,folder)
+    api.states[201]='stopped';(folder/'edge.json').unlink();api.calls=[]
+    with pytest.raises(ValueError):m.attach(plan(),'edge',media(),api,folder)
+    assert not any(c[0]=='POST' for c in api.calls)

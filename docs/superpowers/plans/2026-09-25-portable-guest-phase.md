@@ -18,7 +18,7 @@ Review focus: uncertain POSTs and power loss; existing disks and foreign markers
 
 ## Execution evidence and review
 
-Implemented tasks 1–5 as the guided console workflow selected after the user delegated the installation-method choice. Unit tests were run failing before each new module/CLI boundary and then passing. Final local verification: 702 tests and all Ansible syntax/read-only task checks passed. No live Proxmox host was available; the code is not represented as a live-accepted deployment.
+Implemented tasks 1–5 as the guided console workflow selected after the user delegated the installation-method choice. Unit tests were run failing before each new module/CLI boundary and then passing. Final local verification: 703 tests and all Ansible syntax/read-only task checks passed. No live Proxmox host was available; the code is not represented as a live-accepted deployment.
 
 Author review (subagents prohibited in this side conversation) found and fixed misleading no-change completion wording, malformed progress records and stale catalogue receipts. Each behaviour has a regression test observed failing before its fix. Other protective tests exercise uncertain start/upload responses, partial configuration response loss, network drift, foreign ownership and disk-only login attestation. A transient syntax error introduced during the review edits was caught and fixed before the final suite.
 
@@ -27,3 +27,5 @@ Ruling: use guided console installation for both OPNsense and Ubuntu rather than
 Ruling: checksum trust is rooted in the reviewed repository catalogue sourced from official HTTPS metadata; vendor signature verification is not claimed. Cost: catalogue updates require review and a trusted project revision.
 
 No unresolved important findings from the author review. Live platform acceptance, guest boot and the subsequent network/service phase are outstanding external/scope gates, not passing checks inferred from unit tests.
+
+Final refusal-path review also caught implicit adoption of an attached installer when its local guest journal was missing. A failing regression reproduced that case; attachment now requires the matching previously recorded intent. This prevents a missing journal from reopening a prior installer session. The full suite passed 703 tests after the fix. Hosted real-media verification passed in run 36177734261; live Proxmox remains NOT RUN.

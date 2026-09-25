@@ -223,8 +223,10 @@ The runtime creates only its own narrowly scoped nftables table and refuses unex
 
 ## Portable Proxmox guest-installation wizard (0.4.0-dev.1)
 
-The development wizard now covers site planning, stopped-shell allocation, repository-pinned OS media preparation, checksum-verified upload, isolated console installation and explicit operator login attestation. The final local suite passed 702 tests, plus all local Ansible syntax/read-only task checks. No guest or server software was executed on the preparation Mac.
+The development wizard now covers site planning, stopped-shell allocation, repository-pinned OS media preparation, checksum-verified upload, isolated console installation and explicit operator login attestation. The final local suite passed 703 tests, plus all local Ansible syntax/read-only task checks. No guest or server software was executed on the preparation Mac.
 
 Simulated API and filesystem tests cover uncertain mutations, ownership/drift refusal, disconnected NICs, private journals, corrupted or stale media, decompression bounds, multipart upload and wizard resume. Review was performed by the author. It is not independent review or proof of actual Proxmox compatibility.
 
 Live Proxmox upload/configuration/boot and the OPNsense/Ubuntu console installation exercise remain NOT RUN. The guest-installation phase is implemented as a guided workflow, not unattended installation; a running VM is reported separately from operator-confirmed OS/login evidence. Local networking/services and physical crisis acceptance are later gates.
+
+The real vendor-media check passed at `6aff2da` in [run 36177734261](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36177734261). It verified the pinned compressed OPNsense source, decompressed ISO (2,101,714,944 bytes; SHA256 `1efd5dc9fa12a1f93571183fe5e3823e22e332872de8417fafb5e4e4d48d5dcd`) and Ubuntu ISO (4,080,486,400 bytes; SHA256 `97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8`). The catalogue and media preparation code are unchanged in the subsequent review fixes. No ISO was booted or executed.
