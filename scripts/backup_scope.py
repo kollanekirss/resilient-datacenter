@@ -33,7 +33,10 @@ def include(network,application):
     if package(application)=='nextcloud':
         from nextcloud_contracts import ownership as expected_owner
     else:expected_owner=ownership
-    if expected_owner(application_profile(application),network)!=application:
+    from application_catalogue import for_owner
+    expected=expected_owner(application_profile(application),network)
+    expected['images']={key:value['image'] for key,value in for_owner(application).items()}
+    if expected!=application:
         raise ValueError('Application backup scope differs from the supported installation')
     return dict(network,applications=application)
 

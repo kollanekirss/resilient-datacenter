@@ -77,6 +77,7 @@ def test_gateway_issuer_holds_backup_then_gateway_lock(tmp_path,monkeypatch):
         if value=='/etc/rdc-backup':return backup
         if value=='/etc/rdc-backup/operation.lock':return backup/'operation.lock'
         if value=='/etc/rdc-restore-pending.json':return restore
+        if value=='/etc/rdc-upgrade-pending.json':return tmp_path/'upgrade-pending'
         if value=='/run/rdc-gateway-certificate-setup.lock':return tmp_path/'issuer.lock'
         raise AssertionError('Unexpected issuer path '+str(value))
     monkeypatch.setattr(m,'Path',local_path)

@@ -237,6 +237,8 @@ def action(args):
     if args.action=='target':
         from backup_target import prepare,authorize
         return prepare(load_profile(str(args.manifest))) if args.target_action=='prepare' else authorize(args.public_key)
+    upgrade=Path('/etc/rdc-upgrade-pending.json')
+    if upgrade.exists() or upgrade.is_symlink():raise ValueError('Run upgrade recover before ordinary backup operations')
     if args.action=='configure':
         return configure(load_profile(str(args.profile)),password_file=args.recovery_password_file,ssh_key_file=args.recovery_ssh_key_file)
     data,transport=configured(recovery=True) if args.action=='restore-recover' else configured()

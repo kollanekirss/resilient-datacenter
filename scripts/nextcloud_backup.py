@@ -17,12 +17,15 @@ def validate_data(root,application):
     if set(p.name for p in (base/'config').iterdir())!={'config.php'}:raise ValueError('Unreviewed application PHP configuration exists')
     if any(p.is_symlink() for parent in (base,state) for p in parent.rglob('*')):raise ValueError('File-service snapshot data/configuration must not contain links')
     if json.loads((base/'ownership.json').read_text())!=application:raise ValueError('File-service snapshot ownership differs')
+    from application_catalogue import for_owner
+    pins=for_owner(application)
     settings=json.loads((base/'runtime.json').read_text())
-    if set(settings)!={'schema_version','ownership','bind_address','components'} or settings['schema_version']!=1 or settings['ownership']!=application or settings['components']!=image_pins():
+    if set(settings)!={'schema_version','ownership','bind_address','components'} or settings['schema_version']!=1 or settings['ownership']!=application or settings['components']!=pins:
         raise ValueError('File-service snapshot runtime identity differs')
-    if json.loads((base/'code-seeded.json').read_text())!={'image':image_pins()['nextcloud']['image']}:raise ValueError('File-service source image differs')
+    if json.loads((base/'code-seeded.json').read_text())!={'image':pins['nextcloud']['image']}:raise ValueError('File-service source image differs')
     if not re.fullmatch('[a-f0-9]{64}\\n',(base/'database-password').read_text()):raise ValueError('Invalid database bootstrap credential')
     profile=from_owner(application);identity=json.loads((base/'identity.json').read_text())
+    if not identity.get('version','').startswith(pins['nextcloud']['version']+'.'):raise ValueError('File-service database version differs from the selected image')
     expected={'config/config.php':application_config(profile,identity),'ports.conf':apache_ports(),'site.conf':apache_site(),'Caddyfile':proxy(profile,settings['bind_address'])}
     if any((base/name).read_text()!=content for name,content in expected.items()):raise ValueError('File-service snapshot configuration differs from the fixed package')
     if (state/'postgres/PG_VERSION').read_text().strip()!='17' or not (state/'postgres/global/pg_control').is_file() or (state/'postgres/postmaster.pid').exists():

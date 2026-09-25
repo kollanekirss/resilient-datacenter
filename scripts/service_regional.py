@@ -15,6 +15,7 @@ import time
 
 BASE=Path('/etc/rdc-service-regional')
 RESTORE=Path('/etc/rdc-restore-pending.json')
+UPGRADE=Path('/etc/rdc-upgrade-pending.json')
 FIELDS={'schema_version','package','application_owner','gateway_fingerprint','gateway_lan_address','service_lan_address','lan_subnet','peers'}
 PRIVATE=tuple(ipaddress.ip_network(v) for v in ('10.0.0.0/8','172.16.0.0/12','192.168.0.0/16'))
 
@@ -91,13 +92,13 @@ def configured(settings):
 
 def active(settings):
     if not directory_exists():return None
-    if any(path.exists() or path.is_symlink() for path in (BASE/'disabled.json',BASE/'pending.json',RESTORE)):return None
+    if any(path.exists() or path.is_symlink() for path in (BASE/'disabled.json',BASE/'pending.json',RESTORE,UPGRADE)):return None
     return configured(settings)
 
 
 def materialize(settings,original_proxy):
     if not directory_exists():return
-    if RESTORE.exists() or RESTORE.is_symlink():
+    if RESTORE.exists() or RESTORE.is_symlink() or UPGRADE.exists() or UPGRADE.is_symlink():
         write(BASE/'disabled.json',json.dumps({'reason':'application-restore-requires-current-partner-review'}),mode=0o600)
     config=active(settings)
     if config is None:return

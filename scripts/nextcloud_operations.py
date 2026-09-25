@@ -276,6 +276,7 @@ def action(args):
             descriptor=os.open(path,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
             lock=stack.enter_context(os.fdopen(descriptor,'a'));fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         if Path('/etc/rdc-restore-pending.json').exists():raise ValueError('Complete pending recovery before administering the file service')
+        if Path('/etc/rdc-upgrade-pending.json').exists() or Path('/etc/rdc-upgrade-pending.json').is_symlink():raise ValueError('Run upgrade recover before administering the file service')
         if args.action=='apply':
             review=preflight(profile)
             return install_or_resume(profile,review['ownership']['network'],review['address'],username,password)

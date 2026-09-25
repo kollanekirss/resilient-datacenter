@@ -196,6 +196,7 @@ def partners(found):
 
 def probe(name):
     if name not in ('network','applications','certificates','backup','recovery','partners'):raise ValueError('Unknown dimension')
+    if present(Path('/etc/rdc-upgrade-pending.json')):return {'state':'upgrade-pending'}
     if present(Path('/etc/rdc-restore-pending.json')):return {'state':'restore-pending'}
     found=discover()
     if found is None:return {'state':'not-configured'}

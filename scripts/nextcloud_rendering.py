@@ -14,7 +14,7 @@ def configuration_values(profile,identity):
         raise ValueError('Unexpected Nextcloud instance identity')
     if not isinstance(identity['data_fingerprint'],str) or not re.fullmatch('[a-f0-9]{32}',identity['data_fingerprint']):raise ValueError('Invalid client recovery fingerprint')
     if identity['dbuser']!='oc_admin':raise ValueError('Unexpected application database account')
-    if not re.fullmatch(r'[a-zA-Z0-9]{8,32}',identity['instanceid']) or not re.fullmatch(r'35\.0\.1\.\d+',identity['version']):raise ValueError('Unsupported Nextcloud identity/version')
+    if not re.fullmatch(r'[a-zA-Z0-9]{8,32}',identity['instanceid']) or not re.fullmatch(r'35\.0\.[01]\.\d+',identity['version']):raise ValueError('Unsupported Nextcloud identity/version')
     for key in ('passwordsalt','secret','dbpassword'):
         if not isinstance(identity[key],str) or not 20<=len(identity[key])<=512 or any(ord(c)<32 for c in identity[key]):raise ValueError('Invalid Nextcloud secret shape')
     return dict({k:v for k,v in identity.items() if k!='data_fingerprint'},**{'data-fingerprint':identity['data_fingerprint']},dbtype='pgsql',dbname='nextcloud',dbhost='127.0.0.1:5434',dbtableprefix='oc_',
