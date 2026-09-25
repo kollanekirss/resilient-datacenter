@@ -259,3 +259,16 @@ def test_gateway_restore_recovers_interruption_between_directory_renames(tmp_pat
     monkeypatch.setattr(restore,'durable_rename',original)
     assert restore.recover(combined,root=tmp_path/'target',runtime=Runtime())['state']=='previous-data-restored'
     assert target.recovery_pending()
+
+
+def test_gateway_ownership_repeat_install_compares_identity_not_json_key_order(tmp_path):
+    m=importlib.import_module('gateway_backup')
+    from gateway_store import Store
+    application=owner();store=Store(tmp_path/'gateway');store.initialize(application['profile'],application['identity'])
+    m.install_owner(store,application)
+    reordered=json.loads(json.dumps(application,sort_keys=True))
+    original=(store.base/'ownership.json').read_bytes()
+    m.install_owner(store,reordered)
+    assert (store.base/'ownership.json').read_bytes()==original
+    bad=dict(application,network=dict(application['network'],node_name='other'))
+    with pytest.raises(ValueError):m.install_owner(store,bad)

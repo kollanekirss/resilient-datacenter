@@ -31,6 +31,14 @@ def validate_owner(application):
     return application
 
 
+def install_owner(store,application):
+    validate_owner(application);path=store.base/'ownership.json'
+    if path.exists() or path.is_symlink():
+        if decode(private_read(path))!=application:raise ValueError('Existing gateway backup identity differs')
+        return
+    private_write(path,json.dumps(application,sort_keys=True).encode())
+
+
 def private_directory(path):
     info=path.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode&0o077:raise ValueError('Use an owned private gateway recovery directory')

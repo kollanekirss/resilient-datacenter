@@ -121,9 +121,9 @@ def install(profile,identity):
     preflight(profile,identity)
     store=Store(runtime.BASE);store.initialize(profile,identity)
     with store.lock(wait_seconds=10):
-        from gateway_backup import ownership,initialize_archive,ARCHIVE
+        from gateway_backup import ownership,initialize_archive,install_owner,ARCHIVE
         owner=ownership(profile,identity,runtime.root_json(Path('/etc/server-connectivity-profile.json')))
-        private_write(runtime.BASE/'ownership.json',json.dumps(owner).encode())
+        install_owner(store,owner)
         initialize_archive(ARCHIVE,owner)
         # Read the complete frozen catalogue before any package/systemd changes.
         if runtime.INSTALLED.exists():
