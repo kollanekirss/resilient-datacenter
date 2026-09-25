@@ -7,6 +7,18 @@ from proxmox_api import Client,credentials
 def action(args):
     plan=validate(load(args.plan));verb=args.portable_action
     if verb=='preview':return preview(plan)
+    if verb.startswith('network-'):
+        require(args.settings is not None, 'Supply --settings with the reviewed local network settings JSON.')
+        from portable_network import derive
+        settings=load(args.settings);derive(plan,settings)
+        if verb=='network-check':
+            from portable_network_probe import check
+            return check(plan,settings)
+        require(args.output_dir is not None, 'Supply --output-dir for the private network kit.')
+        from portable_network_bundle import prepare,verify
+        if verb=='network-prepare':return prepare(plan,settings,args.output_dir)
+        if verb=='network-verify':return verify(args.output_dir,plan=plan,settings=settings)
+        raise ValueError('Unsupported network operation.')
     cache=Path(args.media_dir or args.plan.parent/'media')
     state=Path(args.state_dir or args.plan.parent/'guest-state')
     if verb=='media-fetch':

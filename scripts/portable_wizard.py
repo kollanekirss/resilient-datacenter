@@ -73,9 +73,14 @@ def wizard(folder,*,input_fn=input,output_fn=print):
                     except ValueError:phase='invalid-record'
                 progress.append(role+': '+phase)
             output_fn('Last recorded progress (not a live health check): '+', '.join(progress))
-            output_fn('Portable installation: 1 Preview | 2 Host check | 3 Allocate shells | 4 Fetch media | 5 Upload media | 6 Guest installation | 7 Instructions | q Save and exit')
+            output_fn('Portable installation: 1 Preview | 2 Host check | 3 Allocate shells | 4 Fetch media | 5 Upload media | 6 Guest installation | 7 Instructions | 8 Local network | q Save and exit')
             choice=ask('Choose a step','q',input_fn=input_fn)
-            if choice=='q':return {'state':'saved','plan':str(plan_path),'notice':'Progress retained. Local service/network configuration is a subsequent phase.'}
+            if choice=='q':return {'state':'saved','plan':str(plan_path),'notice':'Progress retained. Local network preparation is available in step 8; application configuration is a subsequent phase.'}
+            if choice=='8':
+                from portable_network_wizard import step
+                try:step(plan,folder,input_fn=input_fn,output_fn=output_fn)
+                except (ValueError,OSError) as error:output_fn('Local network needs attention: '+str(error))
+                continue
             if choice=='7':instructions('edge',output_fn);instructions('chat',output_fn);continue
             verbs={'1':'preview','2':'check','3':'allocate-shells','4':'media-fetch','5':'media-upload'}
             args=SimpleNamespace(plan=plan_path,portable_action=verbs.get(choice),media_dir=folder/'media',state_dir=folder/'guest-state',
