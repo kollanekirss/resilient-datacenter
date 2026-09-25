@@ -1,0 +1,18 @@
+{
+  "ubuntu": {
+    "version": "24.04.5",
+    "url": "https://releases.ubuntu.com/24.04/ubuntu-24.04.5-live-server-amd64.iso",
+    "sha256": "97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8",
+    "download_bytes": 4080486400,
+    "iso_max_bytes": 4080486400,
+    "compression": "none"
+  },
+  "opnsense": {
+    "version": "26.7",
+    "url": "https://pkg.opnsense.org/releases/26.7/OPNsense-26.7-dvd-amd64.iso.bz2",
+    "sha256": "95cafedda6d5b22ce832e249dc2309110fbee19f813ad78cf28bb3d387186bfb",
+    "download_bytes": 494298945,
+    "iso_max_bytes": 2147483648,
+    "compression": "bz2"
+  }
+}

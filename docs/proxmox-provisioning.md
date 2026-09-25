@@ -57,7 +57,7 @@ If a request or task fails, existing resources remain. A timed-out POST may have
 
 ## Next implementation and live acceptance
 
-Guest installation requires a reviewed, pinned and verified OPNsense/Ubuntu artifact pipeline, supported boot configuration and offline recovery packaging. Those are not delivered by empty-shell allocation. Local networking and applications require their subsequent modules before links are enabled.
+The separate [guest-installation wizard](portable-installation-wizard.md) now adds pinned media preparation/upload and guided isolated console installation. Those operations are not delivered by empty-shell allocation itself. Complete offline recovery packaging and live Proxmox acceptance remain outstanding. Local networking and applications require their subsequent modules before links are enabled.
 
 On a disposable real Proxmox host, acceptance must verify:
 

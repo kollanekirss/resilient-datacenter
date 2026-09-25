@@ -43,7 +43,7 @@ The proposed domestic design therefore needs several independently reachable ren
 
 The agreed reference deployment is **Proxmox on the physical host, with separate OPNsense, Unbound, NGINX, Synapse/Element, Nextcloud and partner-connector VMs**. Service guests retain their own operating systems; Proxmox does not replace Linux inside those VMs. Prepare services, accounts and certificates during normal operation so local use does not require outside services during a crisis.
 
-This is a planned profile, not a capability of the current installer. Read the [reference architecture](docs/architecture/portable-proxmox.md) and [delivery roadmap](docs/architecture/portable-proxmox-roadmap.md). A [validated site-plan preview](docs/portable-site-plan.md) is available with `./rdc portable preview examples/portable-site.json`. It changes no servers. An [experimental Proxmox adapter](docs/proxmox-provisioning.md) can check an API and explicitly allocate stopped, disconnected VM shells. Guest OS installation, live Proxmox acceptance and disconnected local access remain outstanding. The existing Ubuntu deployment remains available.
+This is a planned profile, not a capability of the current installer. Read the [reference architecture](docs/architecture/portable-proxmox.md) and [delivery roadmap](docs/architecture/portable-proxmox-roadmap.md). A [validated site-plan preview](docs/portable-site-plan.md) is available with `./rdc portable preview examples/portable-site.json`. It changes no servers. An [experimental Proxmox adapter](docs/proxmox-provisioning.md) can check an API and explicitly allocate stopped, disconnected VM shells. The [guided installation wizard](docs/portable-installation-wizard.md) now prepares and uploads pinned OS media and manages isolated console installation. Live Proxmox acceptance, local network/service configuration and disconnected application access remain outstanding. The existing Ubuntu deployment remains available.
 
 ## Example hardware for a small institutional pilot
 
@@ -95,6 +95,9 @@ The next engineering priority is **local operation after a complete disconnected
 The first resilience model is **one active service plus recoverable backup**. Federation exchanges permitted messages/files; it does not replicate an entire installation or migrate user accounts. Joining a network does not create an application account.
 
 ## Start here
+
+For the new modular Proxmox guest-installation journey, prepare the dependencies below and run `./rdc start --platform proxmox --output-dir /absolute/private/path/my-portable-site`. Follow the [wizard guide](docs/portable-installation-wizard.md). This development profile includes guided console installation and does not yet configure the local services.
+
 
 Read the [machine and access checklist](docs/prerequisites.md). On your preparation computer, install Git and Python 3.11 or newer, then:
 

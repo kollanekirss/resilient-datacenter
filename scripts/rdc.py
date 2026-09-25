@@ -41,15 +41,22 @@ def parser():
     result=Parser(prog='rdc',description=__doc__)
     commands=result.add_subparsers(dest='command',required=True)
     portable=commands.add_parser('portable',help='Preview/check a portable site or explicitly allocate stopped VM shells')
-    portable.add_argument('portable_action',choices=('preview','check','allocate-shells'))
+    portable.add_argument('portable_action',choices=('preview','check','allocate-shells','media-fetch','media-upload','upload-abandon','guest-attach','guest-start','guest-finish','guest-boot','guest-status','guest-confirm-login'))
     portable.add_argument('plan',type=Path)
     portable.add_argument('--json',action='store_true')
     portable.add_argument('--token-file',type=Path)
     portable.add_argument('--ca-file',type=Path)
+    portable.add_argument('--media-dir',type=Path)
+    portable.add_argument('--state-dir',type=Path)
+    portable.add_argument('--kind',choices=('ubuntu','opnsense'))
+    portable.add_argument('--iso-storage',default='local')
+    portable.add_argument('--role',choices=('edge','dns','nginx','chat','files','partner'))
+    portable.add_argument('--operator')
     commands.add_parser('status',help='Read separate local operational evidence').add_argument('--json',action='store_true')
     upgrade=commands.add_parser('upgrade',help='Check, apply or recover a reviewed local application upgrade')
     upgrade.add_argument('upgrade_action',choices=('check','apply','recover'))
     start=commands.add_parser('start',help='Plan personal, institutional or regional services; changes no servers')
+    start.add_argument('--platform',choices=('ubuntu','proxmox'),default='ubuntu')
     start.add_argument('--resume',type=Path)
     start.add_argument('--output-dir',type=Path,default=ROOT/'inventories/lab/journey')
     commands.add_parser('guide',help='Open checked tasks for a saved product journey').add_argument('journey',type=Path)
@@ -244,20 +251,11 @@ def backup_action(args):
 
 def dispatch(args) -> ActionResult:
     if args.command=='portable':
-        from portable_plan import load, preview, render
-        try:
-            if args.portable_action=='preview':
-                outcome=preview(load(args.plan))
-            else:
-                from portable_plan import validate
-                from proxmox_api import Client, credentials
-                from proxmox_provision import check, allocate
-                if not args.token_file:raise ValueError('Supply --token-file pointing to a private API credential file.')
-                plan=validate(load(args.plan))
-                api=Client(plan['proxmox']['endpoint'],credentials(args.token_file),args.ca_file)
-                outcome=(check if args.portable_action=='check' else allocate)(plan,api)
+        from portable_operations import action
+        from portable_plan import render
+        try:outcome=action(args)
         except ValueError as error:
-            print('Site plan rejected: '+str(error));return result_for_state('blocked')
+            print('Portable operation needs attention: '+str(error));return result_for_state('blocked')
         print(json.dumps(outcome,indent=2) if args.json or args.portable_action!='preview' else render(outcome))
         return result_for_state('checks-passed')
     if args.command=='upgrade':
@@ -274,6 +272,14 @@ def dispatch(args) -> ActionResult:
         print(json.dumps(evidence,indent=2) if args.json else render(evidence))
         return result_for_state('blocked' if needs_attention(evidence) else 'checks-passed')
     if args.command=='start':
+        if getattr(args,'platform','ubuntu')=='proxmox':
+            from portable_wizard import wizard
+            if args.resume and args.resume.name!='site.json':raise ValueError('Resume using the saved portable site.json file.')
+            folder=args.resume.parent if args.resume else args.output_dir
+            if not args.resume and folder==ROOT/'inventories/lab/journey':folder=ROOT/'inventories/lab/portable'
+            outcome=wizard(folder)
+            print(json.dumps(outcome,indent=2))
+            return result_for_state('cancelled' if outcome['state']=='cancelled' else 'checks-passed')
         from product_journey import wizard
         outcome=wizard(args.output_dir,resume=args.resume,input_fn=input)
         print(json.dumps(outcome,indent=2));return result_for_state(outcome['state'])
