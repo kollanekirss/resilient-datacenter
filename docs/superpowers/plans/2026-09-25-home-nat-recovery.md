@@ -9,3 +9,5 @@ Spec: ../specs/2026-09-25-home-nat-recovery-design.md. Inline execution under th
 5. Author-review, record source-specific evidence and honest simulation boundaries, refresh personal instructions and integrate passing source. Continue the remaining ingress review, final documentation and experimental release tasks.
 
 Preflight interfaces: VM console transport must be independent of the network identity that bootstrap replaces; backup credentials must outlive the fenced guest; exact source/image pins and application ownership must match the staged snapshot. Never downgrade these contracts to make a fixture pass.
+
+Execution record: run 36165726657 at 596e4aa passed both real guest journeys. Matrix recovery took 149.58 seconds with a 13.13-second-old snapshot; files took 237.15 seconds with a 10.22-second-old snapshot. These measured boundaries are documented, not SLAs. The daemon path and readiness defects found by real guests have regression tests. Main's controlled upgrades and interface guard are merged into this checkout; 635 combined unit tests pass. Native combined-source checks and integration follow. Review is inline author review.
