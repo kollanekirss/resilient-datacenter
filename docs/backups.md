@@ -1,8 +1,8 @@
 # Encrypted backups and guarded recovery
 
-This experimental workflow protects the kit's Headscale controller, DERP identity or enrolled networking client. The development source can explicitly extend an enrolled node’s backup scope to the [Matrix package](matrix-services.md#add-chat-to-encrypted-backups), including its database, media and signing identity. It does **not** yet protect Nextcloud or arbitrary directories. Existing network-only snapshots do not become application backups. It briefly stops the owned service to make a consistent private local copy, restarts it, then encrypts and uploads the copy using pinned Restic 0.19.1. Allow local free space for that copy. During recovery, allow additional space for both the candidate and previous data.
+This experimental workflow protects owned Headscale controller, DERP and enrolled-node state. Explicit application scope adds the fixed Matrix/Element, Nextcloud or regional gateway package, including its required database, files, identities and configuration. It does not back up arbitrary directories or automatically replicate a writable application.
 
-The commands below run on the relevant **Ubuntu 24.04 amd64 server**, from a project checkout with its dependencies prepared. `sudo ./rdc` uses that checkout's Python environment. Keep administrative access independent of the network being recovered: provider console, local console or a separately managed SSH connection. Restoring a client can interrupt an SSH session carried by that client; use the independent connection.
+Existing network-only snapshots remain network-only. After adding an application, include its scope and take a new verified snapshot. Save independent recovery credentials and perform a fenced recovery exercise before relying on it.
 
 ## 1. Choose separate storage
 
@@ -111,7 +111,7 @@ Finally, test an actual client connection and the operations your institution de
 
 ## Current evidence and limits
 
-See [validation status](validation-status.md) and the pull request's actual checks. Disposable tests exercise real Restic/SFTP encrypted round trips and real Headscale/DERP lifecycle recovery. They do not establish physical offsite placement, power-loss durability on your storage hardware, home-network reachability, an enrolled client's recovery, institutional policy acceptance or beginner usability. The old-instance fencing decision remains with the operator.
+See [validation status](validation-status.md) and the pull request's actual checks. Disposable tests exercise real Restic/SFTP encrypted round trips and real Headscale/DERP lifecycle recovery. Separate acceptance workflows cover actual enrolled identities and fresh-machine reconstruction; consult the current evidence rather than assuming all fixtures use a real VPN. None establishes physical offsite placement, power-loss durability on your hardware, institutional policy acceptance or beginner usability. The old-instance fencing decision remains with the operator.
 
 Restic's [backup documentation](https://restic.readthedocs.io/en/stable/040_backup.html) and [restore documentation](https://restic.readthedocs.io/en/stable/050_restore.html) describe the underlying backup tool. Its [repository preparation guide](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html) explains recovery credentials and storage access.
 

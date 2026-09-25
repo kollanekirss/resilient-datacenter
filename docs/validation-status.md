@@ -1,5 +1,21 @@
 # Validation status — 2026-09-25
 
+## Current scope and evidence boundaries
+
+| Capability | Current evidence |
+|---|---|
+| Guided plans, separate operational status and strict local checks | Implemented; exact source checks required for each change |
+| Matrix/Element and Nextcloud | Actual applications, user operations, TLS lifecycle and encrypted recovery on disposable Ubuntu |
+| Regional federation | Actual separate internal/regional networks, approved chat/file exchange, denial and revocation |
+| Additional relays/controller recovery | Actual pinned services and enrolled clients; prepared-host recovery and forced-relay outage |
+| Controlled upgrades | Explicit predecessor-to-current paths, migration failure, interruption, post-commit writes and new-version backup/restore |
+| Home NAT and fresh guest recovery | Candidate acceptance in PR #12; not yet counted as passed |
+| Interface-bound private application HTTPS | Candidate acceptance in PR #13; not yet counted as passed |
+| Physical independent sites, public DNS-provider issuance, unfamiliar-colleague completion | NOT RUN; see the site acceptance worksheet |
+| Independent security/code review | NOT RUN; reviews performed by the implementing author |
+
+All CI site separations are logical boundaries on disposable infrastructure. Timings are observations, not availability guarantees. Historical sections below preserve what was tested at each increment; they are not evidence for untested later changes.
+
 ## Additional relay and enrolled-controller recovery evidence
 
 Source `2e19b0d` passed the actual infrastructure acceptance in [run 36163225492](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36163225492). Two separate production DERP processes served actual enrolled clients. Direct UDP data paths were blocked. After the selected relay stopped, an HTTPS operation succeeded through the surviving region; this run observed 10.09 seconds to recovery. Existing clients also completed HTTPS during a short controller outage over established relay sessions. These observations are not timing guarantees or evidence that fresh relay admission works without control.
@@ -8,15 +24,17 @@ The same run captured enrolled Headscale state in encrypted SFTP storage reached
 
 The independent setup wizard supports one to four relay locations with separate validated addresses/certificates and stable region IDs. Source passed 610 local tests and all 16 Ansible syntax/task checks. Author review covered strict inventory projection, cross-location duplicate rejection, per-host certificate derivation, template compatibility, saved-draft validation and the test's forced-relay/fencing boundaries. No independent review was performed. See [operator guidance](infrastructure-resilience.md).
 
-## Current guided-product evidence
+## Guided-product increment evidence
 
 Implementation source `049fb3e` passed 595 local tests and all disposable workflows. `rdc start` saves private intent and role cards; `rdc guide` delegates allowlisted tasks to the existing operations. `rdc status` reports network, applications, certificates, backup, recovery and partners separately. File/probe tests cover missing, malformed and mixed ownership, stopped services, unavailable storage, retained historical success, failed renewal, unknown/time-limited probes and partner recovery review. None of these marks a whole installation resilient.
 
 Actual Matrix [run 36158678655](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678655), Nextcloud [run 36158678627](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678627) and gateway [run 36158678699](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678699) verified the new status probes and private restore evidence after encrypted recovery. The Matrix test additionally uploaded a one-time encryption key, captured it, consumed it, restored the older database and verified that the key could not be issued again. A fresh Element browser still recovered encrypted history using the independently held recovery key. Technical restore evidence deliberately records no user-operation proof; those user checks are separate CI assertions.
 
-The same source passed actual regional [Matrix exchange](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678622), [file exchange](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678585), [infrastructure certificates/recovery](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678604), [encrypted backup transport](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678668) and [local checks](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678433). Application recovery fixtures use synthetic network state; the independent-network workflows use actual clients. This is disposable acceptance, not real independent sites, public provider issuance or beginner usability. Controlled upgrades and integrated home-network/replacement acceptance remain in progress; additional relay and enrolled-controller evidence is recorded above.
+The same source passed actual regional [Matrix exchange](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678622), [file exchange](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678585), [infrastructure certificates/recovery](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678604), [encrypted backup transport](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678668) and [local checks](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678433). Application recovery fixtures use synthetic network state; the independent-network workflows use actual clients. This is disposable acceptance, not real independent sites, public provider issuance or beginner usability. Controlled-upgrade evidence is recorded in its later section. Integrated home-network/replacement acceptance is tracked separately; additional relay and enrolled-controller evidence is recorded above.
 
-**Legacy/profile workflows, guided local installation and unified operations: implemented and locally checked. Live deployment: NOT RUN.**
+## Historical networking baseline
+
+The following table records the earlier networking increment. Later sections and the current summary supersede its CI gaps; external operator deployments remain NOT RUN.
 
 | Check | Status | Evidence / boundary |
 |---|---|---|

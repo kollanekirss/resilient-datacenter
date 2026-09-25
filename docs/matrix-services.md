@@ -1,6 +1,6 @@
 # Matrix and Element: experimental package
 
-This package is being developed on the Matrix services branch. It is not yet a supported institutional release. See the [product acceptance requirements](superpowers/specs/2026-09-25-resilient-services-product-design.md). The released networking archive does not contain this package.
+This package is available in experimental development source and has bounded disposable application/recovery evidence. It is not a supported institutional release. See the [product acceptance requirements](superpowers/specs/2026-09-25-resilient-services-product-design.md). The older 0.2.0-alpha.1 networking archive does not contain this package.
 
 Matrix is the chat server; Element is its browser interface. Each person needs both access to your private network and a separate chat account. Installing a second server does not replicate the first one's accounts or messages automatically.
 
@@ -15,7 +15,7 @@ Use a dedicated Ubuntu 24.04 **amd64** machine with systemd, approximately 4 GiB
 5. Keep a console or other independent administration path available. Do not depend entirely on the service being repaired for recovery access.
 6. If this node already has scheduled networking backups, disable the schedule before installing applications. After installation, explicitly extend backup scope, take a new snapshot, and re-enable the schedule.
 
-The installer uses pinned upstream container image digests. It installs Ubuntu's Podman and selects runc. It does not publish container ports or replace the host firewall. PostgreSQL, Synapse and Element's static web server listen on loopback; the HTTPS proxy listens only on the overlay address. Open registration, guest accounts and external federation start disabled. Calls, TURN, bridges and SSO are not included in this package.
+The installer uses pinned upstream container image digests. It installs Ubuntu's Podman and selects runc. It does not publish container ports or replace other host firewall rules. Its owned input table rejects application HTTPS arriving outside the overlay or local loopback interface. PostgreSQL, Synapse and Element's static web server listen on loopback; the HTTPS proxy listens only on the overlay address. Open registration, guest accounts and external federation start disabled. Calls, TURN, bridges and SSO are not included in this package.
 
 ## Install on the service node
 

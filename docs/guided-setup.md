@@ -1,8 +1,8 @@
 # Guided network setup
 
-This milestone provides a question-and-answer wizard, offsite controller/relay preparation and a dedicated local-node installer. It installs networking only. Matrix/Element, Nextcloud, backups, automatic recovery and regional gateways are not included yet.
+This guide covers the network part of the current [product journey](product-start.md): question-and-answer setup, offsite controller/relay preparation and local-node installation. Continue to the separate chat/file, backup and regional guides after networking.
 
-**Status:** locally tested, including simulated enrollment and local TLS tests. Actual Ubuntu installation, real enrollment and home-NAT connectivity have not been tested. Use disposable pilot machines first; this is not a production-ready release or a completed beginner-usability validation.
+**Experimental:** actual Ubuntu enrollment and application/network recovery have bounded disposable acceptance evidence. Consult [validation status](validation-status.md) for the latest home-NAT and fresh-machine results. Real home routers, physical sites, public-provider issuance and unfamiliar-user acceptance remain separate checks.
 
 Use the [common `rdc` interface](operations.md) for the menu, deployment commands, diagnostics and documented exit codes. The original Python/Ansible commands below remain supported as reference interfaces.
 
@@ -81,13 +81,13 @@ The final BUNDLE.json lists the current files and their checksums. Its state is 
 
 Before answering all independent-mode questions, obtain:
 
-- Two fresh Ubuntu 24.04 amd64 servers for controller and relay, with public IPv4 addresses and independently verified SSH access.
+- At least two fresh Ubuntu 24.04 amd64 servers for controller and relay, with public IPv4 addresses and independently verified SSH access.
 - Two real DNS names resolving to those servers.
 - Publicly trusted certificates with matching DNS SANs, full chains and corresponding unencrypted PEM private keys, stored securely on the operator computer.
 - The pinned relay executable and checksum. Build it using `scripts/build_derper.py` as explained in the README; the wizard never builds/downloads tools as a side effect of a question.
 - Names and unique requested tags for local nodes at your locations. You do not need their public IP addresses or public SSH access.
 
-The wizard does not buy servers, configure DNS-provider accounts or issue/renew certificates. These remain operator prerequisites. Consult docs/networking.md for public ports, firewall rules and bootstrap dependencies. Follow your certificate issuer's supported process before applying; do not bypass TLS validation to continue.
+The wizard does not buy servers or configure DNS-provider accounts. Supplied certificates remain operator-managed; the explicit managed mode has its own issuer/renewal workflow and provider prerequisites. Consult docs/networking.md for public ports, firewall rules and bootstrap dependencies. Follow your certificate issuer's supported process before applying; do not bypass TLS validation to continue.
 
 The wizard generates infrastructure.yml, one node-NAME.yml per local node, NEXT-STEPS.md and BUNDLE.json. From the project directory on the operator computer:
 
@@ -97,7 +97,7 @@ The wizard generates infrastructure.yml, one node-NAME.yml per local node, NEXT-
 .venv/bin/ansible-playbook -i inventories/lab/setup/infrastructure.yml playbooks/infrastructure-deploy.yml
 ```
 
-These entry points manage only the controller and relay. Planned home nodes are tag/enrollment declarations, never SSH targets. No dummy public service node is required. The application policy initially denies inter-node application connections; enrollment alone does not grant access to a future chat or file service.
+These entry points manage only the controller and relay. Planned home nodes are tag/enrollment declarations, never SSH targets. No dummy public service node is required. The application policy initially denies inter-node application connections; use the guided HTTPS/backup access workflow to approve each required connection. Enrollment alone does not grant service access.
 
 On the controller, check existing users and create the enrollment administrator once, using the name selected in the wizard:
 

@@ -1,6 +1,6 @@
 # Experimental regional gateway
 
-This is a development milestone, not the completed regional service package. Matrix and Nextcloud exchange across real independent Headscale networks, transport restrictions and interrupted policy changes have disposable Ubuntu evidence. Gateway certificate renewal and gateway recovery remain in progress. Use disposable infrastructure for this path until the remaining checks pass.
+This experimental package has disposable Ubuntu evidence for Matrix and Nextcloud exchange across independent Headscale networks, transport restrictions, interrupted policy changes, certificate renewal and encrypted gateway recovery. Clean replacement bootstrap and persistent partner-review closure are also exercised. Physical institutions, public-provider issuance and unfamiliar-user acceptance remain external; consult the current validation record before use.
 
 ## What the gateway connects
 

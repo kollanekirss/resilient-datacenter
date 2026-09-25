@@ -1,6 +1,6 @@
 # Verified experimental releases
 
-Releases package the networking foundation. They do not yet include Matrix/Element, Nextcloud, automatic recovery or verified production resilience. The downloaded relay targets **Linux amd64**; configuration and verification may run on macOS. There is no ARM binary and no automatic installation or upgrade.
+The 0.3.0-alpha.1 release candidate packages the guided product source: networking, Matrix/Element, Nextcloud, restricted federation, encrypted recovery and selected controlled upgrades. Publish it only after the matching source passes its required checks. The old 0.2.0-alpha.1 release packages the networking foundation only. Neither is a supported production release or automatic failover system. The downloaded relay targets **Linux amd64**; configuration and verification may run on macOS. There is no ARM binary and no automatic installation or upgrade.
 
 ## Download
 
@@ -9,7 +9,7 @@ Start from a reviewed checkout of this repository and prepare its Python environ
 Find a specific experimental release and its full source commit on the repository's Releases page. Check the tagged source and workflow; never take an expected commit from an untrusted mirror.
 
 ```sh
-./rdc release fetch 0.2.0-alpha.1 --commit FULL_40_CHARACTER_COMMIT --output-dir "$PWD/artifacts/verified-alpha1"
+./rdc release fetch 0.3.0-alpha.1 --commit FULL_40_CHARACTER_COMMIT --output-dir "$PWD/artifacts/verified-product-alpha1"
 ```
 
 The version is an example; use a published version. The output's parent directory must already exist, belong to you, and not allow other users to write. The destination must not exist. No symlink parents are accepted. A release fetch requires network access to GitHub and its attestation trust services; offline verification is not yet provided.

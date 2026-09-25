@@ -1,25 +1,22 @@
-# Resilient Datacenter — experimental self-hosting kit
+# Resilient Datacenter — experimental self-hosted services
 
-An Ansible connectivity kit for fresh **Ubuntu 24.04 LTS amd64** servers. It now includes two opt-in deployment profiles:
+Run your own private network, chat and files, keep an encrypted recovery copy elsewhere, and optionally exchange approved services with other organisations. This project provides a guided command-line installer and checked operating procedures for **fresh Ubuntu 24.04 amd64 machines with systemd**. Use existing VMs, physical machines or VPSs; no custom ISO or Proxmox requirement.
 
-- **Independent:** your own Headscale controller, separate DERP relay and one or more client nodes.
-- **Join:** your client nodes only, with explicit enrollment approval from an existing network administrator.
+**Experimental, not a supported production release.** Real applications, separate networks, federation, encrypted recovery and selected upgrades have disposable Ubuntu acceptance evidence. Physical sites, public certificate-provider issuance and an unfamiliar colleague's complete installation/recovery exercise still need acceptance. There is no automatic failover or promise of uninterrupted relocation.
 
-Start with the [common command interface](docs/operations.md) and [guided setup and local installation](docs/guided-setup.md) to answer questions and prepare an offsite network plus local-node manifests. The new local installer is designed for home/private-network Ubuntu machines without public management SSH; home NAT behaviour and the complete beginner journey still require acceptance testing.
+## Choose your use
 
-See [verified experimental releases](docs/releases.md) for relay downloads with exact source and signed provenance. Downloading never installs or upgrades servers.
+| Use | What you build |
+|---|---|
+| Personal | Offsite controller and relay, chat and/or files at home, encrypted storage and replacement capacity at another location |
+| Institution | Your own network, Matrix with Element and Nextcloud on separate VMs, local accounts, certificates, backup and guided recovery |
+| Regional partners | Each institution keeps its internal network; a separate gateway joins the regional network and carries only bilaterally approved application traffic |
 
-The [encrypted backup and recovery guide](docs/backups.md) covers owned network-service data, explicit fencing and guarded restore. The development source adds opt-in [Matrix/Element chat](docs/matrix-services.md) and [Nextcloud files](docs/nextcloud-services.md), each with application backup and recovery.
-
-The [deployment-profile operator guide](docs/deployment-profiles.md) remains available for the existing SSH-managed workflows. Matrix/Element and Nextcloud have disposable Ubuntu application and recovery evidence. The experimental [regional gateway](docs/regional-gateway.md) has actual Matrix and Nextcloud federation and proxy/firewall evidence across independent test networks; gateway certificate renewal and encrypted recovery have disposable evidence. Gateway replacement bootstrap also has bounded disposable evidence. The guided product journey and separate operational status are available in development source; controlled application upgrades remain in progress. The guided workflow requires operator-supplied servers and DNS; it accepts supplied certificates or an explicit [managed certificate mode](docs/managed-certificates.md) for fresh infrastructure. [Additional relay locations and enrolled-controller recovery](docs/infrastructure-resilience.md) have bounded disposable evidence. Beginner usability has not been validated.
-
-The original four-VPS pilot and its existing commands are retained below as the **legacy workflow**. Use one workflow consistently; neither path automatically migrates the other's installations.
-
-**Status: experimental development.** Disposable Ubuntu runners have exercised actual network-service, Matrix and Nextcloud recovery; full multi-site deployments have not been accepted. No VPSs, DNS records or cloud resources have been created. This is the connectivity foundation, not a production autonomous data centre. Local validation cannot establish interoperability, failover or uninterrupted relocation; those require the live acceptance tests.
+The first resilience model is **one active service plus recoverable backup**. Federation exchanges permitted messages/files; it does not replicate an entire installation or migrate user accounts. Joining a network does not create an application account.
 
 ## Start here
 
-Clone the project on your operator computer, then run the preparation wizard with Python 3.11 or newer:
+Read the [machine and access checklist](docs/prerequisites.md). On your preparation computer, install Git and Python 3.11 or newer, then:
 
 ```sh
 git clone https://github.com/kollanekirss/resilient-datacenter.git
@@ -29,118 +26,58 @@ python3 -m venv .venv
 ./rdc start
 ```
 
-Run `./rdc` for the interactive menu, `./rdc doctor /absolute/path/node-NAME.yml` for diagnostics, and `./rdc version` for source identity. The GitHub Local checks workflow runs non-deployment checks on Ubuntu.
+Choose personal, institution or regional. The wizard asks questions and saves a private machine plan; it does not purchase or install servers. Continue with `./rdc guide /absolute/path/journey.json` using the path shown by the wizard. Follow the [step-by-step starting guide](docs/product-start.md) on the machine named by each task. A Mac can prepare configuration; server installation is blocked on unsupported systems.
 
-Choose **personal**, **institution** or **regional** to prepare a machine plan and checklist. Continue with `./rdc guide /absolute/path/journey.json`. The [product starting guide](docs/product-start.md) explains the full order and separate `./rdc status` evidence. Preparation does not install anything on servers. The original `./rdc setup` wizard remains available for independent or joining network configuration.
+Use a reviewed commit or [verified experimental release](docs/releases.md), and record `./rdc version`. Main is development source. The older 0.2.0-alpha.1 archive contains only the networking foundation; it cannot deploy the current product.
 
-Follow the [guided setup instructions](docs/guided-setup.md) for the separate deployment, local installation and enrollment commands. Local installation supports **Ubuntu 24.04 amd64 with systemd**. Servers, DNS names, certificates and administrator approval are still required. The development checkout includes experimental Matrix/Element and Nextcloud packages on separate enrolled VMs. The published 0.2.0-alpha.1 archive predates them. Automatic failover is not available.
-
-See [validation status](docs/validation-status.md) for completed local checks and unperformed live tests, and [contributing](CONTRIBUTING.md) to help improve the pilot. The project code is available under the [MIT license](LICENSE); third-party software keeps its own licenses.
-
-## Connectivity overview
+## How the roles connect
 
 ```mermaid
 flowchart TB
-    Operator[Administrator: independent SSH / provider console]
-    Control[control-01: Headscale HTTPS 443]
-    Relay[relay-01: DERP 443 / STUN 3478]
-    A[server-a: Institution A]
-    B[server-b: Institution B]
-    Operator -.-> Control
-    Operator -.-> Relay
-    Operator -.-> A
-    Operator -.-> B
-    A -. coordination .-> Control
-    B -. coordination .-> Control
-    Relay -. admission verification .-> Control
-    A <-->|Preferred: encrypted direct path| B
-    A <--> Relay
-    B <--> Relay
+    User[User device: approved private-network client]
+    Control[Offsite Headscale controller]
+    Relay[DERP relays at separate locations]
+    Chat[Chat VM: Matrix and Element]
+    Files[File VM: Nextcloud]
+    Backup[Other location: encrypted backup storage]
+    Replacement[Other location: replacement capacity]
+    Gateway[Separate regional gateway VM]
+    Partners[Approved partner gateways and services]
+    User -. coordination .-> Control
+    Chat -. coordination .-> Control
+    Files -. coordination .-> Control
+    User <-->|Encrypted direct path or relay| Relay
+    Relay <--> Chat
+    Relay <--> Files
+    User <-->|Private HTTPS| Chat
+    User <-->|Private HTTPS| Files
+    Chat -->|Encrypted snapshots| Backup
+    Files -->|Separate writer destination| Backup
+    Backup -. fenced recovery .-> Replacement
+    Chat <-->|Restricted private LAN endpoint| Gateway
+    Files <-->|Restricted private LAN endpoint| Gateway
+    Gateway <-->|Regional network and bilateral approval| Partners
 ```
 
-In the legacy pilot, only **TCP 8443 A→B and B→A** is granted between the two tagged servers. Other new inter-server application connections are denied by the supplied Headscale policy. The application endpoints bind only to their overlay IPv4 addresses. DERP carries encrypted traffic when a direct connection is unavailable; it does not replicate data or provide application failover.
+Keep controller and relay on separate machines in the tested baseline. Chat and files each use a separate enrolled VM. Each guided backup target accepts one writer, so multiple sources need separate target instances. A replacement must not run a copy of the active node's identity until the original is independently stopped or isolated.
 
-## Legacy four-VPS workflow
+The regional gateway has one regional network membership and a restricted LAN link to internal service VMs. Headscale controllers do not federate. Shared regional coordination remains a dependency, and each gateway is initially a single point of failure. [Infrastructure resilience](docs/infrastructure-resilience.md) explains additional relays and controller recovery.
 
-1. Read [network prerequisites](docs/networking.md).
-2. Prepare your local tools and build the relay artifact below.
-3. Obtain the four VPSs, two public DNS names and appropriate TLS certificates.
-4. Fill and validate your private inventory.
-5. Run read-only preflight, then deploy.
-6. [Enroll the two servers](docs/enrollment.md) through administrator approval.
-7. Deploy test endpoints and run connectivity and isolation tests.
-8. Work through [outage and recovery acceptance](docs/acceptance.md) before adding real institutional services.
+## Install and operate
 
-The [detailed colleague plan](docs/colleague-project-plan.md) explains the wider project. The commands below describe the implemented kit and take precedence over illustrative paths or names in earlier planning documents.
+- [Guided networking and enrollment](docs/guided-setup.md), [commands and access approval](docs/operations.md)
+- [Chat and Element](docs/matrix-services.md), [Nextcloud files](docs/nextcloud-services.md)
+- [Encrypted backup, independent recovery credentials and fenced restoration](docs/backups.md)
+- [Regional gateway and bilateral federation](docs/regional-gateway.md)
+- [Controlled application upgrades](docs/upgrades.md), [certificate management](docs/managed-certificates.md)
+- [Troubleshooting](docs/troubleshooting.md), [acceptance record](docs/validation-status.md), [site acceptance worksheet](docs/site-acceptance.md)
 
-## Local preparation — no VPS required
+Run `sudo ./rdc status` on a managed server. Network, applications, certificates, backup age, recovery evidence and partners are reported separately. A running service is not proof of recovered user data. Complete each exercise with a real login and message/file operation.
 
-Use Python 3.11 or newer, OpenSSL and Go 1.21 or newer. Run these commands from this project directory. They create project-local dependencies and caches. Dependency downloads require internet access.
+Keep stable domain names, trusted certificates, independent administration access and recovery secrets outside the failed site. Backups briefly stop writers for consistency. Automatic pruning, immutable backup storage, external alert delivery, SSO, ARM support, built-in resilient DNS/Unbound, OPNsense configuration, office editing and general user-device fleet management are not included. DNS and provider access remain explicit prerequisites.
 
-```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python scripts/check_local.py
-.venv/bin/python scripts/build_derper.py
-```
+## Project and evidence
 
-The relay helper selects **Go 1.26.6** and **tailscale.com v1.102.4**, cross-builds for Linux/amd64, and records the SHA256 in `artifacts/derper-build.json`. Module downloads use Go's checksum database; the resolved module checksums are retained in `artifacts/derper-go.sum`. It does not install Go or binaries globally. Keep the build metadata alongside an archived deployment release. Rebuilds after a toolchain or source change are a new release to test, not an automatic upgrade.
+Consult [validation status](docs/validation-status.md) for exact runs and their limits. Historical results do not certify later source changes. The [product design](docs/superpowers/specs/2026-09-25-resilient-services-product-design.md) and [completion ledger](docs/superpowers/plans/2026-09-25-product-completion.md) define the scope and remaining work.
 
-A relay artifact was already built in this working copy. It is ignored by Git; colleagues cloning this repository must build their own or receive a verified release artifact.
-
-## Prepare deployment inputs
-
-Suggested small lab starting point: 2 vCPU, 2 GB RAM and 20 GB disk per VPS, spread across at least two providers/locations. These are sizing assumptions for a connectivity pilot, not a production capacity recommendation.
-
-```sh
-mkdir -p inventories/lab
-cp inventories/example/hosts.yml inventories/lab/hosts.yml
-```
-
-Edit only the private copy. Supply four distinct public IPv4 management addresses, SSH usernames, actual controller/relay DNS names, absolute local certificate/key paths, and the relay artifact path/checksum. Keep host names, group names, tags and peer pairings as supplied. Custom inventory plugins, arbitrary Ansible overrides and embedded credentials are intentionally outside this first version.
-
-Certificates:
-
-- Controller and relay: public-CA certificates with matching DNS SANs and full intermediate chains. Their names must resolve before deployment.
-- Test endpoints: SANs matching `test_dns_name`; an institutional test CA is acceptable. Supply its PEM trust bundle as `test_ca_certificate`. Public DNS records for these endpoint names are unnecessary for the tests, which explicitly resolve them to discovered overlay addresses.
-- Keys: unencrypted PEM, stored outside source control. The validator checks certificate dates, SANs and key matching; it also checks test endpoint chains against the supplied trust bundle. Public trust and reachability for controller/relay must be verified live.
-- Renewal: your institution must issue/renew these certificates. Update the local files and redeploy the affected stage before expiry. This kit does not automate issuance or renewal.
-
-Use an SSH agent or your SSH configuration for management keys; retain host-key verification. Confirm host keys through provider console or another trusted channel before Ansible. Sudo access is required; add `--ask-become-pass` if your institution requires an interactive sudo password.
-
-```sh
-.venv/bin/python scripts/validate_inventory.py inventories/lab/hosts.yml
-.venv/bin/ansible-playbook -i inventories/lab/hosts.yml playbooks/preflight.yml
-```
-
-Preflight validates local inputs and reads target state without installing services. It rejects unsupported operating systems, unowned existing installations and a running managed client using another controller. Use fresh VPSs; this is not a migration tool. Ordinary check mode cannot simulate a fresh installation end to end because target binaries do not yet exist. `--syntax-check` is an offline syntax check only.
-
-## Deploy and enroll
-
-```sh
-.venv/bin/ansible-playbook -i inventories/lab/hosts.yml playbooks/deploy.yml
-```
-
-Deployment preserves `/var/lib/headscale`, `/var/lib/sc-derp` and `/var/lib/tailscale`. It does not register or reset nodes. Review [enrollment](docs/enrollment.md), register each node, then run:
-
-```sh
-.venv/bin/ansible-playbook -i inventories/lab/hosts.yml playbooks/test-services.yml
-.venv/bin/ansible-playbook -i inventories/lab/hosts.yml playbooks/verify.yml
-.venv/bin/ansible-playbook -i inventories/lab/hosts.yml playbooks/verify-deny.yml
-```
-
-Run the full inventory without `--limit` or `--tags`; this small pilot expects all four hosts and both peers. Positive verification checks real HTTPS responses, certificate trust, hostname and server identity in both directions. Diagnostic `tailscale ping` output is separate: it does not prove application-policy access. Denial verification temporarily starts port 8444, confirms its local HTTPS response, confirms local SSH on port 22, then tests both remote ports. A refused connection is inconclusive and fails the check. Cleanup runs after failures; the temporary service also expires after 120 seconds.
-
-Successful live checks write separate per-server JSON reports under `artifacts/`. A failed run does not constitute acceptance; use command exit status and fresh report timestamps, not an old file. Denied-port results must be checked against host/provider firewall rules before attributing the result specifically to Headscale policy.
-
-## What is deliberately still pending
-
-- Real multi-site and home-NAT deployments, disconnected-operation acceptance and colleague usability. Disposable runtime tests are recorded in the validation guide.
-- Multiple controllers/relays, resilient bootstrap DNS, identity-service recovery and institutional trust governance.
-- Regional application federation, resilient DNS, optional institutional SSO and integration guidance for existing routers such as OPNsense.
-- A supported client-device installer and fleet lifecycle management.
-- Production security review, external monitoring/alerts, physical offsite acceptance, controlled application upgrades and measured availability commitments.
-
-There is one controller and one relay. The relay checks new client admission against the controller and fails closed. Existing direct sessions may continue during controller loss, but new enrollment, policy distribution and fresh relay admission are affected. There is no claim of high availability or disruption-free relocation. Tagged machine identities require explicit revocation and lifecycle management; the configured default expiry for untagged nodes does not imply tagged servers expire automatically.
-
-See [validation status](docs/validation-status.md), [acceptance](docs/acceptance.md), [recovery](docs/recovery.md), and [version provenance](docs/provenance.md).
+[Contribute](CONTRIBUTING.md), [report a vulnerability privately](SECURITY.md), or consult the [legacy four-VPS pilot](docs/legacy-pilot.md). Project code uses the [MIT license](LICENSE); upstream components retain their own licenses and notices.

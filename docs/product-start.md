@@ -46,4 +46,4 @@ Successful completed restores record capture/completion times and the component 
 
 ## Still required before a supported deployment
 
-Controlled upgrades, extended infrastructure outage acceptance and the complete unfamiliar-colleague exercise are tracked in the product completion plan. Public DNS/provider issuance, real independent sites and your institution's operational acceptance need real infrastructure and people. The software cannot promise uninterrupted relocation during a network partition or data recovery newer than the last successful snapshot.
+The reviewed upgrade paths and infrastructure outage tests are described in their guides. Follow the product completion ledger and current acceptance record for the fresh-machine journey; the unfamiliar-colleague exercise remains external. Public DNS/provider issuance, real independent sites and your institution's operational acceptance need real infrastructure and people. The software cannot promise uninterrupted relocation during a network partition or data recovery newer than the last successful snapshot.
