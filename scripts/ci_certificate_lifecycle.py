@@ -118,6 +118,8 @@ def main():
             run(['nft','list','ruleset'])
             raise
         if role=='controller':
+            from ci_service_access import exercise as access_exercise
+            access_exercise()
             from ci_scheduled_backup import exercise as scheduled_exercise
             scheduled_exercise()
         run(['systemctl','stop',service])

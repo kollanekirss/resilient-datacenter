@@ -49,6 +49,13 @@ def parser():
         command=infra_actions.add_parser(action)
         command.add_argument('inventory',type=Path)
         if action=='apply': command.add_argument('--ask-become-pass',action='store_true')
+    access=commands.add_parser('access',help='Prepare explicit application access without editing network policy by hand')
+    accesses=access.add_subparsers(dest='access_action',required=True)
+    for mode in ('setup','prepare'):
+        command=accesses.add_parser(mode);command.add_argument('inventory',type=Path);command.add_argument('--output-file',type=Path,required=True)
+        if mode=='prepare':
+            command.add_argument('--source',required=True);command.add_argument('--destination',required=True)
+            command.add_argument('--service',choices=('https','backup'),required=True);command.add_argument('--remove',action='store_true')
     node=commands.add_parser('node',help='Operate on THIS Ubuntu computer only')
     node_actions=node.add_subparsers(dest='action',required=True)
     for action in ('check','apply','enroll','status'):
@@ -151,6 +158,12 @@ def backup_action(args):
 
 
 def dispatch(args) -> ActionResult:
+    if args.command=='access':
+        from service_access import action
+        try:outcome=action(args)
+        except ValueError as error:
+            print('Access preparation blocked: '+str(error));return result_for_state('blocked')
+        print(json.dumps(outcome,indent=2));return result_for_state(outcome['state'])
     if args.command=='setup':
         state=run_wizard(args.output_dir,resume=args.resume,input_fn=input)
         return result_for_state(state)

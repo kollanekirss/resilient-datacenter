@@ -65,7 +65,9 @@ sudo ./rdc services account --admin
 
 Create ordinary users with `sudo ./rdc services account`. Passwords are entered through a hidden prompt. Do not put passwords in command arguments or public issue reports. The shared registration secret and administration API stay local to the server.
 
-On an enrolled user device, open the Element HTTPS address and sign in. Confirm that two users can exchange a message in an invited private room. Save each user's Element recovery key independently when enabling encrypted-history recovery. Server backups do not reconstruct a lost client recovery secret.
+Before signing in, have the controller administrator use the [guided access workflow](operations.md#approve-a-device-to-service-connection) to allow each intended user node to reach the service node on `https` (TCP 443). Apply that reviewed inventory. Enrollment alone grants no application connectivity. Both service names must resolve to the service node on the user device as well as on the server.
+
+On an enrolled and approved user device, open the Element HTTPS address and sign in. Confirm that two users can exchange a message in an invited private room. Save each user's Element recovery key independently when enabling encrypted-history recovery. Server backups do not reconstruct a lost client recovery secret.
 
 ## Replace a supplied certificate
 

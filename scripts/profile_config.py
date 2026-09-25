@@ -85,7 +85,7 @@ def _validate_managed_inventory(data: dict, *, check_files: bool, infrastructure
             errors.append('A valid ACME account email is required')
     if infrastructure_only:
         required |= {'enrollment_nodes'}
-    if not required <= set(v) or set(v) - required - (set() if infrastructure_only else {'connectivity_test'}):
+    if not required <= set(v) or set(v) - required - ({'service_access'} if infrastructure_only else {'connectivity_test'}):
         errors.append('Missing or unsupported profile variables; join cannot contain controller/relay management settings')
     if type(v.get('schema_version')) is not int or v['schema_version'] != (3 if managed_acme else 2 if infrastructure_only else 1):
         errors.append('Unsupported inventory schema_version for this entry point')
