@@ -118,6 +118,49 @@ def container_command(name,settings):
                    '--volume',str(TLS)+':/tls:ro',image]
 
 
+def ingress_entries(address):
+    import ipaddress
+    ip=ipaddress.ip_address(address)
+    if ip.version!=4 or ip not in ipaddress.ip_network('100.64.0.0/10'):raise ValueError('Invalid application ingress address')
+    table='rdc_application'
+    def match(left,right,op='=='):return {'match':{'op':op,'left':left,'right':right}}
+    return [{'table':{'family':'inet','name':table,'comment':'rdc-application-ingress-v1'}},
+            {'chain':{'family':'inet','table':table,'name':'input','type':'filter','hook':'input','prio':-150,'policy':'accept'}},
+            {'rule':{'family':'inet','table':table,'chain':'input','expr':[
+                match({'meta':{'key':'iifname'}},'lo','!='),
+                match({'meta':{'key':'iifname'}},'tailscale0','!='),
+                match({'payload':{'protocol':'ip','field':'daddr'}},str(ip)),
+                match({'payload':{'protocol':'tcp','field':'dport'}},443),{'drop':None}]}}]
+
+
+def validate_ingress(data,address):
+    def normalize(value):
+        if isinstance(value,dict):return {k:normalize(v) for k,v in value.items() if k!='handle'}
+        if isinstance(value,list):return [normalize(v) for v in value]
+        return value
+    if not isinstance(data,dict) or set(data)!={'nftables'} or not isinstance(data['nftables'],list):raise ValueError('Cannot verify application ingress')
+    entries=[normalize(e) for e in data['nftables'] if not isinstance(e,dict) or 'metainfo' not in e]
+    if entries!=ingress_entries(address):raise ValueError('Application ingress rules differ; administrator review required')
+
+
+def ingress_nft(*args,input=None):
+    result=subprocess.run(['/usr/sbin/nft',*args],input=input,capture_output=True,text=True,check=True,timeout=15)
+    return json.loads(result.stdout) if result.stdout.strip() else None
+
+
+def application_ingress(settings,*,create=False):
+    address=settings['bind_address'];entries=ingress_entries(address)
+    tables=ingress_nft('-j','list','tables')
+    exists=any(e.get('table',{}).get('family')=='inet' and e['table'].get('name')=='rdc_application' for e in tables['nftables'])
+    if not exists:
+        if not create:raise ValueError('Application ingress protection is missing; restart the owned proxy')
+        # Exclusive create and all rules in one atomic batch. Never flush an
+        # existing table or override another firewall's drop decision.
+        commands=[{'create':entries[0]},*({'add':entry} for entry in entries[1:])]
+        ingress_nft('-j','-f','-',input=json.dumps({'nftables':commands}))
+    validate_ingress(ingress_nft('-j','list','table','inet','rdc_application'),address)
+
+
 def unit(name):
     if name not in UNITS: raise ValueError('Unsupported component')
     dependencies={'postgres':[],'synapse':['rdc-postgres.service'],'element':[],
@@ -162,7 +205,7 @@ def ready(name,settings,*,attempts=90):
             elif name=='element':
                 data=http_json('/config.json',port=8082)
                 if data!=root_json(BASE/'element.json'): raise ValueError('Element is not serving its owned configuration')
-            else:verify_https(settings)
+            else:application_ingress(settings);verify_https(settings)
             return
         except (OSError,ValueError,subprocess.SubprocessError) as error:
             last=error
@@ -183,6 +226,8 @@ def main():
                 phase='stop-container';podman('stop','--time','45',UNITS[name],timeout=60)
             return 0
         phase='verify-image';verify_image(name,settings)
+        if name=='proxy':
+            phase='private-ingress';application_ingress(settings,create=True)
         if existing is not None:
             if existing.get('State',{}).get('Running'):
                 return subprocess.run(['/usr/bin/podman','attach',UNITS[name]]).returncode
