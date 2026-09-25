@@ -60,6 +60,14 @@ def main():
     assert request('GET',path)[1]==content
     denied(path,username='cibob',password=bob_password)
     share_path='/ocs/v2.php/apps/files_sharing/api/v1/shares'
+    # Outgoing federation must be rejected locally before any remote exchange.
+    try:
+        _,federated=request('POST',share_path+'?format=json',{'path':'/proof.txt','shareType':'6','shareWith':'unapproved@partner.invalid','permissions':'1'},form=True)
+    except urllib.error.HTTPError as error:
+        assert error.code in (400,403)
+    else:
+        assert json.loads(federated)['ocs']['meta']['status']=='failure'
+
     code,body=request('POST',share_path+'?format=json',{'path':'/proof.txt','shareType':'0','shareWith':'cibob','permissions':'1'},form=True)
     result=json.loads(body)['ocs'];assert result['meta']['status']=='ok'
     shared=result['data'];target=shared['file_target']
