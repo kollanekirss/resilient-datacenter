@@ -1,8 +1,8 @@
 # Resilient self-hosted services: product design
 
-Date: 2026-09-25. Status: proposed expanded product specification for review.
+Date: 2026-09-25. Status: active product scope; implementation and acceptance remain in progress.
 
-This document records the clarified end goal. It does not claim the features below are implemented. The current software is a locally tested four-VPS connectivity pilot; no live deployment has been verified.
+This document records the clarified end goal. It does not claim the features below are implemented. Consult README.md and validation-status.md for current implementation and evidence. Disposable Ubuntu service tests do not establish live institutional deployment.
 
 ## Product promise
 
@@ -112,7 +112,7 @@ Internet separation can delay partner delivery and offsite backups. Restoration 
 6. Operator status, lifecycle automation and additional infrastructure resilience.
 7. Public experimental release after installation tests; a supported release only after all advertised journeys pass usability and recovery acceptance.
 
-Each service, local-install and gateway milestone needs its own implementation specification and tests. The next detailed plan implements only milestone 1; it must not imply milestones 2–7 are delivered.
+Each service, local-install and gateway milestone needs its own implementation specification and tests. The original profile plan covered milestone 1. Subsequent plans cover guided installation, verified releases, certificate lifecycle and guarded backups/recovery. Matrix/Element, Nextcloud, regional gateways and all journey acceptance remain outstanding.
 
 ## Relationship to earlier documents
 

@@ -1,0 +1,17 @@
+# Backup and guarded maintenance foundation
+
+The next implementation provides encrypted, consistent offsite backups before permitting component upgrades. It is shared infrastructure for later Matrix and Nextcloud packages. Routine implementation choices are delegated by the user's request to continue through the full product specification.
+
+Use pinned Restic 0.19.1 (Linux amd64 compressed binary SHA256 f415415624dcc452f2a02b8c33641791a8c6d6d3b65bbb3543fcf9a25151585c). Initial transport is SFTP with a dedicated backup identity, explicit host-key pinning, strict known-host checks and an independently retained repository password. No arbitrary commands, paths, SSH options or secret values in public configuration. Repository location is derived from validated institution/node identifiers. Other transports require their own contract.
+
+Separate prepare/configure, repository initialization, backup, read-only status, restore staging and explicit restore application. No pruning, unattended upgrades or generic downgrade. A second empty node is not a protected service. Status must distinguish an existing snapshot from a tested restore, show snapshot age, and keep restore-test status unknown until an actual verification succeeds.
+
+Backup service data/configuration/identities from a fixed role/package catalogue. Stop only the relevant owned services, copy a consistent snapshot into root-private local staging, and restart before uploading it; always attempt to restart originally active services on errors. Check available local staging space and refuse partial/unreadable copies. Encrypt the snapshot using Restic and mark success only after its successful exit and snapshot identity are verified. This initial method incurs a maintenance pause and requires temporary disk capacity; it does not promise zero downtime.
+
+Restores first download a specific full snapshot ID into an isolated directory and validate metadata, paths, ownership and recorded versions. They never infer fencing from a failed ping. Promotion requires an explicit operator acknowledgement that the previous instance is fenced. Unknown version compatibility, unsupported targets or mismatched ownership block mutation. Keep current data until the restored service is verified, and record any recovery failure. Credentials must be available independently of the service/site being recovered.
+
+Managed updates use a reviewed compatibility catalogue, exact current/target identity, verified release provenance, a recoverable pre-change backup and an explicit plan/apply boundary. Initial catalogue entries remain absent until an actual upgrade/recovery path is exercised; unavailable evidence must block an upgrade, never be represented as support. Binary replacement is not database rollback.
+
+Implementation order: strict configuration and fixed resource catalogue; failure-first quiesce/snapshot/restart tests; pinned Restic transport and secret ownership; disposable backup/restore integrity tests; guarded operator commands and status; documented target configuration; tested transition/restore execution where evidence supports it. Actual multi-location service recovery and colleague usability acceptance remain external exercises.
+
+Sources: https://restic.readthedocs.io/en/stable/040_backup.html , https://restic.readthedocs.io/en/stable/050_restore.html , https://github.com/restic/restic/releases/tag/v0.19.1 .
