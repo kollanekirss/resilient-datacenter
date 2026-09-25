@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "administrator_address": "10.76.10.20",
+  "proxmox_address": "10.76.10.10",
+  "linux_interfaces": {
+    "dns": "ens18",
+    "nginx": "ens18",
+    "chat": "ens18",
+    "files": "ens18",
+    "partner": "ens18"
+  },
+  "dhcp": {
+    "start": "10.76.20.100",
+    "end": "10.76.20.199"
+  },
+  "clock": {
+    "mode": "host-rtc",
+    "source": null
+  }
+}

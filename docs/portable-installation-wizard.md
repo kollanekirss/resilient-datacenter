@@ -2,7 +2,7 @@
 
 This development iteration adds a resumable **Proxmox guest-installation wizard**. It prepares verified installation media, uploads it, starts each isolated installer and guides an operator through installing OPNsense and Ubuntu. It is a guided console workflow, not unattended installation.
 
-The phase ends with operator-confirmed OS installation and console login on disk-only VMs. OPNsense routing, Unbound, NGINX, Synapse and Nextcloud configuration remain the subsequent phase. Do not enable the guest network links or describe this phase alone as an operational crisis datacenter.
+The phase ends with operator-confirmed OS installation and console login on disk-only VMs. The next [local network step](portable-local-network.md) prepares OPNsense configuration instructions and the separate Unbound/time module. NGINX, Synapse and Nextcloud configuration remain subsequent work. Keep guest links disconnected until following that reviewed network transition; this installation phase alone is not an operational crisis datacenter.
 
 ## Before starting
 
@@ -38,6 +38,7 @@ No secrets are saved by answering these planning questions. Credential *file pat
 5. **Upload media.** Upload each kind once to the chosen ISO storage. Upload bytes are checksum-checked by Proxmox before use. Every upload uses a unique filename and retains its task receipt. Credentials never accompany vendor download requests.
 6. **Guest installation.** Select edge, dns, nginx, chat, files or partner. Follow the actions below, one guest at a time. The same Ubuntu ISO is reused for all five Linux guests.
 7. **Instructions.** Show the console procedure again. Quit at any point and resume later; progress is retained.
+8. **Local network.** Prepare or verify the [site-specific network kit](portable-local-network.md), or run client DNS/time checks after guided activation. Kit preparation needs no Proxmox credentials and changes no server.
 
 ### Actions for each guest
 

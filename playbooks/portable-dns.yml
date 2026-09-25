@@ -1,0 +1,201 @@
+---
+- name: Configure the explicitly prepared portable DNS and time VM
+  hosts: portable_dns
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require an absolute private preparation kit path
+      ansible.builtin.assert:
+        that:
+          - rdc_network_kit is defined
+          - rdc_network_kit is string
+          - rdc_network_kit.startswith('/')
+          - not ansible_check_mode
+        fail_msg: Supply the reviewed absolute rdc_network_kit path. Use network-verify for non-mutating inspection.
+    - name: Verify every kit artifact on the preparation computer
+      ansible.builtin.command:
+        argv:
+          - '{{ ansible_playbook_python }}'
+          - '{{ playbook_dir }}/../scripts/portable_network_bundle.py'
+          - '{{ rdc_network_kit }}'
+      delegate_to: localhost
+      become: false
+      changed_when: false
+      register: rdc_verified_kit
+    - name: Bind inventory to verified kit and intended Ubuntu guest
+      ansible.builtin.assert:
+        that:
+          - (rdc_verified_kit.stdout | from_json).binding == rdc_network_binding
+          - (rdc_verified_kit.stdout | from_json).dns_address == rdc_dns_address
+          - ansible_host == rdc_dns_address
+          - ansible_facts.distribution == 'Ubuntu'
+          - ansible_facts.distribution_version == '24.04'
+          - ansible_facts.architecture == 'x86_64'
+          - rdc_dns_address in ansible_facts.all_ipv4_addresses
+        fail_msg: This module manages only the prepared Ubuntu 24.04 DNS VM, never the Proxmox host.
+    - name: Inspect explicit console role consent
+      ansible.builtin.stat:
+        path: /etc/rdc-portable-dns-consent
+        follow: false
+      register: rdc_consent_file
+    - name: Require a private root-owned regular consent file
+      ansible.builtin.assert:
+        that:
+          - rdc_consent_file.stat.exists
+          - rdc_consent_file.stat.isreg | default(false)
+          - not (rdc_consent_file.stat.islnk | default(false))
+          - rdc_consent_file.stat.uid == 0
+          - rdc_consent_file.stat.mode == '0600'
+    - name: Read role consent
+      ansible.builtin.slurp:
+        src: /etc/rdc-portable-dns-consent
+      register: rdc_consent
+    - name: Verify console consent belongs to this configuration
+      ansible.builtin.assert:
+        that: (rdc_consent.content | b64decode | trim) == rdc_network_binding
+    - name: Inspect prior role ownership
+      ansible.builtin.stat:
+        path: /etc/rdc-portable-dns
+        follow: false
+      register: rdc_prior
+    - name: Refuse foreign configuration directories
+      ansible.builtin.assert:
+        that:
+          - not rdc_prior.stat.exists or (rdc_prior.stat.isdir | default(false))
+          - not (rdc_prior.stat.islnk | default(false))
+    - name: Read prior ownership when present
+      ansible.builtin.slurp:
+        src: /etc/rdc-portable-dns/ownership
+      when: rdc_prior.stat.exists
+      register: rdc_owner
+    - name: Refuse ownership changes or partial foreign installations
+      ansible.builtin.assert:
+        that: not rdc_prior.stat.exists or (rdc_owner.content | default('') | b64decode | trim) == rdc_network_binding
+        fail_msg: Existing configuration has another binding. Review migration via console; do not overwrite it.
+    - name: Require packages prepared while connected
+      ansible.builtin.package_facts:
+        manager: auto
+    - name: Check prepared software
+      ansible.builtin.assert:
+        that:
+          - "'unbound' in ansible_facts.packages"
+          - "'chrony' in ansible_facts.packages"
+          - "'nftables' in ansible_facts.packages"
+          - "'openssh-server' in ansible_facts.packages"
+    - name: Inspect nftables compatibility
+      ansible.builtin.command: /usr/sbin/nft --version
+      changed_when: false
+      register: rdc_nft_version
+    - name: Require atomic table destruction support
+      ansible.builtin.assert:
+        that: (rdc_nft_version.stdout | regex_search('[0-9]+\.[0-9]+\.[0-9]+')) is version('1.0.9', '>=')
+    - name: Inspect existing firewall without changing it
+      ansible.builtin.command: /usr/sbin/nft -j list tables
+      changed_when: false
+      register: rdc_tables
+    - name: Refuse unrelated active firewall tables or unowned RDC table
+      ansible.builtin.assert:
+        that:
+          - (rdc_tables.stdout | from_json).nftables | selectattr('table', 'defined') | map(attribute='table.name') | difference(['rdc_dns']) | length == 0
+          - (rdc_tables.stdout | from_json).nftables | selectattr('table', 'defined') | map(attribute='table.family') | difference(['inet']) | length == 0
+          - rdc_prior.stat.exists or ((rdc_tables.stdout | from_json).nftables | selectattr('table', 'defined') | list | length == 0)
+        fail_msg: Use a dedicated fresh DNS VM. Existing firewalls require independent review; nothing will be flushed.
+    - name: Create role directory
+      ansible.builtin.file:
+        path: /etc/rdc-portable-dns
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Persist ownership before configuration work
+      ansible.builtin.copy:
+        content: '{{ rdc_network_binding }}{{ "\n" }}'
+        dest: /etc/rdc-portable-dns/ownership
+        owner: root
+        group: root
+        mode: '0600'
+    - name: Install syntax-checked local DNS configuration
+      ansible.builtin.copy:
+        src: '{{ rdc_network_kit }}/dns/unbound.conf'
+        dest: /etc/unbound/rdc-portable.conf
+        owner: root
+        group: root
+        mode: '0644'
+        validate: /usr/sbin/unbound-checkconf %s
+      notify: Restart portable DNS
+    - name: Stage time configuration under the distribution AppArmor-allowed path
+      ansible.builtin.copy:
+        src: '{{ rdc_network_kit }}/dns/chrony.conf'
+        dest: /etc/chrony/rdc-portable.pending.conf
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Check staged chrony syntax before activation
+      ansible.builtin.command: /usr/sbin/chronyd -p -f /etc/chrony/rdc-portable.pending.conf
+      changed_when: false
+    - name: Activate checked local time configuration
+      ansible.builtin.copy:
+        src: /etc/chrony/rdc-portable.pending.conf
+        remote_src: true
+        dest: /etc/chrony/rdc-portable.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart portable time
+    - name: Install atomic dedicated firewall configuration
+      ansible.builtin.copy:
+        src: '{{ rdc_network_kit }}/dns/firewall.nft'
+        dest: /etc/rdc-portable-dns/firewall.nft
+        owner: root
+        group: root
+        mode: '0644'
+        validate: /usr/sbin/nft --check --file %s
+      notify: Restart portable firewall
+    - name: Install separate role units
+      ansible.builtin.copy:
+        src: '{{ playbook_dir }}/../portable/{{ item }}.service'
+        dest: '/etc/systemd/system/{{ item }}.service'
+        owner: root
+        group: root
+        mode: '0644'
+      loop: [rdc-portable-firewall, rdc-portable-dns, rdc-portable-time]
+      register: rdc_units
+    - name: Reload role units
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+    - name: Activate dedicated firewall before opening listeners
+      ansible.builtin.systemd_service:
+        name: rdc-portable-firewall
+        state: started
+        enabled: true
+    - name: Stop conflicting stock daemons while retaining stock configuration
+      ansible.builtin.systemd_service:
+        name: '{{ item }}'
+        state: stopped
+        enabled: false
+      loop: [unbound, chrony]
+    - name: Apply any changed role configuration
+      ansible.builtin.meta: flush_handlers
+    - name: Start local services without waiting for WAN
+      ansible.builtin.systemd_service:
+        name: '{{ item }}'
+        state: '{{ "restarted" if rdc_units.changed else "started" }}'
+        enabled: true
+      loop: [rdc-portable-dns, rdc-portable-time]
+    - name: Report configuration rather than readiness
+      ansible.builtin.debug:
+        msg: DNS/time configured. Run client network-check and physical isolation/clock checks; application readiness is not established.
+  handlers:
+    - name: Restart portable firewall
+      ansible.builtin.systemd_service:
+        name: rdc-portable-firewall
+        state: restarted
+    - name: Restart portable DNS
+      ansible.builtin.systemd_service:
+        name: rdc-portable-dns
+        state: restarted
+    - name: Restart portable time
+      ansible.builtin.systemd_service:
+        name: rdc-portable-time
+        state: restarted

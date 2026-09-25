@@ -1,0 +1,13 @@
+[Unit]
+Description=RDC dedicated DNS and time firewall
+Before=rdc-portable-dns.service rdc-portable-time.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/usr/sbin/nft --check --file /etc/rdc-portable-dns/firewall.nft
+ExecStart=/usr/sbin/nft --file /etc/rdc-portable-dns/firewall.nft
+# Stop intentionally retains policy. Never flush another service's tables.
+
+[Install]
+WantedBy=multi-user.target
