@@ -27,3 +27,6 @@ jobs:
         env:
           SERVICE_ROLE: ${{ matrix.role }}
         run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT .venv/bin/python scripts/ci_certificate_lifecycle.py "$SERVICE_ROLE"
+      - name: Collect disposable service diagnostics on failure
+        if: failure()
+        run: sudo journalctl -u headscale -u sc-derp --no-pager --lines=100
