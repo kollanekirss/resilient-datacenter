@@ -1,6 +1,8 @@
 - name: Record managed host
   ansible.builtin.copy:
-    content: "server-connectivity pilot\n"
+    content: 'server-connectivity pilot
+
+      '
     dest: /etc/server-connectivity.managed
     mode: '0644'
 - name: Create relay service account
@@ -32,21 +34,27 @@
   ansible.builtin.assert:
     that: relay_binary.stat.checksum == derper_sha256
   when: not ansible_check_mode
+- name: Prepare explicitly managed certificate
+  ansible.builtin.include_role:
+    name: managed_tls
+  when: tls_mode | default('supplied') == 'managed-acme'
 - name: Install certificate chain
   ansible.builtin.copy:
     src: '{{ tls_certificate }}'
-    dest: '/etc/sc-derp/{{ derp_hostname }}.crt'
+    dest: /etc/sc-derp/{{ derp_hostname }}.crt
     group: sc-derp
     mode: '0640'
   notify: Restart relay
+  when: tls_mode | default('supplied') == 'supplied'
 - name: Install private key
   ansible.builtin.copy:
     src: '{{ tls_private_key }}'
-    dest: '/etc/sc-derp/{{ derp_hostname }}.key'
+    dest: /etc/sc-derp/{{ derp_hostname }}.key
     group: sc-derp
     mode: '0640'
   no_log: true
   notify: Restart relay
+  when: tls_mode | default('supplied') == 'supplied'
 - name: Install relay service
   ansible.builtin.template:
     src: sc-derp.service.j2
@@ -61,3 +69,8 @@
     state: started
 - name: Apply pending restart
   ansible.builtin.meta: flush_handlers
+- name: Verify certificate activation and enable renewal
+  ansible.builtin.include_role:
+    name: managed_tls
+    tasks_from: verify
+  when: tls_mode | default('supplied') == 'managed-acme'

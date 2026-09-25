@@ -9,7 +9,7 @@ Start with the [common command interface](docs/operations.md) and [guided setup 
 
 See [verified experimental releases](docs/releases.md) for relay downloads with exact source and signed provenance. Downloading never installs or upgrades servers.
 
-The [deployment-profile operator guide](docs/deployment-profiles.md) remains available for the existing SSH-managed workflows. Matrix/Element, Nextcloud, application recovery and regional gateways are not yet implemented. The guided workflow still requires operator-supplied servers, DNS and certificates; beginner usability has not been validated.
+The [deployment-profile operator guide](docs/deployment-profiles.md) remains available for the existing SSH-managed workflows. Matrix/Element, Nextcloud, application recovery and regional gateways are not yet implemented. The guided workflow requires operator-supplied servers and DNS; it accepts supplied certificates or an explicit [managed certificate mode](docs/managed-certificates.md) for fresh infrastructure. Beginner usability has not been validated.
 
 The original four-VPS pilot and its existing commands are retained below as the **legacy workflow**. Use one workflow consistently; neither path automatically migrates the other's installations.
 

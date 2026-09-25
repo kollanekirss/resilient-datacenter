@@ -1,0 +1,32 @@
+name: Disposable certificate lifecycle
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  certificate-service:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [controller, relay]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Prepare disposable runner dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+      - name: Exercise real service certificate activation and rollback
+        env:
+          SERVICE_ROLE: ${{ matrix.role }}
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT .venv/bin/python scripts/ci_certificate_lifecycle.py "$SERVICE_ROLE"
+      - name: Collect disposable service diagnostics on failure
+        if: failure()
+        run: sudo journalctl -u headscale -u sc-derp --no-pager --lines=100

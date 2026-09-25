@@ -26,8 +26,8 @@ database:
     path: /var/lib/headscale/db.sqlite
     write_ahead_log: true
     wal_autocheckpoint: 1000
-tls_cert_path: /etc/headscale/tls.crt
-tls_key_path: /etc/headscale/tls.key
+tls_cert_path: {{ '/etc/rdc-tls/active/tls.crt' if tls_mode | default('supplied') == 'managed-acme' else '/etc/headscale/tls.crt' }}
+tls_key_path: {{ '/etc/rdc-tls/active/tls.key' if tls_mode | default('supplied') == 'managed-acme' else '/etc/headscale/tls.key' }}
 log:
   level: info
   format: text

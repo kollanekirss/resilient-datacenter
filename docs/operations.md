@@ -135,3 +135,7 @@ GitHub's Local checks workflow runs this command on a disposable Ubuntu runner w
 ## Verified downloads
 
 `./rdc release fetch VERSION --commit FULL_COMMIT --output-dir NEW_DIRECTORY` verifies the fixed project publisher, workflow, source revision and artifact hashes before making release files available. It never installs them. See [release instructions](releases.md) for prerequisites and trust limits.
+
+## Infrastructure certificate lifecycle
+
+The wizard offers supplied certificates (existing schema 2) or explicit managed issuance (schema 3). See [managed certificates](managed-certificates.md) for operator terms acceptance, public port/DNS requirements, status and renewal recovery. No certificate mode is silently changed on an existing installation.

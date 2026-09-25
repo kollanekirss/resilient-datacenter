@@ -45,6 +45,7 @@
     - /usr/local/bin/tailscale
     - /etc/systemd/system/tailscaled.service
     - /etc/sc-test
+    - /etc/rdc-tls
   register: profile_existing
 - name: Refuse unowned existing or legacy installations
   ansible.builtin.assert:
@@ -90,6 +91,42 @@
     that: profile_marker_stat.stat.exists
     fail_msg: Deploy this profile before enrollment checks or test-service installation.
   when: profile_require_owned | default(false) | bool
+- name: Inspect existing certificate authority state before managed issuance
+  ansible.builtin.stat:
+    path: /etc/letsencrypt
+  register: existing_acme_state
+  when: expected_profile_ownership.tls_mode | default('supplied') == 'managed-acme'
+- name: Refuse adoption of an unowned certificate authority account
+  ansible.builtin.assert:
+    that: profile_marker_stat.stat.exists or not existing_acme_state.stat.exists
+    fail_msg: Existing Certbot state requires a reviewed migration; managed issuance supports fresh dedicated hosts.
+  when: expected_profile_ownership.tls_mode | default('supplied') == 'managed-acme'
+- name: Inspect managed HTTP challenge listener conflicts
+  ansible.builtin.command:
+    argv: [/usr/bin/ss, -H, -ltn, sport, '=', ':80']
+  register: acme_listener
+  changed_when: false
+  when: expected_profile_ownership.tls_mode | default('supplied') == 'managed-acme'
+- name: Require unused HTTP challenge port
+  ansible.builtin.assert:
+    that: acme_listener.stdout | trim == ''
+    fail_msg: Managed certificates require TCP 80 free on this dedicated host and reachable from the Internet.
+  when: expected_profile_ownership.tls_mode | default('supplied') == 'managed-acme'
+- name: Read public certificate name resolution
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - 'import json,socket,sys; print(json.dumps(sorted({x[4][0] for x in socket.getaddrinfo(sys.argv[1],80,type=socket.SOCK_STREAM)})))'
+      - '{{ headscale_hostname if expected_profile_ownership.role == "controller" else derp_hostname }}'
+  register: acme_dns
+  changed_when: false
+  when: expected_profile_ownership.tls_mode | default('supplied') == 'managed-acme'
+- name: Require direct IPv4 DNS for this managed certificate mode
+  ansible.builtin.assert:
+    that: (acme_dns.stdout | from_json) == [ansible_host]
+    fail_msg: Point the public DNS name directly at this host IPv4. IPv6, proxies and load balancers need a separately supported certificate mode.
+  when: expected_profile_ownership.tls_mode | default('supplied') == 'managed-acme'
 - name: Claim a fresh host only after successful preflight
   ansible.builtin.copy:
     content: '{{ expected_profile_ownership | to_nice_json }}'

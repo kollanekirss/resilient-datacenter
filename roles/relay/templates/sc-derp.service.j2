@@ -7,7 +7,7 @@ User=sc-derp
 Group=sc-derp
 StateDirectory=sc-derp
 UMask=0077
-ExecStart=/usr/local/bin/sc-derper -a :443 -http-port=-1 -stun=true -stun-port=3478 -hostname={{ derp_hostname }} -certmode=manual -certdir=/etc/sc-derp -c=/var/lib/sc-derp/derper.key -verify-client-url=https://{{ headscale_hostname }}/verify -verify-client-url-fail-open=false
+ExecStart=/usr/local/bin/sc-derper -a :443 -http-port=-1 -stun=true -stun-port=3478 -hostname={{ derp_hostname }} -certmode=manual -certdir={{ '/etc/rdc-tls/active' if tls_mode | default('supplied') == 'managed-acme' else '/etc/sc-derp' }} -c=/var/lib/sc-derp/derper.key -verify-client-url=https://{{ headscale_hostname }}/verify -verify-client-url-fail-open=false
 Restart=on-failure
 RestartSec=5
 AmbientCapabilities=CAP_NET_BIND_SERVICE
