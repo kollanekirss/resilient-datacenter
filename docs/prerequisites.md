@@ -38,3 +38,7 @@ Regional partners additionally need independently verified organisation signing 
 ## Before using real data
 
 Complete [the site acceptance worksheet](site-acceptance.md). Have a second person follow the released instructions without help from the author, including a recovery exercise. Agree on tolerated backup age, maintenance windows, operating responsibility and what to do when status needs attention. CI cannot make those decisions for your institution.
+
+## Managed client diagnostics
+
+Project-managed Ubuntu clients explicitly disable upstream diagnostic uploads with the supported `TS_NO_LOGS_NO_SUPPORT` setting. Local service logs remain available. This applies after installing or reapplying this reviewed node profile; merely downloading a release does not change an existing daemon. Reapplying may restart its networking service, so retain independent administration access. Separately installed desktop/mobile clients need their own privacy configuration. The opt-out limits upstream support based on those diagnostics; see [Tailscale’s logging documentation](https://tailscale.com/docs/features/logging). This is not a claim of zero external traffic: DNS, time, package/image downloads and configured certificate providers remain dependencies.

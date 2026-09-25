@@ -4,6 +4,7 @@ After=network-online.target
 Wants=network-online.target
 [Service]
 Type=notify
+Environment=TS_NO_LOGS_NO_SUPPORT=true
 ExecStart=/usr/local/sbin/tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/run/tailscale/tailscaled.sock --port=41641
 ExecStopPost=/usr/local/sbin/tailscaled --cleanup
 Restart=on-failure

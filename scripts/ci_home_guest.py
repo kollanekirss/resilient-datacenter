@@ -29,6 +29,9 @@ def main(phase,data):
         finally:auth.unlink(missing_ok=True)
         from local_checks import check_local
         assert check_local(manifest,require_owned=True)==[]
+        pid=subprocess.run(['systemctl','show','--property=MainPID','--value','tailscaled'],check=True,capture_output=True,text=True).stdout.strip()
+        assert pid.isdigit() and int(pid)>0
+        assert b'TS_NO_LOGS_NO_SUPPORT=true' in (Path('/proc')/pid/'environ').read_bytes().split(b'\0')
         before=network_identity()
         assert apply_manifest(manifest,path,confirm_fn=lambda _:'yes')['status']=='installed'
         assert before==network_identity()
