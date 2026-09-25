@@ -1,0 +1,2 @@
+# Disposable CI only; never installed on a managed service node.
+playwright==1.63.0

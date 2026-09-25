@@ -20,8 +20,10 @@ jobs:
         run: |
           python -m venv .venv
           .venv/bin/python -m pip install -r requirements.txt
+          .venv/bin/python -m pip install -r requirements-ci-browser.txt
           sudo apt-get update -qq
-          sudo apt-get install -y podman nftables openssh-server
+          sudo apt-get install -y podman nftables openssh-server libnss3-tools
+          sudo .venv/bin/python -m playwright install --with-deps chromium
       - name: Exercise the actual Matrix package with trusted HTTPS
         run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT .venv/bin/python scripts/ci_matrix_services.py
       - name: Collect disposable application diagnostics on failure
@@ -29,6 +31,8 @@ jobs:
         run: |
           sudo systemctl status rdc-postgres rdc-synapse rdc-element rdc-service-proxy --no-pager || true
           sudo journalctl -u rdc-postgres -u rdc-synapse -u rdc-element -u rdc-service-proxy --no-pager --lines=120
+          sudo systemctl status rdc-backup-sshd tailscaled rdc-backup --no-pager || true
+          sudo journalctl -u rdc-backup-sshd -u tailscaled -u rdc-backup --no-pager --lines=100
           sudo journalctl -k --no-pager --lines=250
           sudo aa-status || true
           sudo podman info --format '{{json .Host.Security}}'

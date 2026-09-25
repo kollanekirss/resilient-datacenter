@@ -122,6 +122,8 @@ def main():
     result=install_or_resume(profile,network,ADDRESS)
     assert result['state']=='service-listeners-verified' and hashlib.sha256(signing.read_bytes()).hexdigest()==signing_hash
     print('Actual encrypted SFTP scheduled application backup, scope transition, selected snapshot restore, account tokens/message/media/signing identity preservation and installation resume PASS.',flush=True)
-    print('Real Tailscale enrollment, browser login interaction, end-to-end encryption recovery and institutional acceptance NOT RUN by this package slice.')
+    from ci_element_browser import exercise
+    exercise('@cialice:'+MATRIX,alice_password,room)
+    print('Real Tailscale enrollment, end-to-end encryption recovery and institutional acceptance NOT RUN by this package slice.')
 
 if __name__=='__main__':main()
