@@ -37,6 +37,8 @@ def main():
              'tls_mode':'supplied','tls_certificate':str(cert),'tls_private_key':str(key)}
     alice_password=secrets.token_urlsafe(24);bob_password=secrets.token_urlsafe(24)
     assert install_or_resume(profile,network,ADDRESS,'cialice',alice_password)['state']=='file-service-listeners-verified'
+    from ci_service_ingress import check as ingress_check
+    ingress_check(ADDRESS,profile['nextcloud_hostname'],'/status.php','rdc-nextcloud-proxy')
     settings=runtime.read_settings()
     for component in runtime.UNITS:
         record=runtime.inspect_container(component,settings)

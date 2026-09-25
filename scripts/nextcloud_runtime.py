@@ -13,7 +13,7 @@ import sys
 import time
 
 if __name__=='__main__':sys.path.insert(0,'/usr/local/lib/rdc-nextcloud')
-from service_runtime import root_json,owner_digest,validate_container,verify_image,podman
+from service_runtime import root_json,owner_digest,validate_container,verify_image,podman,application_ingress
 import nextcloud_regional as regional
 
 BASE=Path('/etc/rdc-nextcloud')
@@ -153,7 +153,7 @@ def ready(name,settings,*,attempts=90):
                     if response.status!=200 or data.get('installed') is not True or data.get('maintenance') or data.get('needsDbUpgrade') or data.get('versionstring')!=settings['components'][name]['version']:
                         raise ValueError('Nextcloud application readiness failed')
                 finally:connection.close()
-            else:verify_https(settings)
+            else:application_ingress(settings);verify_https(settings)
             return
         except (OSError,ValueError,subprocess.SubprocessError):
             if attempt==attempts-1:raise ValueError('File service did not reach verified readiness') from None
@@ -171,6 +171,8 @@ def main():
             if existing is not None:podman('stop','--time','45',UNITS[name],timeout=60)
             return 0
         phase='image';verify_image(name,settings)
+        if name=='proxy':
+            phase='private-ingress';application_ingress(settings,create=True)
         if existing is not None:
             if existing.get('State',{}).get('Running'):return subprocess.run(['/usr/bin/podman','attach',UNITS[name]]).returncode
             phase='remove';podman('rm',UNITS[name])

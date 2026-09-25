@@ -52,9 +52,9 @@ def remote_probe():
 
 
 def prepare_user_network():
-    for args in [('ip','netns','add','rdc-upgrade-user'),('ip','link','add','rdc-upg-host','type','veth','peer','name','rdc-upg-user'),
-                 ('ip','link','set','rdc-upg-user','netns','rdc-upgrade-user'),('ip','address','add','10.217.251.1/30','dev','rdc-upg-host'),
-                 ('ip','link','set','rdc-upg-host','up'),('ip','netns','exec','rdc-upgrade-user','ip','address','add','10.217.251.2/30','dev','rdc-upg-user'),
+    for args in [('ip','netns','add','rdc-upgrade-user'),('ip','link','add','tailscale0','type','veth','peer','name','rdc-upg-user'),
+                 ('ip','link','set','rdc-upg-user','netns','rdc-upgrade-user'),('ip','address','add','10.217.251.1/30','dev','tailscale0'),
+                 ('ip','link','set','tailscale0','up'),('ip','netns','exec','rdc-upgrade-user','ip','address','add','10.217.251.2/30','dev','rdc-upg-user'),
                  ('ip','netns','exec','rdc-upgrade-user','ip','link','set','rdc-upg-user','up'),('ip','netns','exec','rdc-upgrade-user','ip','link','set','lo','up'),
                  ('ip','netns','exec','rdc-upgrade-user','ip','route','add','default','via','10.217.251.1')]:
         subprocess.run(args,check=True,capture_output=True,timeout=15)
