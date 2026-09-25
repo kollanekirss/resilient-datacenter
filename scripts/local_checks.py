@@ -17,7 +17,7 @@ from operation_results import Check, check, message, blocking_checks
 
 MARKER=Path('/etc/server-connectivity-profile.json')
 STATE=Path('/var/lib/tailscale')
-RESERVED=['/etc/server-connectivity.managed','/etc/headscale','/var/lib/headscale','/etc/sc-derp','/var/lib/sc-derp','/var/lib/tailscale','/usr/bin/tailscale','/usr/local/bin/tailscale','/etc/systemd/system/tailscaled.service','/etc/sc-test']
+RESERVED=['/etc/server-connectivity.managed','/etc/headscale','/var/lib/headscale','/etc/sc-derp','/var/lib/sc-derp','/var/lib/tailscale','/usr/bin/tailscale','/usr/local/bin/tailscale','/usr/local/sbin/tailscaled','/etc/systemd/system/tailscaled.service','/etc/sc-test']
 
 
 def platform_errors(system: str, machine: str, os_release: dict, systemd: bool) -> list[str]:

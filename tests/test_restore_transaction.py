@@ -31,7 +31,8 @@ def fixture(tmp_path):
         root=tmp_path/name;(root/'etc').mkdir(parents=True);(root/'var/lib/tailscale').mkdir(parents=True);(root/'usr/local/bin').mkdir(parents=True)
         (root/'etc/server-connectivity-profile.json').write_text(json.dumps(owner))
         (root/'var/lib/tailscale/tailscaled.state').write_text(state)
-        for binary in ('tailscale','tailscaled'): (root/'usr/local/bin'/binary).write_bytes(b'pinned')
+        for relative in ('usr/local/bin/tailscale','usr/local/sbin/tailscaled'):
+            (root/relative).parent.mkdir(parents=True,exist_ok=True);(root/relative).write_bytes(b'pinned')
         return root
     source=make('source','saved identity');target=make('target','current identity')
     stage=tmp_path/'stage';capture(source,stage,owner,services=Services(active=()))
@@ -58,7 +59,7 @@ def test_failed_service_reverts_data_before_releasing_isolation(tmp_path):
 
 def test_component_change_or_pending_transaction_blocks_before_isolation(tmp_path):
     owner,root,stage=fixture(tmp_path);runtime=Runtime()
-    (root/'usr/local/bin/tailscaled').write_text('different binary')
+    (root/'usr/local/sbin/tailscaled').write_text('different binary')
     with pytest.raises(ValueError): api().apply(stage,owner,root=root,runtime=runtime,permissions=lambda *a:None)
     assert runtime.events==[]
 

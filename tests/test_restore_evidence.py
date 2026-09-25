@@ -41,5 +41,5 @@ def test_pending_restore_takes_precedence_over_historical_evidence(tmp_path):
     assert restore_evidence.latest(root,owner)['state']=='service-verified'
     pending=root/'etc/rdc-restore-pending.json';pending.write_text('{}')
     assert restore_evidence.latest(root,owner)['state']=='restore-pending'
-    pending.unlink();(root/'usr/local/bin/tailscaled').write_bytes(b'new version')
+    pending.unlink();(root/'usr/local/sbin/tailscaled').write_bytes(b'new version')
     assert restore_evidence.latest(root,owner)['state']=='verified-on-prior-components'

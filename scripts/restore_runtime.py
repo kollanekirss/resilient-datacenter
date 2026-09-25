@@ -8,6 +8,7 @@ import re
 import shlex
 import stat
 import subprocess
+import time
 from backup_contracts import resources
 from backup_snapshot import Services
 from backup_operations import root_json
@@ -96,6 +97,21 @@ def rules_digest(data,identifier):
         return value
     contents=[normalize(e) for e in entries if 'metainfo' not in e]
     return hashlib.sha256(json.dumps(contents,sort_keys=True).encode()).hexdigest()
+
+
+def verify_peer(manifest,*,attempts=30,pause=time.sleep):
+    from local_checks import inspect_local_checks
+    deadline=time.monotonic()+45
+    transient={'client.stopped','client.inspect_denied','client.awaiting_enrollment','client.unavailable'}
+    for attempt in range(attempts):
+        checks=inspect_local_checks(manifest,require_owned=True,check_tls=False)
+        if checks and all(c.outcome=='pass' for c in checks) and any(c.code=='client.verified' for c in checks):return
+        failures={c.code for c in checks if c.outcome!='pass'}
+        if not failures or not failures<=transient or time.monotonic()>=deadline or attempt==attempts-1:break
+        # A systemd start does not mean the daemon has loaded its restored
+        # identity and preferences. Keep ingress isolated while it becomes ready.
+        pause(1)
+    raise ValueError('Restored networking identity could not be verified')
 
 
 class Runtime(Services):
@@ -202,11 +218,9 @@ class Runtime(Services):
     def verify(self,owner):
         if not all(self.is_active(n) for n in resources(owner).services): raise ValueError('Restored service did not stay active')
         if owner['role']=='peer':
-            from local_checks import inspect_local_checks
             manifest={'kind':'local-node','schema_version':1,'institution_id':owner['institution_id'],'node_name':owner['node_name'],
                       'headscale_hostname':owner['controller_hostname'],'node_tag':owner['node_tag']}
-            checks=inspect_local_checks(manifest,require_owned=True,check_tls=False)
-            if any(c.outcome!='pass' for c in checks) or not any(c.code=='client.verified' for c in checks): raise ValueError('Restored networking identity could not be verified')
+            verify_peer(manifest)
             if 'applications' in owner:
                 from backup_scope import application_runtime
                 runtime=application_runtime(owner['applications']);settings=runtime.read_settings()

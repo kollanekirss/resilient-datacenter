@@ -63,7 +63,8 @@ def main():
         secret=b'CI-ONLY-IDENTITY-'+os.urandom(128)
         (root/'var/lib/tailscale/tailscaled.state').write_bytes(secret)
         (root/'etc/server-connectivity-profile.json').write_text(json.dumps(owner))
-        for name in ('tailscale','tailscaled'): (root/'usr/local/bin'/name).write_bytes(b'CI placeholder; never executed')
+        for relative in ('usr/local/bin/tailscale','usr/local/sbin/tailscaled'):
+            (root/relative).parent.mkdir(parents=True,exist_ok=True);(root/relative).write_bytes(b'CI placeholder; never executed')
         stage=folder/'snapshot';capture(root,stage,owner,services=Services())
         identifier=transport.backup(stage)
         snapshots=transport.snapshots();assert any(s['id']==identifier for s in snapshots)

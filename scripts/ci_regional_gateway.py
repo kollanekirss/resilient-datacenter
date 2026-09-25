@@ -145,10 +145,10 @@ def runtime_acceptance(profile,own,document):
     executable=Path('/usr/local/bin/tailscale')
     if executable.exists():raise ValueError('Synthetic gateway fixture requires no existing VPN client')
     executable.write_text('#!/usr/bin/python3\nimport json,sys\nprint(json.dumps('+repr(status)+' if sys.argv[1:]==["status","--json"] else '+repr(prefs)+'))\n');executable.chmod(0o755)
-    shutil.copy2('/usr/bin/sleep','/usr/local/bin/tailscaled')
+    shutil.copy2('/usr/bin/sleep','/usr/local/sbin/tailscaled')
     Path('/var/lib/tailscale').mkdir(mode=0o700)
     Path('/var/lib/tailscale/ci-identity').write_text('explicitly synthetic gateway network identity')
-    Path('/etc/systemd/system/tailscaled.service').write_text('[Service]\nType=simple\nExecStart=/usr/local/bin/tailscaled infinity\n')
+    Path('/etc/systemd/system/tailscaled.service').write_text('[Service]\nType=simple\nExecStart=/usr/local/sbin/tailscaled infinity\n')
     run('systemctl','daemon-reload');run('systemctl','start','tailscaled')
     from ci_matrix_backup import prepare_backup
     network_snapshot=prepare_backup(network,address='100.64.1.12')

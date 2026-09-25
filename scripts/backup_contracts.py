@@ -77,7 +77,7 @@ def resources(owner):
 
 def binary_paths(owner):
     catalogue={'controller':('usr/bin/headscale',),'relay':('usr/local/bin/sc-derper',),
-               'peer':('usr/local/bin/tailscale','usr/local/bin/tailscaled')}
+               'peer':('usr/local/bin/tailscale','usr/local/sbin/tailscaled')}
     resources(owner)
     paths=catalogue[owner['role']]
     if 'applications' in owner:
