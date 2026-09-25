@@ -11,7 +11,8 @@ import tempfile
 from datetime import datetime, timezone
 from profile_config import load_profile
 from setup_contracts import validate_local_manifest
-from local_checks import check_local
+from local_checks import check_local, inspect_local_checks
+from operation_results import ActionResult, Exit, OperationError, result_for_state
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -35,6 +36,33 @@ def apply_manifest(manifest, path, *, runner=subprocess.run, checker=check_local
         env.update(ANSIBLE_CONFIG=str(ROOT/'ansible.cfg'),ANSIBLE_HOME=str(ROOT/'.cache/ansible'),ANSIBLE_LOCAL_TEMP=str(ROOT/'.work/ansible-tmp'))
         runner(install_command(snapshot,as_root=os.geteuid()==0),cwd=ROOT,env=env,check=True)
     return {'status':'installed','enrollment':'not-verified'}
+
+
+def execute_local(action: str, manifest_path: Path) -> ActionResult:
+    if action not in ('check','apply','enroll','status'):
+        raise OperationError('operation.invalid',Exit.INVALID)
+    try:
+        manifest=load_profile(str(manifest_path))
+    except (OSError,ValueError):
+        raise OperationError('manifest.invalid',Exit.INVALID) from None
+    if validate_local_manifest(manifest):
+        raise OperationError('manifest.invalid',Exit.INVALID)
+    checks=inspect_local_checks(manifest,require_owned=action in ('enroll','status'),check_tls=action!='status')
+    if any(c.outcome in ('fail','unknown') for c in checks):
+        return ActionResult('blocked',Exit.BLOCKED,tuple(checks))
+    try:
+        if action=='apply': result=apply_manifest(manifest,manifest_path)
+        elif action=='check': result={'status':'checks-passed','clock_sync':'not-verified'}
+        else:
+            from local_enrollment import NativeRuntime, enrollment_action
+            result=enrollment_action(manifest,NativeRuntime(),start_requested=action=='enroll')
+        return result_for_state(result['status'],details=result)
+    except ValueError:
+        raise OperationError('client.state_mismatch',Exit.BLOCKED) from None
+    except (OSError,subprocess.SubprocessError):
+        raise OperationError('operation.failed',Exit.FAILED) from None
+    except (KeyboardInterrupt,EOFError):
+        return result_for_state('cancelled')
 
 
 def main():
