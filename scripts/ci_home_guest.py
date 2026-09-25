@@ -37,11 +37,13 @@ def main(phase,data):
         profile=data['profile'];address=network_identity()['address']
         with Path('/etc/hosts').open('a') as stream:stream.write('\n'+address+' '+data['hostname']+' chat.home.ci.test\n')
         if data['package']=='matrix':
-            from service_operations import install_or_resume
+            from service_operations import install_or_resume,preflight
             from service_accounts import create
+            preflight(profile)
             install_or_resume(profile,owner,address);create('cialice',data['password'],admin=True)
         else:
-            from nextcloud_operations import install_or_resume
+            from nextcloud_operations import install_or_resume,preflight
+            preflight(profile)
             install_or_resume(profile,owner,address,'cialice',data['password'])
         return {'network':network_identity(),'application_identity':application_identity(data['package'])}
     if phase=='backup-configure':
@@ -59,6 +61,13 @@ def main(phase,data):
         result['captured_at']=evidence['captured_at']
         return dict(result,network=network_identity(),application_identity=application_identity(data['package']))
     if phase=='bootstrap':
+        import local_checks
+        inspect=local_checks.inspect_local_checks
+        def observed(*args,**kwargs):
+            checks=inspect(*args,**kwargs)
+            print('Disposable identity checks: '+','.join(c.code+'='+c.outcome for c in checks),file=sys.stderr,flush=True)
+            return checks
+        local_checks.inspect_local_checks=observed
         from backup_operations import configure,configured
         configure(data['backup_profile'],password_file=Path('/root/recovery-password'),ssh_key_file=Path('/root/recovery-key'))
         from backup_bootstrap import stage,review
