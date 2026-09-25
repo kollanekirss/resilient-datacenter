@@ -118,3 +118,14 @@ The [controller run 36133848306](https://github.com/kollanekirss/resilient-datac
 An intermittent restart failure in runs 36132971329 and 36135765895 occurred while inspecting a container after shutdown. The runtime now retains stopped containers and explicitly validates/removes them before launch, eliminating competing automatic removal. The [updated runtime run 36137009834](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36137009834) passed 20 consecutive verified proxy restarts, ten real failed TLS activations with recovery of the previous live certificate, and the complete application/browser/backup/issuer suite. Its restore service verification took 12.76 seconds in this fixture; this is not a site-recovery guarantee.
 
 These fixtures do not demonstrate real VPN enrollment, home NAT, physical site separation, Nextcloud, regional gateways or beginner acceptance. The older network-only statements above describe their historical increments.
+
+
+## Nextcloud application increment (development source)
+
+The [file-service run 36137540936](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36137540936) passed real pinned Nextcloud 35.0.1, PostgreSQL and Caddy with enforced container confinement, trusted HTTPS, two accounts, exact uploaded/downloaded bytes, another user's access denial, approved local sharing and revocation, background jobs and repeat installation. It also rejects an outgoing unapproved federated share.
+
+The installed scheduled backup entry point captured the database, instance credentials and files into encrypted restricted SFTP storage. Fenced restoration recovered original bytes and account access, removed files created after the selected snapshot, preserved the instance identity and changed the client recovery fingerprint. Promotion and service verification took 52.88 seconds in this disposable fixture; that excludes replacement provisioning and snapshot download, and is not a site-recovery guarantee. A Chromium browser then logged in and displayed the restored file.
+
+Actual TLS activation failure restored the previous live certificate. The frozen certificate timer installed a new trusted leaf and retained it during simulated provider failure. Public DNS/ACME issuance, real VPN/home NAT, physical offsite placement, controlled upgrades, regional sharing and colleague acceptance remain NOT RUN.
+
+Review additionally corrected the effective public-link setting and removed bootstrap credentials before making the pinned code tree readable. The next acceptance run includes public-link creation denial; no earlier run is evidence for that new assertion. Local checks pass 438 tests and all 16 playbook syntax checks.

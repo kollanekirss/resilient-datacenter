@@ -24,7 +24,8 @@ def guard_script(pending=PENDING,permit=PERMIT):
 
 
 def guard_files(owner):
-    names=list(resources(owner).services)
+    names=[n for n in resources(owner).services if not n.endswith('.timer')]
+    if 'rdc-nextcloud-cron.timer' in resources(owner).services:names.append('rdc-nextcloud-cron')
     if owner.get('tls_mode')=='managed-acme': names.append('rdc-certificate-renew')
     return {GUARD:(guard_script(),0o755),**{Path('/etc/systemd/system')/(n+'.service.d')/'20-rdc-restore-guard.conf':
             ('[Service]\nExecStartPre='+str(GUARD)+'\n',0o644) for n in names}}
@@ -166,9 +167,9 @@ class Runtime(Services):
             checks=inspect_local_checks(manifest,require_owned=True,check_tls=False)
             if any(c.outcome!='pass' for c in checks) or not any(c.code=='client.verified' for c in checks): raise ValueError('Restored networking identity could not be verified')
             if 'applications' in owner:
-                from service_runtime import read_settings,ready,UNITS
-                settings=read_settings()
-                for name in reversed(list(UNITS)): ready(name,settings)
+                from backup_scope import application_runtime
+                runtime=application_runtime(owner['applications']);settings=runtime.read_settings()
+                for name in reversed(list(runtime.UNITS)):runtime.ready(name,settings)
         else:
             from cryptography import x509
             from cryptography.hazmat.primitives import hashes

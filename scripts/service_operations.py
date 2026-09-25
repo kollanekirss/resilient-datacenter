@@ -54,6 +54,7 @@ def reserved_paths():
 def preflight(profile):
     require_platform()
     if validate(profile):raise ValueError('Invalid Matrix service profile')
+    if Path('/etc/rdc-nextcloud').exists() or Path('/etc/rdc-nextcloud').is_symlink():raise ValueError('Use a separate enrolled VM for Matrix; this node has file-service state')
     network=root_json(Path('/etc/server-connectivity-profile.json'));owner=ownership(profile,network)
     address=installed_address(network);tls_inputs(profile)
     backup_base=Path('/etc/rdc-backup')
@@ -98,8 +99,8 @@ def preflight(profile):
     return {'ownership':owner,'address':address,'existing':False}
 
 
-def pull_images():
-    pins=image_pins()
+def pull_images(pins=None):
+    pins=image_pins() if pins is None else pins
     with tempfile.TemporaryDirectory(prefix='rdc-image-auth-') as directory:
         auth=Path(directory)/'auth.json';auth.write_text('{"auths":{}}');auth.chmod(0o600)
         for item in pins.values():

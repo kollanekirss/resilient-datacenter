@@ -73,8 +73,8 @@ def validate_restore(stage,owner):
     from backup_scope import verify_installed
     verify_installed(stage/'data',owner)
     if 'applications' in owner:
-        from service_backup import validate_data
-        validate_data(stage/'data',owner['applications'])
+        from backup_scope import application_backup
+        application_backup(owner['applications']).validate_data(stage/'data',owner['applications'])
     return data
 
 
@@ -189,8 +189,9 @@ def configured():
 
 def backup_now():
     data,transport=configured()
-    if Path('/etc/rdc-services/ownership.json').exists() and 'applications' not in data['ownership']:
-        raise ValueError('Chat is installed but backup scope covers only networking. Review backup include-services before taking another snapshot.')
+    from backup_scope import installed_application
+    if installed_application() is not None and 'applications' not in data['ownership']:
+        raise ValueError('An application is installed but backup scope covers only networking. Review backup include-services before taking another snapshot.')
     WORK.mkdir(mode=0o700,exist_ok=True)
     if WORK.is_symlink() or WORK.stat().st_uid!=0 or WORK.stat().st_mode & 0o077: raise ValueError('Unsafe local backup workspace')
     with tempfile.TemporaryDirectory(prefix='snapshot-',dir=WORK) as temporary:
@@ -243,8 +244,9 @@ def action(args):
             summary={'state':'backup-unreachable','restore_test':'not-run','next_step':'Check backup storage reachability, credentials and pinned host key.'}
         summary['schedule']=schedule_status(summary.get('backup_age_seconds'))
         if summary['state']=='snapshot-present' and summary['schedule'].get('overdue'): summary['state']='backup-overdue'
-        summary['scope']='matrix-and-network' if 'applications' in data['ownership'] else 'network-only'
-        if Path('/etc/rdc-services/ownership.json').exists() and 'applications' not in data['ownership']:
+        from backup_scope import tag,installed_application
+        summary['scope']=tag(data['ownership'])+'-and-network' if 'applications' in data['ownership'] else 'network-only'
+        if installed_application() is not None and 'applications' not in data['ownership']:
             summary['state']='application-backup-missing';summary['next_step']='Review backup include-services, then take and test an application backup.'
         return summary
     if args.action=='schedule' and args.schedule_action=='disable':
@@ -254,8 +256,11 @@ def action(args):
     with os.fdopen(fd,'a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         if args.action=='include-services':
-            from service_backup import include_services
-            print('Include Matrix accounts, messages, media, signing identity and database secrets in future encrypted backups. Preserve existing repository credentials and history; update the protected backup runtime if scheduled.')
+            from backup_scope import installed_application,application_backup,package
+            application=installed_application()
+            if application is None:raise ValueError('Install and verify the application before extending backup scope')
+            include_services=application_backup(application).include_services
+            print('Include '+package(application)+' accounts, application data, identity and database secrets in future encrypted backups. Preserve repository credentials and history; update the protected backup runtime if scheduled.')
             phrase='INCLUDE SERVICES '+data['profile']['node_name']
             if not sys.stdin.isatty() or input('Type '+phrase+' to proceed: ').strip()!=phrase:return {'state':'cancelled'}
             return include_services()

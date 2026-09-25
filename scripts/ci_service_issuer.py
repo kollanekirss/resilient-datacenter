@@ -7,12 +7,16 @@ import service_issuer as issuer
 from service_issuer_contracts import renew_command
 
 
-def exercise(certificate_factory):
+def exercise(certificate_factory,*,package='matrix'):
     if os.geteuid()!=0 or os.environ.get('GITHUB_ACTIONS')!='true' or os.environ.get('RUNNER_ENVIRONMENT')!='github-hosted':
         raise ValueError('Issuer fixture requires a disposable GitHub-hosted runner')
     if issuer.BASE.exists() or issuer.RUNTIME.exists():raise ValueError('Issuer fixture requires fresh owned paths')
     profile={'kind':'service-certificates','schema_version':1,'provider':'cloudflare','institution_id':'ci','node_name':'services',
              'matrix_hostname':'matrix.ci.test','element_hostname':'chat.ci.test','acme_email':'ci@example.test','acme_agree_terms':True}
+    if package=='nextcloud':
+        profile={k:v for k,v in profile.items() if k not in ('matrix_hostname','element_hostname')}
+        profile.update(kind='nextcloud-certificates',node_name='files',nextcloud_hostname='files.ci.test')
+    active=issuer.active_directory(profile)/'active'
     issuer.directory(issuer.BASE)
     network=json.loads(Path('/etc/server-connectivity-profile.json').read_text())
     issuer.write(issuer.BASE/'configuration.json',json.dumps({'schema_version':1,'profile':profile,'network':network}))
@@ -24,7 +28,7 @@ def exercise(certificate_factory):
     issuer.write(issuer.BASE/'certbot/renewal/rdc-services.conf',renewal)
     archive=issuer.BASE/'certbot/archive/rdc-services';live=issuer.BASE/'certbot/live/rdc-services'
     for source,name in [('tls.crt','fullchain1.pem'),('tls.key','privkey1.pem')]:
-        issuer.write(archive/name,Path('/etc/rdc-service-tls/active',source).read_bytes())
+        issuer.write(archive/name,(active/source).read_bytes())
     (live/'fullchain.pem').symlink_to('../../archive/rdc-services/fullchain1.pem')
     (live/'privkey.pem').symlink_to('../../archive/rdc-services/privkey1.pem')
     # Never contact a public CA or DNS API with CI fixtures. Only this disposable
@@ -43,13 +47,13 @@ def exercise(certificate_factory):
         assert json.loads(called.read_text())==renew_command()
         status=issuer.status()
         assert status['state']=='active' and status['automatic_renewal'] and status['serving_verified'] and not status['expires_within_14_days']
-        selected=Path('/etc/rdc-service-tls/active/tls.crt').read_bytes()
+        selected=(active/'tls.crt').read_bytes()
         assert selected==cert.read_bytes()
         failure.write_text('simulate provider outage')
         result=subprocess.run(['systemctl','start','rdc-service-certificate.service'],capture_output=True,timeout=240)
         assert result.returncode!=0
         status=issuer.status();assert status['state']=='renewal-failed' and status['serving_verified']
-        assert Path('/etc/rdc-service-tls/active/tls.crt').read_bytes()==selected
+        assert (active/'tls.crt').read_bytes()==selected
         print('Frozen private-service issuer timer: actual new HTTPS activation, independent expiry status and simulated provider failure retaining the current certificate PASS. Public DNS/ACME issuance NOT RUN.',flush=True)
     finally:
         subprocess.run(['systemctl','disable','--now','rdc-service-certificate.timer'],capture_output=True,timeout=30)

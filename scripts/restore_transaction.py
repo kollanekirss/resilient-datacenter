@@ -95,7 +95,7 @@ def retain_current_settings(root,name,candidate,owner):
     elif name=='etc/sc-derp' and owner.get('tls_mode')!='managed-acme':
         keep=[p.name for p in (root/name).iterdir() if p.suffix in ('.crt','.key')]
         if not keep: raise ValueError('The replacement relay has no supplied TLS material')
-    elif name=='etc/rdc-services':
+    elif name in ('etc/rdc-services','etc/rdc-nextcloud'):
         keep=['runtime.json','Caddyfile']
     else: keep=[]
     for item in keep:
@@ -104,13 +104,16 @@ def retain_current_settings(root,name,candidate,owner):
         destination=candidate/item
         if destination.is_symlink(): destination.unlink()
         shutil.copy2(source,destination)
+    if name=='etc/rdc-nextcloud':
+        from nextcloud_backup import refresh_client_fingerprint
+        refresh_client_fingerprint(candidate,owner['applications'])
 
 
 def set_permissions(path,name,owner):
     import pwd,grp
-    if name in ('etc/rdc-services','var/lib/rdc-services'):
-        from service_backup import restore_permissions
-        return restore_permissions(path,name)
+    if name in ('etc/rdc-services','var/lib/rdc-services','etc/rdc-nextcloud','var/lib/rdc-nextcloud'):
+        from backup_scope import application_backup
+        return application_backup(owner['applications']).restore_permissions(path,name)
     group={'controller':'headscale','relay':'sc-derp','peer':'root'}[owner['role']]
     persistent=name.startswith('var/lib/')
     user=group if persistent else 'root'

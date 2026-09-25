@@ -19,7 +19,7 @@ SNAPSHOT=re.compile('[a-f0-9]{64}')
 class Restic:
     def __init__(self,profile,*,base=Path('/etc/rdc-backup'),binary=Path('/usr/local/bin/rdc-restic'),scope='network'):
         if validate(profile): raise ValueError('Invalid backup profile')
-        if scope not in ('network','matrix'): raise ValueError('Unknown backup scope')
+        if scope not in ('network','matrix','nextcloud'): raise ValueError('Unknown backup scope')
         self.scope=scope
         self.profile=profile; self.base=Path(base); self.binary=Path(binary)
 
@@ -77,7 +77,7 @@ class Restic:
         captured=datetime.fromisoformat(json.loads((Path(stage)/'snapshot.json').read_text())['captured_at'])
         if captured.tzinfo is None: raise ValueError('Snapshot capture time must include a timezone')
         timestamp=captured.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-        tags=['--tag','rdc-v1']+(['--tag','rdc-matrix-v1'] if self.scope=='matrix' else [])
+        tags=['--tag','rdc-v1']+(['--tag','rdc-'+self.scope+'-v1'] if self.scope!='network' else [])
         text=self.execute(['backup','--time',timestamp,'--json','--host',self.profile['node_name'],*tags,'.'],cwd=stage)
         records=[json.loads(line) for line in text.splitlines() if line.strip()]
         summaries=[r for r in records if isinstance(r,dict) and r.get('message_type')=='summary']
@@ -86,7 +86,7 @@ class Restic:
         return summaries[0]['snapshot_id']
 
     def snapshots(self):
-        tags='rdc-v1,rdc-matrix-v1' if self.scope=='matrix' else 'rdc-v1'
+        tags='rdc-v1,rdc-'+self.scope+'-v1' if self.scope!='network' else 'rdc-v1'
         data=json.loads(self.execute(['--no-lock','snapshots','--json','--host',self.profile['node_name'],'--tag',tags],timeout=120))
         if not isinstance(data,list) or len(data)>10000: raise ValueError('Invalid snapshot listing')
         for item in data:

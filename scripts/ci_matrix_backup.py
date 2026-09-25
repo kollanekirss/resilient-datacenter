@@ -30,7 +30,7 @@ def prepare_backup(network):
     from backup_schedule import enable,disable
     subprocess.run(['ip','address','add','100.64.0.12/32','dev','lo'],check=True)
     endpoint=provision_storage(network,'100.64.0.12')
-    profile={'kind':'backup-profile','schema_version':1,'institution_id':'ci','node_name':'services','role':'peer',
+    profile={'kind':'backup-profile','schema_version':1,'institution_id':network['institution_id'],'node_name':network['node_name'],'role':'peer',
              **{k:endpoint[k] for k in ('backup_host','backup_port','backup_host_key')}}
     configure(profile);authorize(Path('/etc/rdc-backup/ssh_key.pub'))
     _,transport=configured();transport.initialize();snapshot=backup_now()['snapshot_id']
@@ -41,7 +41,8 @@ def prepare_backup(network):
 def snapshot(network_snapshot):
     guard()
     from backup_operations import configured,backup_now
-    from service_backup import include_services
+    from backup_scope import installed_application,application_backup,package
+    application=installed_application();include_services=application_backup(application).include_services
     credentials={name:hashlib.sha256(Path('/etc/rdc-backup',name).read_bytes()).hexdigest() for name in ('password','ssh_key')}
     try:backup_now()
     except ValueError as error:assert 'only networking' in str(error)
@@ -54,7 +55,7 @@ def snapshot(network_snapshot):
     from backup_schedule import status
     assert status(0)['attempts']['last_attempt']['outcome']=='succeeded'
     snapshots=transport.snapshots();assert len(snapshots)==1 and snapshots[0]['id']!=network_snapshot
-    assert 'rdc-matrix-v1' in snapshots[0]['tags']
+    assert 'rdc-'+package(application)+'-v1' in snapshots[0]['tags']
     return snapshots[0]['id']
 
 
@@ -63,17 +64,17 @@ def restore(identifier):
     from backup_operations import configured,stage_restore,WORK
     from restore_runtime import Runtime
     from restore_transaction import apply
-    from service_runtime import read_settings,ready,UNITS
+    from backup_scope import application_runtime
     from backup_contracts import resources
     data,_=configured();stage_restore(identifier)
     class ApplicationRuntime(Runtime):
         def verify(self,owner):
             # Actual applications are verified; dummy transport cannot prove VPN.
             assert all(self.is_active(n) for n in resources(owner).services)
-            settings=read_settings()
-            for name in UNITS:ready(name,settings)
+            runtime=application_runtime(owner['applications']);settings=runtime.read_settings()
+            for name in runtime.UNITS:runtime.ready(name,settings)
     started=time.monotonic()
     result=apply(WORK/'restores'/identifier,data['ownership'],runtime=ApplicationRuntime(data['ownership']))
     assert result['state']=='restored-service-verified'
     assert not Path('/etc/rdc-restore-pending.json').exists()
-    print('Disposable Matrix restore service verification elapsed seconds: '+str(round(time.monotonic()-started,2)),flush=True)
+    print('Disposable application restore service verification elapsed seconds: '+str(round(time.monotonic()-started,2)),flush=True)

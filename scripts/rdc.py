@@ -82,6 +82,19 @@ def parser():
     targets=target.add_subparsers(dest='target_action',required=True)
     targets.add_parser('prepare').add_argument('manifest',type=Path)
     targets.add_parser('authorize').add_argument('public_key',type=Path)
+    files=commands.add_parser('files',help='Prepare and operate the experimental Nextcloud package')
+    file_actions=files.add_subparsers(dest='action',required=True)
+    file_actions.add_parser('setup').add_argument('--output-file',type=Path,required=True)
+    for action in ('check','apply'):file_actions.add_parser(action).add_argument('profile',type=Path)
+    for action in ('status','account'):file_actions.add_parser(action)
+    file_certificate=file_actions.add_parser('certificate')
+    file_certificate.add_argument('--certificate',type=Path,required=True);file_certificate.add_argument('--private-key',type=Path,required=True)
+    file_issuer=file_actions.add_parser('issuer',help='Optional DNS-based file-service certificate lifecycle')
+    file_issuers=file_issuer.add_subparsers(dest='issuer_action',required=True)
+    file_issuer.set_defaults(certificate_package='nextcloud')
+    file_issuers.add_parser('setup').add_argument('--output-file',type=Path,required=True)
+    file_issue=file_issuers.add_parser('issue');file_issue.add_argument('profile',type=Path);file_issue.add_argument('--token-file',type=Path)
+    for action in ('enable','status'):file_issuers.add_parser(action)
     services=commands.add_parser('services',help='Prepare and operate the experimental local Matrix package')
     service_commands=services.add_subparsers(dest='action',required=True)
     service_commands.add_parser('setup').add_argument('--output-file',type=Path,required=True)
@@ -167,6 +180,15 @@ def dispatch(args) -> ActionResult:
     if args.command=='setup':
         state=run_wizard(args.output_dir,resume=args.resume,input_fn=input)
         return result_for_state(state)
+    if args.command=='files':
+        from nextcloud_operations import action
+        try:outcome=action(args)
+        except ValueError as error:
+            print('File-service action blocked: '+str(error));return result_for_state('blocked')
+        print(json.dumps(outcome,indent=2))
+        if any(outcome.get(key)=='configuration-changed' for key in ('federation','public_links')):return result_for_state('blocked')
+        if outcome.get('expires_within_14_days') or outcome.get('serving_verified') is False or outcome.get('state') in ('issuance-failed','renewal-failed'):return result_for_state('blocked')
+        return result_for_state({'prepared':'prepared','cancelled':'cancelled'}.get(outcome.get('state'),'checks-passed'))
     if args.command=='services':
         try: outcome=service_action(args)
         except ValueError as error:

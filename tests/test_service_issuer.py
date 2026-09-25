@@ -45,3 +45,14 @@ def test_renewal_rejects_hooks_changed_provider_and_external_paths():
     for bad in (renewal()+'deploy_hook = shell-command\n',renewal().replace('authenticator = dns-cloudflare','authenticator = manual'),
                 renewal().replace('/live/rdc-services/cert.pem','/live/other/cert.pem'),renewal().replace('https://acme-v02.api.letsencrypt.org/directory','https://other.test')):
         with pytest.raises(ValueError):m.validate_renewal(bad)
+
+
+def test_file_service_issuer_accepts_only_its_single_domain():
+    m=importlib.import_module('service_issuer_contracts')
+    data={k:v for k,v in profile().items() if k not in ('matrix_hostname','element_hostname')}
+    data.update(kind='nextcloud-certificates',nextcloud_hostname='files.pilot.test')
+    assert m.validate(data)==[]
+    command=m.issue_command(data)
+    assert command.count('-d')==1 and command[command.index('-d')+1]=='files.pilot.test'
+    assert m.validate(dict(data,matrix_hostname='matrix.pilot.test'))
+    with pytest.raises(ValueError):m.issue_command(dict(data,kind='unsupported'))

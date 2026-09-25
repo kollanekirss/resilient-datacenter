@@ -9,13 +9,13 @@ Start with the [common command interface](docs/operations.md) and [guided setup 
 
 See [verified experimental releases](docs/releases.md) for relay downloads with exact source and signed provenance. Downloading never installs or upgrades servers.
 
-The [encrypted backup and recovery guide](docs/backups.md) covers owned network-service data, explicit fencing and guarded restore. The development source adds opt-in [Matrix/Element installation and application recovery](docs/matrix-services.md).
+The [encrypted backup and recovery guide](docs/backups.md) covers owned network-service data, explicit fencing and guarded restore. The development source adds opt-in [Matrix/Element chat](docs/matrix-services.md) and [Nextcloud files](docs/nextcloud-services.md), each with application backup and recovery.
 
-The [deployment-profile operator guide](docs/deployment-profiles.md) remains available for the existing SSH-managed workflows. Matrix/Element and its recovery workflow are under development with disposable Ubuntu acceptance evidence; Nextcloud and regional gateways remain outstanding. The guided workflow requires operator-supplied servers and DNS; it accepts supplied certificates or an explicit [managed certificate mode](docs/managed-certificates.md) for fresh infrastructure. Beginner usability has not been validated.
+The [deployment-profile operator guide](docs/deployment-profiles.md) remains available for the existing SSH-managed workflows. Matrix/Element and Nextcloud have disposable Ubuntu application and recovery evidence. Regional gateways and controlled application upgrades remain outstanding. The guided workflow requires operator-supplied servers and DNS; it accepts supplied certificates or an explicit [managed certificate mode](docs/managed-certificates.md) for fresh infrastructure. Beginner usability has not been validated.
 
 The original four-VPS pilot and its existing commands are retained below as the **legacy workflow**. Use one workflow consistently; neither path automatically migrates the other's installations.
 
-**Status: experimental development.** Disposable Ubuntu runners have exercised actual network-service and Matrix recovery; full multi-site deployments have not been accepted. No VPSs, DNS records or cloud resources have been created. This is the connectivity foundation, not a production autonomous data centre. Local validation cannot establish interoperability, failover or uninterrupted relocation; those require the live acceptance tests.
+**Status: experimental development.** Disposable Ubuntu runners have exercised actual network-service, Matrix and Nextcloud recovery; full multi-site deployments have not been accepted. No VPSs, DNS records or cloud resources have been created. This is the connectivity foundation, not a production autonomous data centre. Local validation cannot establish interoperability, failover or uninterrupted relocation; those require the live acceptance tests.
 
 ## Start here
 
@@ -33,7 +33,7 @@ Run `./rdc` for the interactive menu, `./rdc doctor /absolute/path/node-NAME.yml
 
 Choose **independent** to prepare your own controller/relay or **join** to prepare a node for an existing network. The wizard asks for names, addresses and configuration paths, and can save a draft while you gather prerequisites. Preparation does not install anything on servers.
 
-Follow the [guided setup instructions](docs/guided-setup.md) for the separate deployment, local installation and enrollment commands. Local installation supports **Ubuntu 24.04 amd64 with systemd**. Servers, DNS names, certificates and administrator approval are still required. The development checkout includes the experimental Matrix/Element package. The published 0.2.0-alpha.1 archive predates it. Nextcloud and automatic failover are not available.
+Follow the [guided setup instructions](docs/guided-setup.md) for the separate deployment, local installation and enrollment commands. Local installation supports **Ubuntu 24.04 amd64 with systemd**. Servers, DNS names, certificates and administrator approval are still required. The development checkout includes experimental Matrix/Element and Nextcloud packages on separate enrolled VMs. The published 0.2.0-alpha.1 archive predates them. Automatic failover is not available.
 
 See [validation status](docs/validation-status.md) for completed local checks and unperformed live tests, and [contributing](CONTRIBUTING.md) to help improve the pilot. The project code is available under the [MIT license](LICENSE); third-party software keeps its own licenses.
 
