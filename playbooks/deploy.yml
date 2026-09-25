@@ -1,0 +1,19 @@
+- import_playbook: preflight.yml
+
+- name: Install the Headscale controller
+  hosts: controller
+  become: true
+  vars_files: [../versions.yml]
+  roles: [controller]
+
+- name: Install the independent private relay
+  hosts: relay
+  become: true
+  vars_files: [../versions.yml]
+  roles: [relay]
+
+- name: Install clients without enrolling or resetting them
+  hosts: peers
+  become: true
+  vars_files: [../versions.yml]
+  roles: [client]

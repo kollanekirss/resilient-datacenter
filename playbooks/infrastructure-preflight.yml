@@ -1,0 +1,47 @@
+- name: Validate profile locally before selecting managed targets
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  any_errors_fatal: true
+  tags: [always]
+  tasks:
+    - name: Require a single static inventory and a supported operation
+      ansible.builtin.assert:
+        that:
+          - ansible_inventory_sources | length == 1
+          - not ansible_check_mode
+          - ansible_limit | default('') == ''
+          - ansible_run_tags | default(['all']) | list == ['all']
+          - ansible_skip_tags | default([]) | length == 0
+        fail_msg: Use one complete static inventory without --limit, tag filters or --check. Use syntax checks or read-only preflight.
+    - name: Clear validation status for this operation
+      ansible.builtin.set_fact:
+        profile_validated: false
+    - name: Validate files and schema without contacting any server
+      ansible.builtin.command:
+        argv:
+          - '{{ ansible_playbook_python }}'
+          - '{{ playbook_dir }}/../scripts/validate_setup.py'
+          - '{{ ansible_inventory_sources[0] }}'
+          - --kind
+          - infrastructure
+          - --json
+      register: profile_input
+      changed_when: false
+    - name: Retain only validated derived values
+      ansible.builtin.set_fact:
+        profile: '{{ profile_input.stdout | from_json }}'
+        profile_validated: true
+
+- name: Read-only target preflight for this profile
+  hosts: all:!localhost
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Verify ownership without claiming the host
+      ansible.builtin.import_role:
+        name: profile_guard
+      vars:
+        profile_claim: false

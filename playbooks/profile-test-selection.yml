@@ -1,0 +1,24 @@
+- import_playbook: profile-preflight.yml
+  vars:
+    profile_require_owned: true
+
+- name: Select the explicitly configured test pair
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Derive the restricted test group
+      ansible.builtin.import_tasks: tasks/profile-select-pair.yml
+
+- name: Require approved identities for only the selected pair
+  hosts: profile_test_peers
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Inspect enrolled peer identities
+      ansible.builtin.import_tasks: tasks/profile-read-peer.yml
+    - name: Require completed enrollment before application tests
+      ansible.builtin.assert:
+        that: profile_peer_state.status == 'enrolled'
+        fail_msg: Complete administrator-approved enrollment with the expected controller and tag first.

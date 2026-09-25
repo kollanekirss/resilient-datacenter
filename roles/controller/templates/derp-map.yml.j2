@@ -1,0 +1,13 @@
+regions:
+  901:
+    regionid: 901
+    regioncode: pilot
+    regionname: Institutional pilot relay
+    nodes:
+      - name: pilot-1
+        regionid: 901
+        hostname: {{ derp_hostname }}
+        ipv4: {{ hostvars[profile_relay_host | default('relay-01')].ansible_host }}
+        ipv6: none
+        stunport: 3478
+        derpport: 443

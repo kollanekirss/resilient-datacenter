@@ -1,0 +1,4 @@
+headscale_version: '0.29.4'
+headscale_sha256: '1f65364716ae1fcc3845b1a65a47583469022e9c6f194dfdfeb25403f89f0841'
+tailscale_version: '1.102.4'
+tailscale_sha256: '50748df1045e60b5b695f19f4c56b0da36c019948b440fb456b6584a50f0d8b9'

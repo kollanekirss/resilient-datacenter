@@ -1,0 +1,19 @@
+# Explicit opt-in: positive checks, then temporary known-listener denial checks.
+- import_playbook: profile-test-selection.yml
+
+- name: Verify selected pair's real HTTPS responses
+  hosts: profile_test_peers
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Reuse positive verification
+      ansible.builtin.import_tasks: tasks/verify-positive.yml
+
+- name: Verify selected pair's denied ports
+  hosts: profile_test_peers
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Reuse known-listener negative verification with cleanup
+      ansible.builtin.import_tasks: tasks/verify-negative.yml

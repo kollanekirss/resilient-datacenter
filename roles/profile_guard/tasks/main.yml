@@ -1,0 +1,100 @@
+- name: Require successful local validation in this run
+  ansible.builtin.assert:
+    that:
+      - hostvars['localhost'].profile_validated | default(false) | bool
+      - inventory_hostname in hostvars['localhost'].profile.roles
+      - hostvars['localhost'].profile.roles.keys() | list | sort == groups['all'] | sort
+    fail_msg: Local validation must run first; use the complete inventory without --limit or --tags.
+- name: Derive expected ownership from validated input
+  ansible.builtin.set_fact:
+    expected_profile_ownership: '{{ hostvars["localhost"].profile.ownership[inventory_hostname] }}'
+- name: Read target platform facts
+  ansible.builtin.setup:
+    gather_subset: [min]
+- name: Require the supported operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.distribution_version == '24.04'
+      - ansible_facts.architecture == 'x86_64'
+- name: Inspect profile ownership record
+  ansible.builtin.stat:
+    path: /etc/server-connectivity-profile.json
+  register: profile_marker_stat
+- name: Read existing ownership without relying on daemon state
+  ansible.builtin.slurp:
+    src: /etc/server-connectivity-profile.json
+  register: profile_marker
+  when: profile_marker_stat.stat.exists
+- name: Require the exact same profile, institution, role and controller
+  ansible.builtin.assert:
+    that: (profile_marker.content | b64decode | from_json) == expected_profile_ownership
+    fail_msg: Ownership differs. Controller/profile changes require an explicit migration; no state was reset.
+  when: profile_marker_stat.stat.exists
+- name: Inspect reserved installation and state locations
+  ansible.builtin.stat:
+    path: '{{ item }}'
+  loop:
+    - /etc/server-connectivity.managed
+    - /etc/headscale
+    - /var/lib/headscale
+    - /etc/sc-derp
+    - /var/lib/sc-derp
+    - /var/lib/tailscale
+    - /usr/bin/tailscale
+    - /usr/local/bin/tailscale
+    - /etc/systemd/system/tailscaled.service
+    - /etc/sc-test
+  register: profile_existing
+- name: Refuse unowned existing or legacy installations
+  ansible.builtin.assert:
+    that: profile_marker_stat.stat.exists or not (profile_existing.results | selectattr('stat.exists') | list | length > 0)
+    fail_msg: This host has an existing installation without matching profile ownership. Use its original workflow or a reviewed migration.
+- name: Locate persistent peer state
+  ansible.builtin.stat:
+    path: /var/lib/tailscale/tailscaled.state
+  register: profile_client_state
+  when: expected_profile_ownership.role == 'peer'
+- name: Check daemon availability without starting it
+  ansible.builtin.command: /bin/systemctl is-active tailscaled
+  changed_when: false
+  failed_when: false
+  register: profile_daemon
+  when: expected_profile_ownership.role == 'peer'
+- name: Require an inspectable daemon when a persistent peer identity exists
+  ansible.builtin.assert:
+    that: not profile_client_state.stat.exists or profile_daemon.rc == 0
+    fail_msg: Existing peer state cannot be verified while tailscaled is stopped. Inspect/start it through management access, then rerun; deployment will not reset it.
+  when: expected_profile_ownership.role == 'peer'
+- name: Inspect active peer controller selection
+  ansible.builtin.command: /usr/local/bin/tailscale debug prefs
+  register: profile_preferences
+  changed_when: false
+  when: expected_profile_ownership.role == 'peer' and profile_daemon.rc == 0
+- name: Inspect active peer enrollment state
+  ansible.builtin.command: /usr/local/bin/tailscale status --json
+  register: profile_client_status
+  changed_when: false
+  when: expected_profile_ownership.role == 'peer' and profile_daemon.rc == 0
+- name: Reject a different controller, including expired or stopped enrollment
+  ansible.builtin.assert:
+    that:
+      - >-
+        (profile_preferences.stdout | from_json).ControlURL == 'https://' + expected_profile_ownership.controller_hostname
+        or ((profile_client_status.stdout | from_json).BackendState in ['NeedsLogin', 'NoState']
+        and (profile_preferences.stdout | from_json).ControlURL in ['', 'https://controlplane.tailscale.com'])
+    fail_msg: Existing client preferences reference a different controller. Migration is not part of deployment.
+  when: expected_profile_ownership.role == 'peer' and profile_daemon.rc == 0
+- name: Require pre-existing ownership for read-only follow-up stages
+  ansible.builtin.assert:
+    that: profile_marker_stat.stat.exists
+    fail_msg: Deploy this profile before enrollment checks or test-service installation.
+  when: profile_require_owned | default(false) | bool
+- name: Claim a fresh host only after successful preflight
+  ansible.builtin.copy:
+    content: '{{ expected_profile_ownership | to_nice_json }}'
+    dest: /etc/server-connectivity-profile.json
+    owner: root
+    group: root
+    mode: '0644'
+  when: profile_claim | default(false) | bool

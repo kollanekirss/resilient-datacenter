@@ -1,0 +1,15 @@
+[Unit]
+Description=Institutional pilot Tailscale node
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=notify
+ExecStart=/usr/local/sbin/tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/run/tailscale/tailscaled.sock --port=41641
+ExecStopPost=/usr/local/sbin/tailscaled --cleanup
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=tailscale
+StateDirectory=tailscale
+UMask=0077
+[Install]
+WantedBy=multi-user.target

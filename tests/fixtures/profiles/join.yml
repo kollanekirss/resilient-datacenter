@@ -1,0 +1,14 @@
+# Synthetic inputs: local tests only; never connect to these addresses.
+all:
+  vars:
+    schema_version: 1
+    deployment_mode: join
+    institution_id: south
+    headscale_hostname: control.pilot.test
+  children:
+    peers:
+      hosts:
+        south-services:
+          ansible_host: 9.9.9.9
+          ansible_user: ubuntu
+          node_tag: tag:south-services

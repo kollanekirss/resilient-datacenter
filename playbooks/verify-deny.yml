@@ -1,0 +1,9 @@
+# Explicitly opt-in: starts temporary listeners and always attempts cleanup.
+- import_playbook: verify.yml
+- name: Prove known listening ports cannot be reached by the other server
+  hosts: peers
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Run shared verification tasks
+      ansible.builtin.import_tasks: tasks/verify-negative.yml

@@ -1,0 +1,18 @@
+[Unit]
+Description=Institutional pilot private HTTPS test endpoint
+After=tailscaled.service
+Requires=tailscaled.service
+StartLimitIntervalSec=0
+[Service]
+User=sc-test
+Group=sc-test
+ExecStart=/usr/bin/python3 /opt/sc-test/test_service.py --bind={{ overlay_ip }} --identity={{ inventory_hostname }} --cert=/etc/sc-test/tls.crt --key=/etc/sc-test/tls.key
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+CapabilityBoundingSet=
+[Install]
+WantedBy=multi-user.target

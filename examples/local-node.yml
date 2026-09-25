@@ -1,0 +1,7 @@
+# Invalid-by-default documentation example. Prefer the guided wizard.
+kind: local-node
+schema_version: 1
+institution_id: south
+node_name: home-services
+headscale_hostname: control.example.com
+node_tag: tag:home-services

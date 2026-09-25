@@ -1,0 +1,47 @@
+- name: Record managed host
+  ansible.builtin.copy:
+    content: "server-connectivity pilot\n"
+    dest: /etc/server-connectivity.managed
+    mode: '0644'
+- name: Install HTTPS test utility and system certificate roots
+  ansible.builtin.apt:
+    name: [curl, ca-certificates]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+- name: Download verified client archive
+  ansible.builtin.get_url:
+    url: 'https://pkgs.tailscale.com/stable/tailscale_{{ tailscale_version }}_amd64.tgz'
+    dest: '/var/tmp/tailscale-{{ tailscale_version }}.tgz'
+    checksum: 'sha256:{{ tailscale_sha256 }}'
+    mode: '0644'
+- name: Unpack pinned client
+  ansible.builtin.unarchive:
+    src: '/var/tmp/tailscale-{{ tailscale_version }}.tgz'
+    dest: /opt
+    remote_src: true
+    creates: '/opt/tailscale_{{ tailscale_version }}_amd64/tailscale'
+- name: Install client and daemon
+  ansible.builtin.copy:
+    src: '/opt/tailscale_{{ tailscale_version }}_amd64/{{ item.src }}'
+    dest: '{{ item.dest }}'
+    remote_src: true
+    mode: '0755'
+  loop:
+    - {src: tailscale, dest: /usr/local/bin/tailscale}
+    - {src: tailscaled, dest: /usr/local/sbin/tailscaled}
+  notify: Restart client
+- name: Install persistent client service
+  ansible.builtin.template:
+    src: tailscaled.service.j2
+    dest: /etc/systemd/system/tailscaled.service
+    mode: '0644'
+  notify: Restart client
+- name: Enable client without performing enrollment
+  ansible.builtin.systemd_service:
+    name: tailscaled
+    daemon_reload: true
+    enabled: true
+    state: started
+- name: Apply pending restart
+  ansible.builtin.meta: flush_handlers

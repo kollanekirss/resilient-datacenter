@@ -1,0 +1,51 @@
+# Synthetic inputs: local tests only; never connect to these addresses.
+all:
+  vars:
+    schema_version: 1
+    deployment_mode: independent
+    institution_id: south
+    headscale_hostname: control.pilot.test
+    derp_hostname: relay.pilot.test
+    enrollment_admin: lab-admin
+    derper_artifact: /local/derper
+    derper_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    connectivity_test:
+      nodes:
+      - south-services
+      - second-peer
+      ca_certificate: /local/ca.crt
+  children:
+    peers:
+      hosts:
+        south-services:
+          ansible_host: 9.9.9.9
+          ansible_user: ubuntu
+          node_tag: tag:south-services
+          test_dns_name: south-services.pilot.test
+          tls_certificate: /local/south-services.crt
+          tls_private_key: /local/south-services.key
+        second-peer:
+          ansible_host: 8.8.4.4
+          ansible_user: ubuntu
+          node_tag: tag:second-peer
+          test_dns_name: second-peer.pilot.test
+          tls_certificate: /local/second-peer.crt
+          tls_private_key: /local/second-peer.key
+        third-peer:
+          ansible_host: 208.67.222.222
+          ansible_user: ubuntu
+          node_tag: tag:third-peer
+    controller:
+      hosts:
+        north-control:
+          ansible_host: 1.1.1.1
+          ansible_user: ubuntu
+          tls_certificate: /local/control.crt
+          tls_private_key: /local/control.key
+    relay:
+      hosts:
+        west-relay:
+          ansible_host: 8.8.8.8
+          ansible_user: ubuntu
+          tls_certificate: /local/relay.crt
+          tls_private_key: /local/relay.key

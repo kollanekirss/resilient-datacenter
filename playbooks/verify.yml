@@ -1,0 +1,8 @@
+- import_playbook: peer-state.yml
+- name: Verify real HTTPS requests in both directions
+  hosts: peers
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Run shared verification tasks
+      ansible.builtin.import_tasks: tasks/verify-positive.yml

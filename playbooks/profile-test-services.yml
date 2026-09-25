@@ -1,0 +1,15 @@
+- import_playbook: profile-test-selection.yml
+
+- name: Install endpoints only on the selected pair
+  hosts: profile_test_peers
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  pre_tasks:
+    - name: Require validated pair membership before mutation
+      ansible.builtin.assert:
+        that:
+          - hostvars['localhost'].profile_validated | default(false) | bool
+          - inventory_hostname in hostvars['localhost'].profile.test_pair
+          - profile_peer_state.status == 'enrolled'
+  roles: [test_service]

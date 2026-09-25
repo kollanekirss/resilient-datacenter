@@ -1,0 +1,54 @@
+- import_playbook: profile-preflight.yml
+  vars:
+    profile_expected_mode: independent
+
+- name: Install owned independent controller with explicit policy
+  hosts: controller
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  vars_files: [../versions.yml]
+  vars:
+    profile_policy: '{{ hostvars["localhost"].profile.policy }}'
+    profile_relay_host: '{{ hostvars["localhost"].profile.relay_host }}'
+  pre_tasks:
+    - name: Claim validated controller
+      ansible.builtin.import_role:
+        name: profile_guard
+      vars:
+        profile_claim: true
+    - name: Require explicit profile policy and relay selection
+      ansible.builtin.assert:
+        that:
+          - profile_policy is mapping
+          - "'grants' in profile_policy"
+          - profile_relay_host in groups.relay
+  roles: [controller]
+
+- name: Install owned independent relay
+  hosts: relay
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  vars_files: [../versions.yml]
+  pre_tasks:
+    - name: Claim validated relay
+      ansible.builtin.import_role:
+        name: profile_guard
+      vars:
+        profile_claim: true
+  roles: [relay]
+
+- name: Install peers without enrollment or identity reset
+  hosts: peers
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  vars_files: [../versions.yml]
+  pre_tasks:
+    - name: Claim validated peers
+      ansible.builtin.import_role:
+        name: profile_guard
+      vars:
+        profile_claim: true
+  roles: [client]

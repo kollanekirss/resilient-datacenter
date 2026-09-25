@@ -1,0 +1,68 @@
+- name: Temporary listener experiment
+  block:
+    - name: Start time-limited denied-port listener
+      ansible.builtin.command:
+        argv:
+          - systemd-run
+          - --unit=sc-test-deny
+          - --collect
+          - --property=User=sc-test
+          - --property=Group=sc-test
+          - --property=RuntimeMaxSec=120
+          - /usr/bin/python3
+          - /opt/sc-test/test_service.py
+          - '--bind={{ overlay_ip }}'
+          - --port=8444
+          - '--identity={{ inventory_hostname }}'
+          - --cert=/etc/sc-test/tls.crt
+          - --key=/etc/sc-test/tls.key
+      changed_when: true
+    - name: Prove temporary listener serves valid HTTPS locally
+      ansible.builtin.command:
+        argv: [curl, --noproxy, '*', --fail, --silent, --show-error, --max-time, '5', --cacert, /etc/sc-test/ca.crt, --resolve, '{{ test_dns_name }}:8444:{{ overlay_ip }}', 'https://{{ test_dns_name }}:8444/health']
+      register: local_health
+      retries: 5
+      delay: 1
+      until: local_health.rc == 0
+      changed_when: false
+    - name: Require correct local application identity
+      ansible.builtin.assert:
+        that: (local_health.stdout | from_json).server == inventory_hostname
+    - name: Prove SSH is listening locally on overlay address
+      ansible.builtin.wait_for:
+        host: '{{ overlay_ip }}'
+        port: 22
+        timeout: 5
+    - name: Attempt remote denied ports and accept only timeout as blocked
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - -c
+          - |
+            import socket,sys
+            try:
+                s=socket.create_connection((sys.argv[1],int(sys.argv[2])),timeout=5)
+                s.close()
+            except socket.timeout:
+                sys.exit(2)
+            except OSError:
+                sys.exit(3)
+          - '{{ hostvars[peer_name].overlay_ip }}'
+          - '{{ item | string }}'
+      loop: [22, 8444]
+      register: denied_probe
+      changed_when: false
+      failed_when: denied_probe.rc != 2
+    - name: Record denied-port result independently
+      ansible.builtin.copy:
+        content: "{{ {'scope': 'live', 'generated_at_utc': now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ'), 'server': inventory_hostname, 'destination': peer_name, 'tcp_22': 'pass', 'tcp_8444': 'pass', 'known_listeners_verified': true, 'attribution': 'Confirm overlay host firewall does not independently block these ports before attributing isolation to Headscale policy.'} | to_nice_json }}"
+        dest: '{{ playbook_dir }}/../artifacts/deny-{{ inventory_hostname }}.json'
+        mode: '0600'
+      delegate_to: localhost
+      become: false
+  always:
+    - name: Remove temporary listener even if a check fails
+      ansible.builtin.systemd_service:
+        name: sc-test-deny
+        state: stopped
+      failed_when: false

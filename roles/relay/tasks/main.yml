@@ -1,0 +1,63 @@
+- name: Record managed host
+  ansible.builtin.copy:
+    content: "server-connectivity pilot\n"
+    dest: /etc/server-connectivity.managed
+    mode: '0644'
+- name: Create relay service account
+  ansible.builtin.user:
+    name: sc-derp
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+- name: Create private relay configuration directory
+  ansible.builtin.file:
+    path: /etc/sc-derp
+    state: directory
+    owner: root
+    group: sc-derp
+    mode: '0750'
+- name: Upload operator-built pinned DERP artifact
+  ansible.builtin.copy:
+    src: '{{ derper_artifact }}'
+    dest: /usr/local/bin/sc-derper
+    owner: root
+    mode: '0755'
+  notify: Restart relay
+- name: Verify uploaded artifact
+  ansible.builtin.stat:
+    path: /usr/local/bin/sc-derper
+    checksum_algorithm: sha256
+  register: relay_binary
+- name: Reject corrupted artifact
+  ansible.builtin.assert:
+    that: relay_binary.stat.checksum == derper_sha256
+  when: not ansible_check_mode
+- name: Install certificate chain
+  ansible.builtin.copy:
+    src: '{{ tls_certificate }}'
+    dest: '/etc/sc-derp/{{ derp_hostname }}.crt'
+    group: sc-derp
+    mode: '0640'
+  notify: Restart relay
+- name: Install private key
+  ansible.builtin.copy:
+    src: '{{ tls_private_key }}'
+    dest: '/etc/sc-derp/{{ derp_hostname }}.key'
+    group: sc-derp
+    mode: '0640'
+  no_log: true
+  notify: Restart relay
+- name: Install relay service
+  ansible.builtin.template:
+    src: sc-derp.service.j2
+    dest: /etc/systemd/system/sc-derp.service
+    mode: '0644'
+  notify: Restart relay
+- name: Enable relay
+  ansible.builtin.systemd_service:
+    name: sc-derp
+    daemon_reload: true
+    enabled: true
+    state: started
+- name: Apply pending restart
+  ansible.builtin.meta: flush_handlers

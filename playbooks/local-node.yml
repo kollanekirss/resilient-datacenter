@@ -1,0 +1,13 @@
+- name: Apply a validated local-node installation on this machine only
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  tags: [always]
+  vars_files: [../versions.yml]
+  pre_tasks:
+    - name: Validate local installation boundaries before modification
+      ansible.builtin.import_role:
+        name: local_node_guard
+  roles: [client]

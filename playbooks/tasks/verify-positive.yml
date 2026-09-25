@@ -1,0 +1,44 @@
+- name: Require matching certificates and expected remote response
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --noproxy
+      - '*'
+      - --fail
+      - --silent
+      - --show-error
+      - --connect-timeout
+      - '10'
+      - --max-time
+      - '20'
+      - --cacert
+      - /etc/sc-test/ca.crt
+      - --resolve
+      - '{{ hostvars[peer_name].test_dns_name }}:8443:{{ hostvars[peer_name].overlay_ip }}'
+      - 'https://{{ hostvars[peer_name].test_dns_name }}:8443/health'
+  register: health
+  changed_when: false
+- name: Check application response identity
+  ansible.builtin.assert:
+    that:
+      - (health.stdout | from_json).status == 'ok'
+      - (health.stdout | from_json).server == peer_name
+- name: Show independently inspectable path diagnostics
+  ansible.builtin.command:
+    argv: [/usr/local/bin/tailscale, ping, '--c=5', '{{ hostvars[peer_name].overlay_ip }}']
+  register: path_probe
+  changed_when: false
+- name: Display results without interpreting ping as application access
+  ansible.builtin.debug:
+    msg:
+      application: '{{ inventory_hostname }} -> {{ peer_name }} HTTPS 8443 passed'
+      path_diagnostic: '{{ path_probe.stdout_lines }}'
+      pending: Forced relay, denied-port, outages and restore require separate acceptance tests.
+
+- name: Record live positive checks separately from untested scenarios
+  ansible.builtin.copy:
+    content: "{{ {'scope': 'live', 'generated_at_utc': now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ'), 'server': inventory_hostname, 'allowed_https_to': peer_name, 'allowed_https': 'pass', 'path_diagnostic': path_probe.stdout, 'denied_ports': 'not-run', 'forced_relay': 'not-run', 'controller_outage': 'not-run', 'restore': 'not-run'} | to_nice_json }}"
+    dest: '{{ playbook_dir }}/../artifacts/verify-{{ inventory_hostname }}.json'
+    mode: '0600'
+  delegate_to: localhost
+  become: false

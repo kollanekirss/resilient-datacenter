@@ -1,0 +1,22 @@
+[Unit]
+Description=Institutional pilot Headscale controller
+After=network-online.target
+Wants=network-online.target
+[Service]
+User=headscale
+Group=headscale
+ExecStart=/usr/bin/headscale serve --config /etc/headscale/config.yaml
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=headscale
+StateDirectory=headscale
+UMask=0077
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/headscale /run/headscale
+[Install]
+WantedBy=multi-user.target

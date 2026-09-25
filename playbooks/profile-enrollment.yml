@@ -1,0 +1,41 @@
+- import_playbook: profile-preflight.yml
+  vars:
+    profile_require_owned: true
+
+- name: Show explicit enrollment instructions and current state
+  hosts: peers
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Read and validate current client identity
+      ansible.builtin.import_tasks: tasks/profile-read-peer.yml
+    - name: Explain the next operator action without registering anything
+      ansible.builtin.debug:
+        msg:
+          state: '{{ profile_peer_state.status }}'
+          node: '{{ inventory_hostname }}'
+          requested_tag: '{{ node_tag }}'
+          client_command: 'sudo /usr/local/bin/tailscale up --login-server=https://{{ headscale_hostname }} --hostname={{ inventory_hostname }} --advertise-tags={{ node_tag }} --accept-dns=false --accept-routes=false --ssh=false'
+          approval: 'Run the client command only when enrollment is required. Verify its pending registration ID independently with the controller administrator. Do not send reusable keys.'
+          authority: '{{ "Local controller administrator" if hostvars["localhost"].profile.mode == "independent" else "Existing network administrator; this deployment cannot approve access" }}'
+    - name: Record current state without claiming application verification
+      ansible.builtin.copy:
+        content: "{{ {'scope': 'live', 'generated_at_utc': now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ'), 'node': inventory_hostname, 'enrollment': profile_peer_state, 'application_test': 'not-run', 'restore': 'not-run'} | to_nice_json }}"
+        dest: '{{ playbook_dir }}/../artifacts/enrollment-{{ inventory_hostname }}.json'
+        mode: '0600'
+      delegate_to: localhost
+      become: false
+
+- name: Show the nonsecret administrator request
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Display names, tags and any requested pilot access
+      ansible.builtin.debug:
+        msg:
+          institution: '{{ profile.institution_id }}'
+          requests: '{{ profile.enrollment_requests }}'
+          requested_test_grants: '{{ profile.requested_grants }}'
+          responsibility: The administrator authorizes tags and access separately, then approves each pending registration. These instructions send no request.

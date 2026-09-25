@@ -1,0 +1,4 @@
+ansible-core==2.19.5
+pytest==8.4.2
+PyYAML==6.0.3
+cryptography==46.0.3

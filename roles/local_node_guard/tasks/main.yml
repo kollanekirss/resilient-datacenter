@@ -1,0 +1,26 @@
+- name: Require explicit full local installation
+  ansible.builtin.assert:
+    that:
+      - local_apply_requested | default(false) | bool
+      - inventory_hostname == 'localhost'
+      - ansible_connection == 'local'
+      - not ansible_check_mode
+      - ansible_limit | default('') == ''
+      - ansible_run_tags | default(['all']) | list == ['all']
+      - ansible_skip_tags | default([]) | length == 0
+    fail_msg: Use local_node.py apply on the intended Ubuntu node. Remote inventory and partial execution are not supported.
+- name: Independently revalidate platform, manifest, ownership and controller trust
+  ansible.builtin.command:
+    argv: ['{{ ansible_playbook_python }}', '{{ playbook_dir }}/../scripts/local_checks.py', '{{ local_manifest_path }}', --json]
+  register: local_check_result
+  changed_when: false
+- name: Retain validated expected ownership
+  ansible.builtin.set_fact:
+    local_expected: '{{ (local_check_result.stdout | from_json).ownership }}'
+- name: Record ownership only after all local checks pass
+  ansible.builtin.copy:
+    content: '{{ local_expected | to_nice_json }}'
+    dest: /etc/server-connectivity-profile.json
+    owner: root
+    group: root
+    mode: '0644'

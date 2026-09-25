@@ -1,0 +1,29 @@
+# Synthetic fixture; do not deploy.
+all:
+  vars:
+    schema_version: 2
+    deployment_mode: independent
+    institution_id: south
+    headscale_hostname: control.pilot.test
+    derp_hostname: relay.pilot.test
+    enrollment_admin: lab-admin
+    derper_artifact: /local/derper
+    derper_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    enrollment_nodes:
+    - name: south-services
+      node_tag: tag:south-services
+  children:
+    controller:
+      hosts:
+        north-control:
+          ansible_host: 1.1.1.1
+          ansible_user: ubuntu
+          tls_certificate: /local/control.crt
+          tls_private_key: /local/control.key
+    relay:
+      hosts:
+        west-relay:
+          ansible_host: 8.8.8.8
+          ansible_user: ubuntu
+          tls_certificate: /local/relay.crt
+          tls_private_key: /local/relay.key

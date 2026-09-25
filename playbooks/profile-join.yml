@@ -1,0 +1,21 @@
+- import_playbook: profile-preflight.yml
+  vars:
+    profile_expected_mode: join
+
+- name: Install local peers for an independently administered existing network
+  hosts: peers
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  vars_files: [../versions.yml]
+  pre_tasks:
+    - name: Claim only validated local peers
+      ansible.builtin.import_role:
+        name: profile_guard
+      vars:
+        profile_claim: true
+  roles: [client]
+  post_tasks:
+    - name: Report installation without implying remote approval
+      ansible.builtin.debug:
+        msg: Client installed. Use profile-enrollment.yml for explicit registration instructions and approval status.

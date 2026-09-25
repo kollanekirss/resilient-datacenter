@@ -1,0 +1,52 @@
+- name: Create test service account
+  ansible.builtin.user:
+    name: sc-test
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+- name: Create test service directories
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+    owner: root
+    group: sc-test
+    mode: '0750'
+  loop: [/opt/sc-test, /etc/sc-test]
+- name: Install test service implementation
+  ansible.builtin.copy:
+    src: test_service.py
+    dest: /opt/sc-test/test_service.py
+    mode: '0644'
+  notify: Restart test service
+- name: Install certificate and trust bundle
+  ansible.builtin.copy:
+    src: '{{ item.src }}'
+    dest: '{{ item.dest }}'
+    group: sc-test
+    mode: '0644'
+  loop:
+    - {src: '{{ tls_certificate }}', dest: /etc/sc-test/tls.crt}
+    - {src: '{{ test_ca_certificate }}', dest: /etc/sc-test/ca.crt}
+  notify: Restart test service
+- name: Install private key
+  ansible.builtin.copy:
+    src: '{{ tls_private_key }}'
+    dest: /etc/sc-test/tls.key
+    group: sc-test
+    mode: '0640'
+  no_log: true
+  notify: Restart test service
+- name: Install overlay-only service
+  ansible.builtin.template:
+    src: sc-test.service.j2
+    dest: /etc/systemd/system/sc-test.service
+    mode: '0644'
+  notify: Restart test service
+- name: Enable test service
+  ansible.builtin.systemd_service:
+    name: sc-test
+    daemon_reload: true
+    enabled: true
+    state: started
+- name: Apply pending restart
+  ansible.builtin.meta: flush_handlers

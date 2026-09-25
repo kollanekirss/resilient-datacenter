@@ -1,0 +1,109 @@
+- name: Record that this kit manages the fresh host
+  ansible.builtin.copy:
+    content: "server-connectivity pilot\n"
+    dest: /etc/server-connectivity.managed
+    mode: '0644'
+- name: Download pinned Headscale package
+  ansible.builtin.get_url:
+    url: 'https://github.com/juanfont/headscale/releases/download/v{{ headscale_version }}/headscale_{{ headscale_version }}_linux_amd64.deb'
+    dest: '/var/tmp/headscale-{{ headscale_version }}.deb'
+    checksum: 'sha256:{{ headscale_sha256 }}'
+    mode: '0644'
+- name: Install without starting vendor defaults
+  ansible.builtin.apt:
+    deb: '/var/tmp/headscale-{{ headscale_version }}.deb'
+    policy_rc_d: 101
+- name: Secure configuration directory
+  ansible.builtin.file:
+    path: /etc/headscale
+    state: directory
+    owner: root
+    group: headscale
+    mode: '0750'
+- name: Install supplied certificate chain
+  ansible.builtin.copy:
+    src: '{{ tls_certificate }}'
+    dest: /etc/headscale/tls.crt
+    owner: root
+    group: headscale
+    mode: '0640'
+  notify: Restart controller
+- name: Install private key
+  ansible.builtin.copy:
+    src: '{{ tls_private_key }}'
+    dest: /etc/headscale/tls.key
+    owner: root
+    group: headscale
+    mode: '0640'
+  no_log: true
+  notify: Restart controller
+- name: Create protected staging directory
+  ansible.builtin.file:
+    path: /etc/headscale/staged
+    state: directory
+    owner: root
+    group: headscale
+    mode: '0750'
+- name: Stage explicit policy and relay map before activation
+  ansible.builtin.template:
+    src: '{{ item.src }}'
+    dest: '{{ item.dest }}'
+    owner: root
+    group: headscale
+    mode: '0640'
+  loop:
+    - {src: policy.json.j2, dest: /etc/headscale/staged/policy.json}
+    - {src: derp-map.yml.j2, dest: /etc/headscale/staged/derp-map.yml}
+- name: Stage controller configuration pointing to staged policy
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/headscale/staged/config.yaml
+    owner: root
+    group: headscale
+    mode: '0640'
+  vars:
+    controller_config_dir: /etc/headscale/staged
+- name: Ensure persistent controller state belongs to its service user
+  ansible.builtin.file:
+    path: /var/lib/headscale
+    state: directory
+    owner: headscale
+    group: headscale
+    mode: '0700'
+- name: Validate staged configuration with the pinned binary
+  become_user: headscale
+  ansible.builtin.command: /usr/bin/headscale configtest --config /etc/headscale/staged/config.yaml
+  changed_when: false
+  when: not ansible_check_mode
+- name: Activate validated policy and relay map
+  ansible.builtin.copy:
+    src: '/etc/headscale/staged/{{ item }}'
+    dest: '/etc/headscale/{{ item }}'
+    remote_src: true
+    owner: root
+    group: headscale
+    mode: '0640'
+  loop: [policy.json, derp-map.yml]
+  notify: Restart controller
+- name: Activate controller configuration
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/headscale/config.yaml
+    owner: root
+    group: headscale
+    mode: '0640'
+  notify: Restart controller
+- name: Install managed system service
+  ansible.builtin.template:
+    src: headscale.service.j2
+    dest: /etc/systemd/system/headscale.service
+    mode: '0644'
+  notify: Restart controller
+- name: Enable controller
+  ansible.builtin.systemd_service:
+    name: headscale
+    daemon_reload: true
+    enabled: true
+    state: started
+- name: Apply pending restart
+  ansible.builtin.meta: flush_handlers

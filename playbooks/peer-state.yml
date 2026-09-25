@@ -1,0 +1,27 @@
+- name: Read and validate enrolled peer identities
+  hosts: peers
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Read client state
+      ansible.builtin.command: /usr/local/bin/tailscale status --json
+      register: ts_status
+      changed_when: false
+      check_mode: false
+    - name: Read current controller preference
+      ansible.builtin.command: /usr/local/bin/tailscale debug prefs
+      register: ts_prefs
+      changed_when: false
+      check_mode: false
+    - name: Require approved enrollment with the expected controller and tag
+      ansible.builtin.assert:
+        that:
+          - (ts_status.stdout | from_json).BackendState == 'Running'
+          - node_tag in ((ts_status.stdout | from_json).Self.Tags | default([]))
+          - (ts_prefs.stdout | from_json).ControlURL == 'https://' + headscale_hostname
+    - name: Discover persistent overlay IPv4 address
+      ansible.builtin.set_fact:
+        overlay_ip: "{{ (ts_status.stdout | from_json).TailscaleIPs | select('match', '^100\\.') | first }}"
+    - name: Require both servers for cross-server checks
+      ansible.builtin.assert:
+        that: groups.peers | difference(ansible_play_hosts_all) | length == 0

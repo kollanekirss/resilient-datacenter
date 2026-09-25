@@ -1,0 +1,6 @@
+- import_playbook: preflight.yml
+- import_playbook: peer-state.yml
+- name: Install enrolled peers' private HTTPS endpoints
+  hosts: peers
+  become: true
+  roles: [test_service]

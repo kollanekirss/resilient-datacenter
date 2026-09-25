@@ -1,0 +1,13 @@
+- name: Require explicit optional pair before test stages
+  ansible.builtin.assert:
+    that:
+      - profile_validated | default(false) | bool
+      - profile.test_pair | length == 2
+    fail_msg: Configure connectivity_test.nodes and its CA, then deploy/approve its TCP 8443 grants before testing.
+- name: Select only the two validated test nodes
+  ansible.builtin.add_host:
+    name: '{{ item }}'
+    groups: profile_test_peers
+    peer_name: '{{ (profile.test_pair | difference([item])) | first }}'
+    test_ca_certificate: '{{ connectivity_test.ca_certificate }}'
+  loop: '{{ profile.test_pair }}'

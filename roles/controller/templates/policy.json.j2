@@ -1,0 +1,14 @@
+{% if profile_policy is defined %}
+{{ profile_policy | tojson }}
+{% else %}
+{
+  "tagOwners": {
+    "tag:institution-a-server": ["{{ enrollment_admin }}@"],
+    "tag:institution-b-server": ["{{ enrollment_admin }}@"]
+  },
+  "grants": [
+    {"src": ["tag:institution-a-server"], "dst": ["tag:institution-b-server"], "ip": ["tcp:8443"]},
+    {"src": ["tag:institution-b-server"], "dst": ["tag:institution-a-server"], "ip": ["tcp:8443"]}
+  ]
+}
+{% endif %}

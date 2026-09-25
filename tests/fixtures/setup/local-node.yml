@@ -1,0 +1,7 @@
+# Synthetic fixture; do not deploy.
+kind: local-node
+schema_version: 1
+institution_id: south
+node_name: home-services
+headscale_hostname: control.pilot.test
+node_tag: tag:home-services

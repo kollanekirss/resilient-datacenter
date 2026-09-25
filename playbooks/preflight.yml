@@ -1,0 +1,79 @@
+- name: Validate operator inputs before any remote change
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Require exactly one static inventory
+      ansible.builtin.assert:
+        that: ansible_inventory_sources | length == 1
+    - name: Check inventory, artifact and certificates locally
+      ansible.builtin.command:
+        argv:
+          - '{{ ansible_playbook_python }}'
+          - '{{ playbook_dir }}/../scripts/validate_inventory.py'
+          - '{{ ansible_inventory_sources[0] }}'
+      changed_when: false
+      check_mode: false
+
+- name: Verify supported target operating systems and reserved paths
+  hosts: controller:relay:peers
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Require Ubuntu 24.04 amd64
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'Ubuntu'
+          - ansible_facts.distribution_version == '24.04'
+          - ansible_facts.architecture == 'x86_64'
+        fail_msg: This pilot supports only Ubuntu 24.04 amd64.
+    - name: Inspect versioned profile ownership
+      ansible.builtin.stat:
+        path: /etc/server-connectivity-profile.json
+      register: legacy_profile_marker
+    - name: Refuse legacy deployment over a versioned profile
+      ansible.builtin.assert:
+        that: not legacy_profile_marker.stat.exists
+        fail_msg: This host belongs to a versioned profile. Use its profile entry point; legacy deployment would change its policy.
+    - name: Inspect management marker
+      ansible.builtin.stat:
+        path: /etc/server-connectivity.managed
+      register: managed
+    - name: Inspect existing installations
+      ansible.builtin.stat:
+        path: '{{ item }}'
+      loop:
+        - /etc/headscale
+        - /var/lib/headscale
+        - /etc/sc-derp
+        - /var/lib/sc-derp
+        - /var/lib/tailscale
+        - /usr/bin/tailscale
+        - /usr/local/bin/tailscale
+      register: existing
+    - name: Refuse to take over an existing unmanaged installation
+      ansible.builtin.assert:
+        that: managed.stat.exists or not (existing.results | selectattr('stat.exists') | list | length > 0)
+        fail_msg: Existing installation found. Use fresh VPSs or review migration manually.
+
+    - name: Locate managed client binary
+      ansible.builtin.stat:
+        path: /usr/local/bin/tailscale
+      register: client_path
+      when: inventory_hostname in groups.peers
+    - name: Read existing client status
+      ansible.builtin.command: /usr/local/bin/tailscale status --json
+      register: existing_status
+      changed_when: false
+      when: inventory_hostname in groups.peers and client_path.stat.exists
+    - name: Read existing controller selection
+      ansible.builtin.command: /usr/local/bin/tailscale debug prefs
+      register: existing_prefs
+      changed_when: false
+      when: inventory_hostname in groups.peers and client_path.stat.exists
+    - name: Refuse an enrolled client using a different controller
+      ansible.builtin.assert:
+        that: (existing_status.stdout | from_json).BackendState != 'Running' or (existing_prefs.stdout | from_json).ControlURL == 'https://' + headscale_hostname
+        fail_msg: Existing enrollment uses another controller; review migration manually.
+      when: inventory_hostname in groups.peers and client_path.stat.exists

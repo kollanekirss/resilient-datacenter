@@ -1,0 +1,23 @@
+- name: Read client status privately
+  ansible.builtin.command: /usr/local/bin/tailscale status --json
+  register: profile_status_raw
+  changed_when: false
+  no_log: true
+- name: Read client preferences privately
+  ansible.builtin.command: /usr/local/bin/tailscale debug prefs
+  register: profile_prefs_raw
+  changed_when: false
+  no_log: true
+- name: Validate observed identity without exposing full client state
+  ansible.builtin.command:
+    argv: ['{{ ansible_playbook_python }}', '{{ playbook_dir }}/../scripts/profile_state.py']
+    stdin: "{{ {'status': profile_status_raw.stdout | from_json, 'prefs': profile_prefs_raw.stdout | from_json, 'hostname': headscale_hostname, 'tag': node_tag} | to_json }}"
+  delegate_to: localhost
+  become: false
+  register: profile_state_result
+  changed_when: false
+  no_log: true
+- name: Keep only the enrollment summary
+  ansible.builtin.set_fact:
+    profile_peer_state: '{{ profile_state_result.stdout | from_json }}'
+    overlay_ip: '{{ (profile_state_result.stdout | from_json).overlay_ip }}'

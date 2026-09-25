@@ -1,0 +1,50 @@
+server_url: https://{{ headscale_hostname }}
+listen_addr: 0.0.0.0:443
+metrics_listen_addr: 127.0.0.1:9090
+grpc_listen_addr: 127.0.0.1:50443
+grpc_allow_insecure: false
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+  allocation: sequential
+derp:
+  server:
+    enabled: false
+  urls: []
+  paths: [{{ controller_config_dir | default('/etc/headscale') }}/derp-map.yml]
+  auto_update_enabled: false
+disable_check_updates: true
+node:
+  expiry: 180d
+  ephemeral:
+    inactivity_timeout: 30m
+database:
+  type: sqlite
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+    write_ahead_log: true
+    wal_autocheckpoint: 1000
+tls_cert_path: /etc/headscale/tls.crt
+tls_key_path: /etc/headscale/tls.key
+log:
+  level: info
+  format: text
+policy:
+  mode: file
+  path: {{ controller_config_dir | default('/etc/headscale') }}/policy.json
+dns:
+  magic_dns: false
+  base_domain: pilot.internal
+  override_local_dns: false
+  nameservers:
+    global: []
+unix_socket: /var/run/headscale/headscale.sock
+unix_socket_permission: '0770'
+logtail:
+  enabled: false
+taildrop:
+  enabled: false
+auto_update:
+  enabled: false
