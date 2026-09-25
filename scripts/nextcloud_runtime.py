@@ -91,6 +91,8 @@ def regional_controls_command(settings,config):
           '$c->setAppValue("core","shareapi_allow_links","no");'
           '$a->setValueBool("core",\\OC\\OCM\\OCMSignatoryManager::APPCONFIG_SIGN_ENFORCED,true);'
           '$a->setValueBool("core",\\OC\\OCM\\OCMSignatoryManager::APPCONFIG_SIGN_DISABLED,false);'
+          '$m=\\OCP\\Server::get(\\OCP\\App\\IAppManager::class);'
+          +('$m->enableApp("federation");' if config else '$m->disableApp("federation");')+
           'echo "rdc-regional-controls-applied\\n";')
     return common(settings)+['--rm','--interactive','--user=33:33','--memory=512m','--entrypoint=php',
         '--volume',str(APP)+':/var/www/html:ro','--volume',str(regional.BASE/'runtime-config')+':/var/www/html/config:ro',

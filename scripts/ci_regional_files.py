@@ -114,7 +114,7 @@ def setup(institution,index,identity,document):
     command[offset:offset]=['--volume','/usr/local/share/ca-certificates/rdc-application-ci.crt:/ci-ca.crt:ro']
     fixture.launch(node,institution+'-nextcloud',command)
     network.run('nsenter','--net=/var/run/netns/'+node,'podman','exec','--user','33:33',institution+'-nextcloud','php','occ','security:certificates:import','/ci-ca.crt',timeout=60)
-    for app in ('federation','updatenotification','sharebymail'):network.run('nsenter','--net=/var/run/netns/'+node,'podman','exec','--user','33:33',institution+'-nextcloud','php','occ','app:disable',app,timeout=60)
+    for app in ('updatenotification','sharebymail'):network.run('nsenter','--net=/var/run/netns/'+node,'podman','exec','--user','33:33',institution+'-nextcloud','php','occ','app:disable',app,timeout=60)
     fixture.launch(node,institution+'-proxy',runtime.container_command('proxy',settings))
     with (Path('/etc/netns')/(institution+'-user')/'hosts').open('a') as stream:stream.write(settings['bind_address']+' '+hostname+'\n')
     for _ in range(30):

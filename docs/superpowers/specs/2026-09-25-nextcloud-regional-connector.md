@@ -16,6 +16,8 @@ Nextcloud uses two trust paths: discovery uses its certificate-manager bundle, w
 
 Start with explicit user-to-user file sharing. Enable only incoming and outgoing server-to-server shares; keep group federation, automatic acceptance, public links, global lookup upload, mail sharing and application-store access disabled. A recipient must explicitly accept a share. The application share token and permissions authorize file access independently of gateway membership. Require signed OCM requests where both pinned peers support them; verify successful and invalid/unsigned flows before advertising that protection.
 
+The pinned OCM controller's `FederationRateLimit` directly loads the `federation` app's `TrustedServers` service. Run 36149617425 proves disabling that dependency causes HTTP500 before a signed share can be processed. Enable the shipped `federation` app only while the connector is active; disable it again on suspension/recovery. Do not populate its trusted-server list automatically or enable automatic share acceptance. The gateway continues to deny contact-directory, administrative and general DAV endpoints.
+
 ## Candidate route catalogue to verify
 
 This is a bounded source-derived candidate list, not permission to expose an entire app:

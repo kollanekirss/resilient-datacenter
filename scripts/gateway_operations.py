@@ -163,7 +163,7 @@ def action(args):
         from service_link import export_gateway
         from regional_operations import export
         require_platform();runtime.verify_runtime();store=Store(runtime.BASE)
-        with store.lock():return export(args.output_file,export_gateway(store))
+        with store.lock():return export(args.output_file,export_gateway(store,args.package))
     require_platform();interactive();runtime.verify_runtime();store=Store(runtime.BASE)
     documents=None;revoked=None
     if command=='policy':

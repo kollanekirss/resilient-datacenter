@@ -112,3 +112,30 @@ def disable_transition(settings,runtime):
         try:os.fsync(descriptor)
         finally:os.close(descriptor)
     return {'state':'connector-disabled','internal_service':'listeners-verified'}
+
+
+def action(args):
+    from backup_operations import require_platform
+    from regional_operations import imported,interactive
+    from service_link import prepare
+    import regional_agreements as agreements
+    import nextcloud_runtime as application
+    require_platform();settings=application.read_settings();command=args.regional_service_action
+    if command=='status':
+        current=connector.configured(settings)
+        return {'state':'connector-not-installed' if current is None else ('connector-configured' if connector.active(settings) else 'connector-suspended'),
+                'application_federation':'not-verified','configuration':current,
+                'recovery':'Reapply a currently reviewed public service-link document after restoration.'}
+    if command=='disable':return disable()
+    if command!='attach':raise ValueError('Unsupported file connector action')
+    interactive();bundle=imported(args.document);fingerprint=agreements.fingerprint(bundle.get('gateway_identity'))
+    current=connector.configured(settings)
+    if current is not None:expected=current['gateway_fingerprint']
+    else:
+        print('This is your institution approval identity: '+fingerprint)
+        expected=input('Enter the full fingerprint independently confirmed from your administrator workspace: ').strip()
+    candidate=prepare(bundle,settings,expected_fingerprint=expected,now=int(time.time()))
+    print(json.dumps(candidate,indent=2))
+    print('This briefly restarts files and their HTTPS proxy. Users must explicitly accept shared files. This creates no replica or automatic failover; regional exchange still needs a real test.')
+    if input('Type ATTACH to configure this Nextcloud gateway connection: ').strip()!='ATTACH':return {'state':'cancelled'}
+    return configure(bundle,expected_fingerprint=expected)

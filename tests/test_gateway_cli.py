@@ -26,3 +26,13 @@ def test_public_link_export_and_application_attachment_are_distinct_commands():
     result=parser().parse_args(['services','regional','attach','link.json'])
     assert result.action=='regional' and result.regional_service_action=='attach'
     assert parser().parse_args(['services','regional','disable']).regional_service_action=='disable'
+
+
+def test_file_connector_cli_selects_its_own_application_scope():
+    from rdc import parser
+    args=parser().parse_args(['gateway','service-link','--package','nextcloud','--output-file','files-link.json'])
+    assert args.package=='nextcloud'
+    assert parser().parse_args(['gateway','service-link','--output-file','chat-link.json']).package=='matrix'
+    args=parser().parse_args(['files','regional','attach','files-link.json'])
+    assert args.command=='files' and args.action=='regional' and args.regional_service_action=='attach'
+    assert parser().parse_args(['files','regional','disable']).regional_service_action=='disable'

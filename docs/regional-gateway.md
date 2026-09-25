@@ -1,6 +1,6 @@
 # Experimental regional gateway
 
-This is a development milestone, not the completed regional service package. Matrix transport rules and gateway lifecycle have disposable Ubuntu evidence. Real application federation, real distinct Headscale memberships, Nextcloud routes, gateway certificate renewal and gateway recovery remain separate acceptance work. Use disposable infrastructure for this path until those checks pass.
+This is a development milestone, not the completed regional service package. Matrix exchange across real independent Headscale networks, transport restrictions and gateway lifecycle have disposable Ubuntu evidence. Nextcloud exchange, gateway certificate renewal and gateway recovery remain in progress. Use disposable infrastructure for this path until the remaining checks pass.
 
 ## What the gateway connects
 
@@ -46,7 +46,7 @@ sudo ./rdc gateway status
 
 The policy command replaces the selected set of agreement documents; an empty selection closes all peer access. At most eight peer documents are supported initially. Both parties' signatures and exact pinned local identity must match. Agreements that are expired, not yet active or locally revoked produce no access. Only Matrix transport is currently enabled, even when a signed agreement also names Nextcloud.
 
-The gateway exposes Matrix federation/key endpoints over regional HTTPS. It blocks Matrix client/admin routes. Its LAN-only CONNECT proxy accepts the Matrix service's fixed source address and only the selected partner Matrix hostnames on port 443. It cannot be used as a general web proxy. The upstream service endpoint must use verified HTTPS on its dedicated LAN address, port 8443; completing that application integration is separate work.
+The gateway exposes Matrix federation/key endpoints over regional HTTPS. It blocks Matrix client/admin routes. Its LAN-only CONNECT proxy accepts the Matrix service's fixed source address and only the selected partner Matrix hostnames on port 443. It cannot be used as a general web proxy. The upstream service endpoint uses verified HTTPS on its dedicated LAN address, port 8443; configure it with the service attachment instructions below.
 
 A successful gateway policy command proves local policy activation, not a successful federated chat or file operation. Status deliberately reports application federation as unverified.
 

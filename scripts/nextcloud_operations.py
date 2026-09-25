@@ -201,7 +201,7 @@ def install_or_resume(profile,network,address,admin_user,admin_password):
     runtime.synchronize_regional(settings)
     subprocess.run(['/bin/systemctl','start','rdc-nextcloud.service'],check=True,timeout=180)
     # Preserve only the currently reviewed connector's narrowly selected shares.
-    for app in ('federation','updatenotification','sharebymail'):
+    for app in ('updatenotification','sharebymail'):
         runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','app:disable',app,timeout=60)
     expected='approved-gateway-configured' if runtime.regional.active(settings) else 'disabled'
     if federation_status()!=expected or public_links_status()!='disabled':raise ValueError('External sharing controls did not take effect')
@@ -239,6 +239,9 @@ def action(args):
     import getpass
     import sys
     from profile_config import load_profile
+    if args.action=='regional':
+        from nextcloud_link import action as regional_action
+        return regional_action(args)
     if args.action=='issuer':
         from service_issuer import action as issuer_action
         return issuer_action(args)
