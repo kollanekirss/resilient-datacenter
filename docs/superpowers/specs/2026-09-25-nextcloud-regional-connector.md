@@ -10,6 +10,8 @@ Generate a separate, root-owned configuration overlay and private LAN HTTPS list
 
 All outbound Nextcloud HTTP uses the fixed LAN forward proxy, with no proxy exceptions. Keep TLS verification enabled. The gateway maps exact approved partner HTTPS names to signed regional addresses and rejects every other CONNECT destination, HTTP fallback and arbitrary port. Determine private-address validation from pinned upstream behavior; do not globally disable local-address protection to bypass an unexplained error.
 
+Disposable run 36148407760 established that Nextcloud's DNS-pinning middleware rejects discovery before CONNECT when the private partner has no public DNS record. Its pinned implementation also explicitly rejects 100.64.0.0/10. While this fixed connector is active, set `dns_pinning=false`: the gateway's signed static address mapping replaces DNS resolution/pinning. Keep `allow_local_remote_servers=false`, TLS verification and an empty proxy exception list. The proxy must deny unknown names, IP literals, HTTP fallback and arbitrary ports; its mappings must never use DNS. A suspended connector restores the DNS-pinning default and directs HTTP to the closed local proxy endpoint. This is specific to the managed exact-destination connector, not advice for unrestricted Nextcloud proxies.
+
 Start with explicit user-to-user file sharing. Enable only incoming and outgoing server-to-server shares; keep group federation, automatic acceptance, public links, global lookup upload, mail sharing and application-store access disabled. A recipient must explicitly accept a share. The application share token and permissions authorize file access independently of gateway membership. Require signed OCM requests where both pinned peers support them; verify successful and invalid/unsigned flows before advertising that protection.
 
 ## Candidate route catalogue to verify
@@ -46,3 +48,6 @@ Remove regional controller/gateways and prove both institutions can still log in
 - https://github.com/nextcloud/server/blob/v35.0.1/apps/files_sharing/lib/External/Storage.php
 - https://github.com/nextcloud/server/blob/v35.0.1/lib/private/Http/Client/Client.php
 - https://github.com/nextcloud/server/blob/v35.0.1/lib/private/Security/RemoteHostValidator.php
+- https://github.com/nextcloud/server/blob/v35.0.1/lib/private/Http/Client/DnsPinMiddleware.php
+- https://github.com/nextcloud/server/blob/v35.0.1/lib/private/Http/Client/ClientService.php
+- https://github.com/nextcloud/server/blob/v35.0.1/lib/private/Net/IpAddressClassifier.php

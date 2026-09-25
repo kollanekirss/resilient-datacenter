@@ -32,7 +32,12 @@ def validate(config,settings):
 
 def php_overlay(config):
     values={'proxy':'http://'+config['gateway_lan_address']+':3128' if config else 'http://127.0.0.1:9',
-            'proxyexclude':[],'sharing.federation.allowSelfSignedCertificates':False,'allow_local_remote_servers':False}
+            'proxyexclude':[],'sharing.federation.allowSelfSignedCertificates':False,'allow_local_remote_servers':False,
+            # The proxy pins approved DNS identities to signed addresses without
+            # resolving them. Nextcloud's separate DNS middleware runs before
+            # CONNECT and rejects this intentionally private destination space.
+            # Keep hostname/literal-address checks and end-to-end TLS enabled.
+            'dns_pinning':config is None}
     encoded=base64.b64encode(json.dumps(values,sort_keys=True).encode()).decode()
     return '<?php\n$CONFIG = json_decode(base64_decode("'+encoded+'"), true, 512, JSON_THROW_ON_ERROR);\n'
 

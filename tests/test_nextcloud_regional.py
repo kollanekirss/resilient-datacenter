@@ -19,6 +19,10 @@ def test_file_connector_keeps_identity_and_routes_all_outbound_http_through_fixe
     assert active['proxy']=='http://10.203.1.1:3128' and active['proxyexclude']==[]
     assert active['sharing.federation.allowSelfSignedCertificates'] is False
     assert active['allow_local_remote_servers'] is False
+    # Pinned Nextcloud otherwise resolves/rejects private partner addresses
+    # before the exact-destination proxy ever receives a CONNECT request.
+    assert active['dns_pinning'] is False
+    assert closed['dns_pinning'] is True
     assert closed['proxy']=='http://127.0.0.1:9' and closed['proxyexclude']==[]
     assert not {'instanceid','secret','dbpassword','trusted_domains'} & active.keys()
     for change in ({'gateway_lan_address':'169.254.169.254'},{'package':'matrix'},{'peers':[{'hostname':'https://outside.test/path','expires_at':1800003600}]}):
