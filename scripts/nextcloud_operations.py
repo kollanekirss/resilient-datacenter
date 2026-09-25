@@ -153,7 +153,7 @@ def freeze_code(root):
 
 
 def cron_unit():
-    return '[Unit]\nDescription=RDC Nextcloud background jobs\nAfter=rdc-nextcloud.service\nPartOf=rdc-nextcloud.service\nRequisite=rdc-nextcloud.service\n[Service]\nType=oneshot\nExecStart=/usr/bin/python3 -I -B /usr/local/lib/rdc-nextcloud/nextcloud_cron.py\nTimeoutStartSec=300\nUMask=0077\n'
+    return '[Unit]\nDescription=RDC Nextcloud background jobs\nAfter=rdc-nextcloud.service\nPartOf=rdc-nextcloud.service\n[Service]\nType=oneshot\nExecStart=/usr/bin/python3 -I -B /usr/local/lib/rdc-nextcloud/nextcloud_cron.py\nTimeoutStartSec=300\nUMask=0077\n'
 
 
 def cron_timer():return '[Unit]\nDescription=RDC Nextcloud background-job schedule\n[Timer]\nOnBootSec=5m\nOnUnitActiveSec=5m\n[Install]\nWantedBy=timers.target\n'

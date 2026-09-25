@@ -64,3 +64,13 @@ def test_bootstrap_secrets_removed_before_code_becomes_readable(tmp_path,monkeyp
     monkeypatch.setattr(Path,'chmod',chmod)
     m.freeze_code(root)
     assert seen and (root/'index.php',0o644) in seen
+
+
+def test_cron_does_not_schedule_an_application_activation_job():
+    import configparser
+    m=importlib.import_module('nextcloud_operations')
+    unit=configparser.ConfigParser();unit.read_string(m.cron_unit())
+    # Requisite schedules VERIFY_ACTIVE and can replace a concurrent STOP job.
+    # The fixed runner checks the owned container while holding the app lock.
+    for name in ('Requires','Requisite','Wants','BindsTo','Upholds'):
+        assert not unit['Unit'].get(name)

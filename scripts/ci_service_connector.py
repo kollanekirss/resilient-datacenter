@@ -26,7 +26,24 @@ def exercise(settings,package='matrix'):
         from nextcloud_link import configure
         import nextcloud_link,nextcloud_regional,nextcloud_runtime
         original=nextcloud_link.Runtime
-        class Failed(original):
+        class ConcurrentCron(original):
+            def stop(self):
+                # Exercise the real systemd race: timer activation while the
+                # application is stopping must not cancel its stop transaction.
+                stopping=subprocess.Popen(['/bin/systemctl','stop','rdc-nextcloud-proxy.service','rdc-nextcloud.service'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+                for _ in range(200):
+                    state=subprocess.run(['/bin/systemctl','show','rdc-nextcloud.service','--property=ActiveState','--value'],check=True,capture_output=True,text=True,timeout=10).stdout.strip()
+                    if state=='deactivating':break
+                    if stopping.poll() is not None:raise AssertionError('Could not exercise cron during application stop')
+                    time.sleep(.05)
+                else:raise AssertionError('Application did not begin stopping')
+                cron=subprocess.run(['/bin/systemctl','start','rdc-nextcloud-cron.service'],capture_output=True,timeout=120)
+                stdout,stderr=stopping.communicate(timeout=120)
+                assert stopping.returncode==0,stderr.decode(errors='replace')
+                assert cron.returncode!=0,'Background job ignored the held application operation lock'
+                assert subprocess.run(['/bin/systemctl','is-active','rdc-nextcloud.service'],capture_output=True,timeout=10).returncode!=0
+                print('Concurrent background-job activation leaves the application stop intact PASS.',flush=True)
+        class Failed(ConcurrentCron):
             def validate(self,config):
                 super().validate(config)
                 raise ValueError('Injected failure after native file connector validation')

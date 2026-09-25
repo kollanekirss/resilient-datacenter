@@ -162,24 +162,14 @@ def main():
         with (Path('/etc/netns')/node/'hosts').open('a') as stream:
             for institution in ('north','south'):stream.write(network.NODES[institution+'-gateway']['address']+' files.'+institution+'.ci.test\n')
     north,south=apps['north'],apps['south'];content=b'Approved cross-institution file '+os.urandom(128)
-    # Exercise the actual application client, including its signed-request TLS
-    # behavior. A missing-arguments response is expected for this empty payload.
-    probe=('require "/var/www/html/lib/base.php";'
-           '$s=\\OCP\\Server::get(\\OCP\\OCM\\IOCMDiscoveryService::class);'
-           'try{$p=$s->discover("https://files.south.ci.test");'
-           'echo json_encode(["enabled"=>$p->isEnabled(),"endpoint"=>$p->getEndPoint()])."\\n";'
-           '$s->requestRemoteOcmEndpoint(null,"https://files.south.ci.test","/shares",[],"post",null,["verify"=>true]);'
-           '}catch(\\Throwable $e){echo json_encode(["class"=>get_class($e),"error"=>$e->getMessage()])."\\n";}')
-    diagnostic=network.run('nsenter','--net=/var/run/netns/north-service','podman','exec','--user','33:33','north-nextcloud','php','-r',probe,timeout=60)
-    from ci_nextcloud_diagnostics import safe_message
-    print('Application signed-request probe: '+safe_message(diagnostic),flush=True)
     own(north,'PUT','/remote.php/dav/files/alice/proof.txt',content)
     own(north,'PUT','/remote.php/dav/files/alice/private.txt',b'Unshared institutional data')
     assert own(north,'GET','/remote.php/dav/files/alice/proof.txt')==content
     share=ocs(north,'POST','shares',{'path':'/proof.txt','shareType':'6','shareWith':'alice@'+south['hostname'],'permissions':'1'})
     pending=ocs(south,'GET','remote_shares/pending');assert len(pending)==1,pending
     incoming=pending[0];ocs(south,'POST','remote_shares/pending/'+str(incoming['id']),{})
-    mounted='/remote.php/dav/files/alice'+urllib.parse.quote(incoming.get('mountpoint','/proof.txt'))
+    accepted=ocs(south,'GET','remote_shares/'+str(incoming['id']))
+    mounted='/remote.php/dav/files/alice/'+urllib.parse.quote(accepted['mountpoint'].lstrip('/'))
     assert own(south,'GET',mounted)==content
     assert request('south-gateway','GET','https://'+north['hostname']+'/remote.php/dav/files/alice/private.txt',timeout=5)[0] in (403,404)
     for path in ('/index.php/login','/ocs/v2.php/cloud/users','/index.php/settings/admin'):
@@ -200,7 +190,8 @@ def main():
     ocs(north,'POST','shares',{'path':'/partner-folder','shareType':'6','shareWith':'alice@'+south['hostname'],'permissions':'1'})
     pending=ocs(south,'GET','remote_shares/pending');assert len(pending)==1,pending
     incoming=pending[0];ocs(south,'POST','remote_shares/pending/'+str(incoming['id']),{})
-    folder='/remote.php/dav/files/alice'+urllib.parse.quote(incoming.get('mountpoint','/partner-folder'))
+    accepted=ocs(south,'GET','remote_shares/'+str(incoming['id']))
+    folder='/remote.php/dav/files/alice/'+urllib.parse.quote(accepted['mountpoint'].lstrip('/'))
     own(north,'PUT','/remote.php/dav/files/alice/partner-folder/before.txt',b'Previously approved')
     assert own(south,'GET',folder+'/before.txt')==b'Previously approved'
     for institution in ('north','south'):
