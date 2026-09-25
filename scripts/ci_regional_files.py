@@ -125,7 +125,7 @@ def setup(institution,index,identity,document):
 
 
 def gateway(institution,index,identity,document,tls):
-    folder=ROOT/(institution+'-gateway');folder.mkdir(mode=0o700)
+    folder=ROOT/(institution+'-file-proxy');folder.mkdir(mode=0o700)
     for name in ('tls.crt','tls.key'):(folder/name).write_bytes((tls/name).read_bytes());(folder/name).chmod(0o600)
     profile={'kind':'regional-gateway','schema_version':1,'institution_id':institution,'node_name':institution+'-gateway','regional_controller':network.CONTROLLERS['regional']['hostname'],
         'lan_address':'10.203.'+str(index)+'.1','lan_subnet':'10.203.'+str(index)+'.0/24','identity_file':'/root/identity.json','tls_certificate':str(folder/'tls.crt'),'tls_private_key':str(folder/'tls.key'),'upstreams':{'nextcloud':'10.203.'+str(index)+'.10'}}
@@ -185,5 +185,13 @@ if __name__=='__main__':
     else:
         try:main()
         finally:
+            for path in ROOT.glob('*-files/state/files/nextcloud.log'):
+                for line in path.read_text(errors='replace').splitlines()[-20:]:
+                    try:item=json.loads(line)
+                    except ValueError:continue
+                    # Application diagnostics omit request URLs, users, headers and tokens.
+                    message=str(item.get('message',''))
+                    if not any(term in message.lower() for term in ('token','secret','password','authorization')):
+                        print('File fixture '+path.parts[-4]+': '+message[:600],flush=True)
             for name in reversed(fixture.CONTAINERS):subprocess.run(['podman','stop','--time','5',name],capture_output=True,timeout=15)
             network.cleanup()
