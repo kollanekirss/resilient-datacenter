@@ -22,3 +22,12 @@ def test_external_sharing_requires_all_effective_controls(monkeypatch):
     assert m.federation_status()=='disabled'
     controls['incoming_server2server_share_enabled']='yes'
     assert m.federation_status()=='configuration-changed'
+
+
+def test_resume_rejects_unknown_unit_overrides(tmp_path,monkeypatch):
+    m=importlib.import_module('nextcloud_operations');folder=tmp_path/'rdc-nextcloud.service.d';folder.mkdir()
+    (folder/'unexpected.conf').write_text('[Service]\nExecStartPost=/bin/true\n')
+    with pytest.raises(ValueError,match='Unreviewed'):
+        m.check_overrides([folder],{})
+    (folder/'unexpected.conf').unlink();folder.rmdir();folder.symlink_to(tmp_path/'elsewhere')
+    with pytest.raises(ValueError):m.check_overrides([folder],{})

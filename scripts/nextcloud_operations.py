@@ -42,6 +42,18 @@ def reserved_paths():
             *[Path('/etc/systemd/system',name+'.service') for name in runtime.UNITS.values()]]
 
 
+def check_overrides(folders,known):
+    from restore_runtime import check_guard
+    for folder in folders:
+        if not (folder.exists() or folder.is_symlink()):continue
+        if folder.is_symlink() or not folder.is_dir():raise ValueError('Unsafe file-service unit overrides')
+        for path in folder.iterdir():
+            if path not in known:raise ValueError('Unreviewed file-service unit overrides require administration review')
+            check_guard(path,known[path][0])
+        info=folder.stat()
+        if info.st_uid!=0 or info.st_mode&0o022:raise ValueError('Unsafe file-service unit overrides')
+
+
 def preflight(profile):
     require_platform()
     if validate(profile):raise ValueError('Invalid file-service profile')
@@ -53,6 +65,10 @@ def preflight(profile):
     marker=runtime.BASE/'ownership.json'
     if marker.exists() or marker.is_symlink():
         if root_json(marker)!=owner:raise ValueError('Existing file-service identity or component versions differ')
+        from restore_runtime import guard_files
+        from backup_scope import include
+        units=[TARGET,CRON,TIMER,*[Path('/etc/systemd/system',name+'.service') for name in runtime.UNITS.values()]]
+        check_overrides([Path(str(path)+'.d') for path in units],guard_files(include(network,owner)))
         if (runtime.BASE/'runtime.json').exists() and root_json(runtime.BASE/'runtime.json')['bind_address']!=address:
             raise ValueError('File-service address changed; use a reviewed endpoint migration')
         return {'ownership':owner,'address':address,'existing':True}
