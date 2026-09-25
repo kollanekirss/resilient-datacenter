@@ -39,7 +39,7 @@ jobs:
           sudo podman ps --all --format '{{.Names}} {{.Status}}'
           for node in north south; do
             sudo podman logs --tail 50 "$node-postgres" || true
-            sudo podman logs --tail 70 "$node-synapse" || true
+            sudo podman logs --tail 200 "$node-synapse" || true
             sudo podman logs --tail 50 "$node-proxy" || true
             sudo podman logs --tail 50 "$node-gateway-proxy" || true
           done

@@ -18,6 +18,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import ssl
+import yaml
 import ci_regional_network as network
 import regional_agreements as agreements
 import gateway_contracts
@@ -111,7 +112,9 @@ def setup_application(institution,index,identity,document):
     for name,uid in (('postgres',999),('synapse',991)):
         (state/name).mkdir(mode=0o700);os.chown(state/name,uid,uid)
     synapse=config/'synapse';synapse.mkdir(mode=0o750);os.chown(synapse,0,991)
-    for name,text in (('homeserver.yaml',service_rendering.synapse(profile,generated)),('log.config',service_rendering.logging_config())):
+    logging=yaml.safe_load(service_rendering.logging_config())
+    logging.setdefault('loggers',{})['synapse.http.federation.well_known_resolver']={'level':'INFO'}
+    for name,text in (('homeserver.yaml',service_rendering.synapse(profile,generated)),('log.config',yaml.safe_dump(logging)):
         (synapse/name).write_text(text);os.chown(synapse/name,0,991);(synapse/name).chmod(0o640)
     password=config/'database-password';password.write_text(generated['database_password']+'\n');password.chmod(0o400);os.chown(password,999,999)
     (config/'Caddyfile').write_text(service_rendering.proxy(profile,settings['bind_address']))
