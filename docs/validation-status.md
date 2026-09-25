@@ -1,12 +1,20 @@
 # Validation status — 2026-09-25
 
+## Additional relay and enrolled-controller recovery evidence
+
+Source `2e19b0d` passed the actual infrastructure acceptance in [run 36163225492](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36163225492). Two separate production DERP processes served actual enrolled clients. Direct UDP data paths were blocked. After the selected relay stopped, an HTTPS operation succeeded through the surviving region; this run observed 10.09 seconds to recovery. Existing clients also completed HTTPS during a short controller outage over established relay sessions. These observations are not timing guarantees or evidence that fresh relay admission works without control.
+
+The same run captured enrolled Headscale state in encrypted SFTP storage reached through a separate routed namespace, fenced the controller, removed its live persistent state, and restored the selected backup using the owned recovery engine. It verified the original authority identity, existing client node keys and addresses, useful HTTPS and new enrollment. The restoration/enrollment portion took 5.75 seconds in that run. The prepared OS and TLS baseline remained; fresh-machine reconstruction, real independent sites and public issuance are not established.
+
+The independent setup wizard supports one to four relay locations with separate validated addresses/certificates and stable region IDs. Source passed 610 local tests and all 16 Ansible syntax/task checks. Author review covered strict inventory projection, cross-location duplicate rejection, per-host certificate derivation, template compatibility, saved-draft validation and the test's forced-relay/fencing boundaries. No independent review was performed. See [operator guidance](infrastructure-resilience.md).
+
 ## Current guided-product evidence
 
 Implementation source `049fb3e` passed 595 local tests and all disposable workflows. `rdc start` saves private intent and role cards; `rdc guide` delegates allowlisted tasks to the existing operations. `rdc status` reports network, applications, certificates, backup, recovery and partners separately. File/probe tests cover missing, malformed and mixed ownership, stopped services, unavailable storage, retained historical success, failed renewal, unknown/time-limited probes and partner recovery review. None of these marks a whole installation resilient.
 
 Actual Matrix [run 36158678655](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678655), Nextcloud [run 36158678627](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678627) and gateway [run 36158678699](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678699) verified the new status probes and private restore evidence after encrypted recovery. The Matrix test additionally uploaded a one-time encryption key, captured it, consumed it, restored the older database and verified that the key could not be issued again. A fresh Element browser still recovered encrypted history using the independently held recovery key. Technical restore evidence deliberately records no user-operation proof; those user checks are separate CI assertions.
 
-The same source passed actual regional [Matrix exchange](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678622), [file exchange](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678585), [infrastructure certificates/recovery](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678604), [encrypted backup transport](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678668) and [local checks](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678433). Application recovery fixtures use synthetic network state; the independent-network workflows use actual clients. This is disposable acceptance, not real independent sites, public provider issuance or beginner usability. Controlled upgrades and extended controller/relay/home-network acceptance remain in progress.
+The same source passed actual regional [Matrix exchange](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678622), [file exchange](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678585), [infrastructure certificates/recovery](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678604), [encrypted backup transport](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678668) and [local checks](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36158678433). Application recovery fixtures use synthetic network state; the independent-network workflows use actual clients. This is disposable acceptance, not real independent sites, public provider issuance or beginner usability. Controlled upgrades and integrated home-network/replacement acceptance remain in progress; additional relay and enrolled-controller evidence is recorded above.
 
 **Legacy/profile workflows, guided local installation and unified operations: implemented and locally checked. Live deployment: NOT RUN.**
 
@@ -22,8 +30,8 @@ The same source passed actual regional [Matrix exchange](https://github.com/koll
 | Public DNS and controller/relay TLS trust | NOT RUN | Real domains/certificates required |
 | Node registration/tag acceptance | NOT RUN | Administrator approval on live controller required |
 | Actual inter-server HTTPS and denied ports | NOT RUN | Local TLS tests do not prove overlay enforcement |
-| Private relay path and return to direct | NOT RUN | Requires controlled live fault injection |
-| Controller/relay outages | NOT RUN | Requires separate existing/fresh connection experiments |
+| Private relay path | CI PASS / EXTERNAL NOT RUN | Actual forced-relay loss and surviving-relay HTTPS verified above; physical networks and return-to-direct acceptance remain external |
+| Controller/relay outages | CI PASS / EXTERNAL NOT RUN | Short established-session outage and post-recovery enrollment verified above; public sites remain untested |
 | Deployment rerun and reboot identity preservation | NOT RUN | Persistent paths are tested structurally; operational result remains unverified |
 | Controller backup restore | CI PASS | Disposable exact-version restore, actual database content, ingress isolation, rollback and interrupted recovery; live site loss remains untested |
 

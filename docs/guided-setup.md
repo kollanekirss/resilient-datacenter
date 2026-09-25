@@ -158,3 +158,5 @@ Run this flow separately at each location using different manifests. Never clone
 At this stage, success means the intended machine is installed and approved in the intended network. It does not mean another node is authorized to use an application, that a direct NAT path works, that data is backed up, or that the second site can take over a service.
 
 The controller/relay still have their documented dependencies. DERP admission is fail-closed when controller verification is unavailable. Real direct/relay behaviour must be tested on the target networks. Follow docs/local-install-acceptance.md before claiming this workflow supports your home environment.
+
+For more than one relay location, the independent wizard accepts one to four dedicated relay hosts and prepares separate certificate names. Read [multiple relay locations and controller recovery](infrastructure-resilience.md) before choosing sites. Controllers require a separately reachable backup destination; they are not automatically clients of their own overlay.
