@@ -39,7 +39,11 @@ def listener(name,address,port,vhosts,policies,*,tls=False):
          'path_with_escaped_slashes_action':'REJECT_REQUEST','use_remote_address':True,'xff_num_trusted_hops':0,
          'request_headers_timeout':'15s','stream_idle_timeout':'300s',
          'route_config':{'name':name,'virtual_hosts':vhosts},'http_filters':[rbac(policies),ROUTER]}
-    if not tls:hcm['upgrade_configs']=[{'upgrade_type':'CONNECT'}]
+    if not tls:
+        # Synapse's pinned Twisted client sends HTTP/1.0 CONNECT. Its authority
+        # still must match an approved static target; never supply a default host.
+        hcm['http_protocol_options']={'accept_http_10':True}
+        hcm['upgrade_configs']=[{'upgrade_type':'CONNECT'}]
     chain={'filters':[{'name':'envoy.filters.network.http_connection_manager','typed_config':hcm}]}
     if tls:
         chain['transport_socket']={'name':'envoy.transport_sockets.tls','typed_config':{'@type':'type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext',

@@ -52,3 +52,14 @@ def test_regional_endpoints_cannot_fall_back_to_an_unrelated_interface():
     text=m.firewall(p,peers,lan_interface='rdc-lan',now=NOW+2,replace=False)
     for selector in ('tcp dport 443','tcp sport 443'):
         assert 'output oifname != "tailscale0" ip daddr 100.64.0.0/10 '+selector+' drop' in text
+
+
+def test_synapse_http10_connect_is_accepted_only_on_private_listener():
+    m=importlib.import_module('gateway_rendering');p,own,peers=inputs()
+    listeners=m.envoy(p,own,peers)['static_resources']['listeners']
+    public,private=[item['filter_chains'][0]['filters'][0]['typed_config'] for item in listeners]
+    assert private['http_protocol_options']=={'accept_http_10':True}
+    assert 'http_protocol_options' not in public
+    # A missing or unapproved target still has no default host or route.
+    assert 'default_host_for_http_10' not in json.dumps(private)
+    assert private['http_filters'][0]['name']=='envoy.filters.http.rbac'
