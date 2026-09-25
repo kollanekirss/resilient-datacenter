@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from profile_config import load_profile
 from setup_contracts import validate_local_manifest, local_ownership
 from profile_state import inspect_peer
+from operation_results import Check, check, message, blocking_checks
 
 MARKER=Path('/etc/server-connectivity-profile.json')
 STATE=Path('/var/lib/tailscale')
@@ -41,35 +42,60 @@ def tls_errors(hostname, *, connect_address=None, context=None):
         return ['Controller TLS/DNS connection failed. Check DNS, connectivity, certificate trust/hostname and the local clock; TLS verification was not bypassed.']
 
 
-def check_local(manifest, *, require_owned=False, check_tls=True):
-    errors=validate_local_manifest(manifest)
-    if errors: return errors
-    release=platform.freedesktop_os_release() if platform.system()=='Linux' else {}
-    errors=platform_errors(platform.system(),platform.machine(),release,Path('/run/systemd/system').is_dir())
-    if errors: return errors
-    if os.geteuid()!=0 and shutil.which('sudo') is None: return ['Install/configure sudo or run through local root administration.']
+def inspect_local_checks(manifest, *, require_owned=False, check_tls=True) -> list[Check]:
+    if validate_local_manifest(manifest): return [check('manifest.invalid','fail')]
+    try:
+        release=platform.freedesktop_os_release() if platform.system()=='Linux' else {}
+    except OSError:
+        return [check('platform.unsupported','fail')]
+    if platform_errors(platform.system(),platform.machine(),release,Path('/run/systemd/system').is_dir()):
+        return [check('platform.unsupported','fail')]
+    if os.geteuid()!=0 and shutil.which('sudo') is None:
+        return [check('tooling.sudo_missing','fail')]
     expected=local_ownership(manifest); actual=None
-    if MARKER.is_symlink(): return ['Ownership marker must not be a symlink.']
+    if MARKER.is_symlink(): return [check('ownership.invalid','fail')]
     if MARKER.exists():
         try:
             stat=MARKER.stat()
-            if stat.st_uid!=0 or stat.st_mode & 0o022: return ['Ownership marker must be root-owned and not writable by others.']
+            if stat.st_uid!=0 or stat.st_mode & 0o022:
+                return [check('ownership.invalid','fail')]
             actual=json.loads(MARKER.read_text())
-        except (OSError,ValueError): return ['Cannot read valid local ownership. Inspect permissions using local administration.']
-    daemon=subprocess.run(['/bin/systemctl','is-active','tailscaled'],capture_output=True,text=True,timeout=10).returncode==0
-    errors=ownership_errors(expected,actual,any(Path(p).exists() for p in RESERVED),STATE.exists(),daemon)
-    if require_owned and actual is None: errors.append('Install this local node before enrollment/status checks.')
-    if errors: return errors
+        except (OSError,ValueError): return [check('ownership.invalid','fail')]
+    try:
+        daemon=subprocess.run(['/bin/systemctl','is-active','tailscaled'],capture_output=True,text=True,timeout=10).returncode==0
+    except (OSError,subprocess.SubprocessError):
+        return [check('client.inspect_denied','unknown')]
+    persistent=STATE.exists()
+    if actual is None and (persistent or any(Path(p).exists() for p in RESERVED)):
+        return [check('ownership.unowned','fail')]
+    if actual is not None and actual!=expected: return [check('ownership.mismatch','fail')]
+    if persistent and not daemon: return [check('client.unavailable','fail')]
+    if require_owned and actual is None: return [check('ownership.missing','fail')]
+    results=[check('platform.supported','pass'),check('ownership.valid','pass')]
     if daemon:
         try:
             def read(args):
                 result=subprocess.run(['/usr/local/bin/tailscale',*args],capture_output=True,text=True,timeout=10,check=True)
                 return json.loads(result.stdout)
-            inspect_peer(read(['status','--json']),read(['debug','prefs']),manifest['headscale_hostname'],manifest['node_tag'])
-        except (OSError,ValueError,subprocess.SubprocessError):
-            return ['Could not verify current client identity/controller. Inspect locally; if access was denied, rerun the read-only check using sudo.']
-    if check_tls: errors.extend(tls_errors(manifest['headscale_hostname']))
-    return errors
+            status=read(['status','--json'])
+            state=inspect_peer(status,read(['debug','prefs']),manifest['headscale_hostname'],manifest['node_tag'])
+            if state['status']=='enrolled' and status.get('Self',{}).get('HostName')!=manifest['node_name']:
+                return [*results,check('client.state_mismatch','fail')]
+        except (OSError,ValueError,TypeError,AttributeError,subprocess.SubprocessError):
+            return [*results,check('client.inspect_denied','unknown')]
+        if state['status']=='enrolled': results.append(check('client.verified','pass'))
+        elif state['status']=='awaiting_enrollment': results.append(check('client.awaiting_enrollment','unknown'))
+        else: results.append(check('client.stopped','fail'))
+    else:
+        results.append(check('client.not_installed','not-applicable'))
+    if check_tls:
+        failed=bool(tls_errors(manifest['headscale_hostname']))
+        results.append(check('controller.connection_failed' if failed else 'controller.verified','fail' if failed else 'pass'))
+    return results
+
+
+def check_local(manifest, *, require_owned=False, check_tls=True):
+    return [message(c) for c in blocking_checks(inspect_local_checks(manifest,require_owned=require_owned,check_tls=check_tls))]
 
 
 def main():

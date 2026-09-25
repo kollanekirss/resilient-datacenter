@@ -52,8 +52,10 @@ def enrollment_action(manifest: dict, runtime, *, start_requested: bool) -> dict
 
 
 class NativeRuntime:
-    def __init__(self): self.process=None
-    def _prefix(self): return [] if os.geteuid()==0 else ['sudo','--']
+    def __init__(self, *, allow_sudo=True):
+        self.process=None
+        self.allow_sudo=allow_sudo
+    def _prefix(self): return [] if os.geteuid()==0 or not self.allow_sudo else ['sudo','--']
     def _read(self,args):
         result=subprocess.run(self._prefix()+['/usr/local/bin/tailscale',*args],capture_output=True,text=True,check=True,timeout=15)
         return json.loads(result.stdout)

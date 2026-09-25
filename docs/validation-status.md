@@ -1,10 +1,10 @@
 # Validation status — 2026-09-25
 
-**Legacy kit, independent/join profiles, guided preparation and local-node installer: implemented and locally checked. Live deployment: NOT RUN.**
+**Legacy/profile workflows, guided local installation and unified operations: implemented and locally checked. Live deployment: NOT RUN.**
 
 | Check | Status | Evidence / boundary |
 |---|---|---|
-| Python unit and local integration tests | PASS | 184 tests: legacy/profile coverage plus guided contracts, private bundles, wizard navigation/resume, local installation guards, enrollment state and local TLS checks |
+| Python unit and local integration tests | PASS | 245 tests: legacy/profile coverage plus common CLI, structured diagnostics, private reports, source identity, snapshots, wizard and enrollment boundaries |
 | Ansible syntax | PASS | All 16 playbooks; infrastructure-only and both original profiles passed host/task listing without target connections |
 | Example inventory refuses deployment validation | PASS | CLI exits 1; no connections attempted |
 | DERP cross-build | PASS | Linux/amd64 ELF, source v1.102.4, Go 1.26.6, artifact SHA256 recorded in provenance.md |
@@ -69,3 +69,13 @@ Read the [operator guide](guided-setup.md) and [live acceptance checklist](local
 ## Publication check
 
 Before the initial public source upload, the local check suite was rerun: 184 tests and all 16 playbook syntax checks passed. Live tests were deferred at the project owner's request. Only source, public examples and documentation are included; generated inventories, certificates, build artifacts, caches and execution logs are excluded. Historical planning documents describe their original phase and do not change current support boundaries.
+
+## Unified operations milestone
+
+The common `rdc` launcher, menu, infrastructure/node commands, doctor, private support reports and source identity are implemented. The local suite passes **245 tests** and syntax checks for **16 playbooks**. The infrastructure and original profile task/host listings pass without target connections. The complete suite also passed from a clean tracked-source export with a fresh dependency environment. Only the three expected dynamic-group warnings remain.
+
+Review added regression coverage for noninteractive status, exact runtime node name, pending-enrollment visibility, malformed runtime data and absent project-local Ansible runtime directories. No client was installed or started on the developer computer. No production infrastructure was contacted.
+
+The read-only GitHub Local checks workflow is configured with reviewed immutable action pins and an Ubuntu 24.04 / Python 3.12 runner. Consult the actual pull-request checks for hosted execution results; workflow configuration alone is not a passing CI run. See [operations](operations.md) for the command and exit-code contract.
+
+Certificate issuance/renewal, verified binary distribution, managed upgrades, application services and live acceptance remain outside this increment. No automatic release or main-branch merge is included.

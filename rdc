@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+if [ -L "$0" ]; then
+    printf '%s\n' 'Run rdc from its real project location, not a symlink.' >&2
+    exit 3
+fi
+RDC_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ ! -x "$RDC_ROOT/.venv/bin/python" ]; then
+    printf 'Prepare dependencies in the project directory: %s\n' "$RDC_ROOT" >&2
+    printf '%s\n' 'python3 -m venv .venv' '.venv/bin/python -m pip install -r requirements.txt' >&2
+    exit 3
+fi
+exec "$RDC_ROOT/.venv/bin/python" -I "$RDC_ROOT/scripts/rdc.py" "$@"

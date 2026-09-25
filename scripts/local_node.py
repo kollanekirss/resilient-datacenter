@@ -11,7 +11,9 @@ import tempfile
 from datetime import datetime, timezone
 from profile_config import load_profile
 from setup_contracts import validate_local_manifest
-from local_checks import check_local
+from local_checks import check_local, inspect_local_checks
+from operation_environment import ansible_environment
+from operation_results import ActionResult, Exit, OperationError, result_for_state, blocking_checks
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -31,10 +33,36 @@ def apply_manifest(manifest, path, *, runner=subprocess.run, checker=check_local
     # Apply a private snapshot of the reviewed data, never an arbitrary inventory.
     with tempfile.TemporaryDirectory(prefix='sc-local-') as folder:
         snapshot=Path(folder)/'manifest.json'; snapshot.write_text(json.dumps(manifest)); snapshot.chmod(0o600)
-        env={k:v for k,v in os.environ.items() if not k.startswith('ANSIBLE_')}
-        env.update(ANSIBLE_CONFIG=str(ROOT/'ansible.cfg'),ANSIBLE_HOME=str(ROOT/'.cache/ansible'),ANSIBLE_LOCAL_TEMP=str(ROOT/'.work/ansible-tmp'))
+        env=ansible_environment(ROOT)
         runner(install_command(snapshot,as_root=os.geteuid()==0),cwd=ROOT,env=env,check=True)
     return {'status':'installed','enrollment':'not-verified'}
+
+
+def execute_local(action: str, manifest_path: Path) -> ActionResult:
+    if action not in ('check','apply','enroll','status'):
+        raise OperationError('operation.invalid',Exit.INVALID)
+    try:
+        manifest=load_profile(str(manifest_path))
+    except (OSError,ValueError):
+        raise OperationError('manifest.invalid',Exit.INVALID) from None
+    if validate_local_manifest(manifest):
+        raise OperationError('manifest.invalid',Exit.INVALID)
+    checks=inspect_local_checks(manifest,require_owned=action in ('enroll','status'),check_tls=action!='status')
+    if blocking_checks(checks):
+        return ActionResult('blocked',Exit.BLOCKED,tuple(checks))
+    try:
+        if action=='apply': result=apply_manifest(manifest,manifest_path)
+        elif action=='check': result={'status':'checks-passed','clock_sync':'not-verified'}
+        else:
+            from local_enrollment import NativeRuntime, enrollment_action
+            result=enrollment_action(manifest,NativeRuntime(allow_sudo=action=='enroll'),start_requested=action=='enroll')
+        return result_for_state(result['status'],details=result)
+    except (ValueError,TypeError,AttributeError,KeyError):
+        raise OperationError('client.state_mismatch',Exit.BLOCKED) from None
+    except (OSError,subprocess.SubprocessError):
+        raise OperationError('operation.failed',Exit.FAILED) from None
+    except (KeyboardInterrupt,EOFError):
+        return result_for_state('cancelled')
 
 
 def main():

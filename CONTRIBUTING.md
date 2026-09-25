@@ -19,6 +19,8 @@ The local checks do not install the network client or connect to public fixture 
 4. Add regression coverage for changed deployment behaviour. Preserve strict input validation, ownership checks, TLS verification and explicit enrollment.
 5. Open a pull request describing the user-visible change, checks performed and any untested behaviour.
 
+The common `./rdc` interface and private support reports are documented in [operations](docs/operations.md). New commands must preserve typed pending/blocked outcomes and keep raw diagnostics out of saved reports. GitHub Local checks runs the same local suite on Ubuntu without deployment permissions.
+
 ## Useful first contributions
 
 - Run the documented acceptance flow on disposable Ubuntu machines and report sanitized results.
