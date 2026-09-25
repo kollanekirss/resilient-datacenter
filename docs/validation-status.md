@@ -4,7 +4,7 @@
 
 | Check | Status | Evidence / boundary |
 |---|---|---|
-| Python unit and local integration tests | PASS | 299 tests: legacy/profile coverage plus common CLI, structured diagnostics, private reports, source identity, snapshots, wizard and enrollment boundaries |
+| Python unit and local integration tests | PASS | 356 tests: legacy/profile coverage plus common CLI, structured diagnostics, private reports, source identity, snapshots, wizard and enrollment boundaries |
 | Ansible syntax | PASS | All 16 playbooks; infrastructure-only and both original profiles passed host/task listing without target connections |
 | Example inventory refuses deployment validation | PASS | CLI exits 1; no connections attempted |
 | DERP cross-build | PASS | Linux/amd64 ELF, source v1.102.4, Go 1.26.6, artifact SHA256 recorded in provenance.md |
@@ -17,7 +17,7 @@
 | Private relay path and return to direct | NOT RUN | Requires controlled live fault injection |
 | Controller/relay outages | NOT RUN | Requires separate existing/fresh connection experiments |
 | Deployment rerun and reboot identity preservation | NOT RUN | Persistent paths are tested structurally; operational result remains unverified |
-| Controller backup restore | NOT RUN | Requires isolated restore exercise |
+| Controller backup restore | CI PASS | Disposable exact-version restore, actual database content, ingress isolation, rollback and interrupted recovery; live site loss remains untested |
 
 Reproduce local checks from the project directory:
 
@@ -95,3 +95,5 @@ Local checks pass **354 tests**, including consistent snapshot capture, componen
 The [real controller and relay recovery run](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36127299427) passed for both pinned services. It captures service data, promotes a snapshot while isolated, retains the current certificate, verifies the real HTTPS service, rolls back an injected validation failure, blocks service startup after interruption and recovers using the journal. This evidence is service-level recovery in a disposable Ubuntu runner. Real enrolled client recovery, independent fencing, public DNS changes, physical outages and end-user operations remain **NOT RUN**.
 
 No application backup, automatic retention, unattended update, storage immutability or zero-downtime recovery is claimed. Follow the [backup guide](backups.md) for the supported commands and topology limits. Later changes must retain passing checks; consult the current commit's CI rather than treating this historical result as proof of untested changes.
+
+The strengthened [recovery run](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36127740610) verifies actual non-loopback ingress denial during isolation and restored Headscale user records. It caught an nftables command that created a table without its nested rules; the runtime now uses explicit commands in one atomic batch and checks the installed rule structure. Local checks subsequently pass **356 tests** and all **16 playbook syntax checks**. Backup timestamps now represent quiesced data capture, not the later upload start.

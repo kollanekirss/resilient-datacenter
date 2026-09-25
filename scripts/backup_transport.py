@@ -1,5 +1,6 @@
 """Pinned Restic operations over explicitly pinned SFTP; no shell or ambient credentials."""
 import json
+from datetime import datetime,timezone
 import os
 from pathlib import Path
 import re
@@ -44,7 +45,7 @@ class Restic:
 
     def execute(self,args,*,cwd=None,timeout=1800):
         self.check_credentials()
-        env={'PATH':'/usr/local/bin:/usr/bin:/bin','LANG':'C.UTF-8'}
+        env={'PATH':'/usr/local/bin:/usr/bin:/bin','LANG':'C.UTF-8','TZ':'UTC'}
         with tempfile.TemporaryFile() as output:
             result=subprocess.run(self.command(args),cwd=cwd,env=env,stdin=subprocess.DEVNULL,stdout=output,
                                   stderr=subprocess.DEVNULL,timeout=timeout)
@@ -58,7 +59,10 @@ class Restic:
         self.execute(['init','--repository-version','2'],timeout=120)
 
     def backup(self,stage):
-        text=self.execute(['backup','--json','--host',self.profile['node_name'],'--tag','rdc-v1','.'],cwd=stage)
+        captured=datetime.fromisoformat(json.loads((Path(stage)/'snapshot.json').read_text())['captured_at'])
+        if captured.tzinfo is None: raise ValueError('Snapshot capture time must include a timezone')
+        timestamp=captured.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        text=self.execute(['backup','--time',timestamp,'--json','--host',self.profile['node_name'],'--tag','rdc-v1','.'],cwd=stage)
         records=[json.loads(line) for line in text.splitlines() if line.strip()]
         summaries=[r for r in records if isinstance(r,dict) and r.get('message_type')=='summary']
         if len(summaries)!=1 or not isinstance(summaries[0].get('snapshot_id'),str) or not SNAPSHOT.fullmatch(summaries[0]['snapshot_id']):

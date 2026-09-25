@@ -40,7 +40,7 @@ def exercise(role):
             assert not reachable(), 'Recovery isolation did not block real non-loopback ingress'
     cert=Path('/etc/rdc-tls/active/tls.crt').read_bytes()
     def users(*args):
-        return subprocess.run(['/usr/bin/headscale','--config','/etc/headscale/config.yaml','users',*args,'--output','json'],check=True,capture_output=True,text=True).stdout
+        return subprocess.run(['/usr/bin/headscale','--config','/etc/headscale/config.yaml','users',*args,'--output','json'],check=True,capture_output=True,text=True,timeout=30).stdout
     if role=='controller': users('create','ci-before')
     marker=state/'recovery-ci-proof';marker.write_text('snapshot contents')
     with tempfile.TemporaryDirectory(prefix='rdc-restore-ci-') as directory:

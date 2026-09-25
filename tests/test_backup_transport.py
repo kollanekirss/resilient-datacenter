@@ -19,6 +19,7 @@ def test_ssh_arguments_pin_identity_and_do_not_use_user_config(tmp_path):
 
 
 def test_backup_requires_complete_snapshot_id(monkeypatch,tmp_path):
+    (tmp_path/'snapshot.json').write_text(json.dumps({'captured_at':'2026-09-25T10:00:00+00:00'}))
     m=api().Restic(profile(),base=tmp_path)
     monkeypatch.setattr(m,'execute',lambda *a,**k:json.dumps({'message_type':'summary','snapshot_id':'a'*64}))
     assert m.backup(tmp_path)=='a'*64
@@ -46,3 +47,13 @@ def test_secret_files_cannot_be_symlinks_or_readable_by_others(tmp_path):
     m=api().Restic(profile(),base=tmp_path)
     for name in ('password','ssh_key','known_hosts'): (tmp_path/name).write_text('private')
     with pytest.raises(ValueError): m.check_credentials()
+
+
+def test_backup_time_is_data_capture_time_not_later_upload_time(monkeypatch,tmp_path):
+    m=api().Restic(profile(),base=tmp_path);calls=[]
+    (tmp_path/'snapshot.json').write_text(json.dumps({'captured_at':'2026-09-25T10:00:00+02:00'}))
+    def execute(args,**kwargs):
+        calls.append(args);return json.dumps({'message_type':'summary','snapshot_id':'a'*64})
+    monkeypatch.setattr(m,'execute',execute)
+    m.backup(tmp_path)
+    assert calls[0][calls[0].index('--time')+1]=='2026-09-25 08:00:00'

@@ -114,11 +114,12 @@ def _capture(root,destination,owner,*,services=None):
                 recovery.append(name)  # A failed stop can still have stopped the service.
                 services.stop(name)
                 if services.is_active(name): raise ValueError('Service did not stop; snapshot refused')
+        captured_at=datetime.now(timezone.utc).isoformat()
         # Repeat inspection after the write-producing services have stopped.
         inspect_resources(root,catalogue.paths)
         destination.mkdir(mode=0o700)
         for name in catalogue.paths: copy_resource(root/name,destination/'data'/name)
-        metadata={'schema_version':1,'captured_at':datetime.now(timezone.utc).isoformat(),
+        metadata={'schema_version':1,'captured_at':captured_at,
                   'ownership':owner,'binary_sha256':components,'paths':list(catalogue.paths),'services_originally_active':original}
         (destination/'snapshot.json').write_text(json.dumps(metadata,indent=2)+'\n')
         (destination/'snapshot.json').chmod(0o600)
