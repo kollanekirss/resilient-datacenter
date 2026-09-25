@@ -77,6 +77,14 @@ def main(selected):
     profile={'schema_version':1,'institution_id':'ci','node_name':node,'tls_mode':'supplied','tls_certificate':str(cert),'tls_private_key':str(key)}
     if selected=='matrix':profile.update(kind='matrix-services',matrix_hostname=host,element_hostname=certificates.ELEMENT)
     else:profile.update(kind='nextcloud-services',nextcloud_hostname=host)
+    real_upgrade_command=upgrade.command
+    def observed_command(argv,**kwargs):
+        label='rsync' if '--entrypoint=rsync' in argv else 'occ-upgrade' if 'upgrade' in argv else 'identity-export'
+        try:return real_upgrade_command(argv,**kwargs)
+        except BaseException:
+            print('Disposable upgrade fixed-command phase failed: '+label,flush=True)
+            raise
+    upgrade.command=observed_command
     with old_installer(selected) as operations:
         if selected=='matrix':operations.install_or_resume(profile,network,ADDRESS)
         else:operations.install_or_resume(profile,network,ADDRESS,'cialice',password)
@@ -127,7 +135,9 @@ def main(selected):
                 raise ValueError('Injected failure after actual target version verification and candidate write')
     with upgrade.locks(selected):
         try:transaction.apply(plan,FailedCandidate(plan['source_owner']))
-        except transaction.UpgradeError as error:assert error.recovered and not error.committed
+        except transaction.UpgradeError as error:
+            if not candidate_verified:raise
+            assert error.recovered and not error.committed
         else:raise AssertionError('Candidate verification failure was ignored')
     assert candidate_verified==[True],'Failure did not reach actual target verification'
     assert read_proof()=='before-upgrade' and stable()==identity and remote_probe()
