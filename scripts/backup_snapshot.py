@@ -76,6 +76,8 @@ def certificate_lock(root):
 
 
 def capture(root,destination,owner,*,services=None):
+    pending=Path(root)/'etc/rdc-restore-pending.json'
+    if pending.exists() or pending.is_symlink(): raise ValueError('Resolve the pending restore before taking a new backup')
     try: actual=json.loads((Path(root)/'etc/server-connectivity-profile.json').read_text())
     except (OSError,ValueError): raise ValueError('Cannot verify snapshot ownership') from None
     if actual!=owner: raise ValueError('Snapshot ownership differs from the installed role')

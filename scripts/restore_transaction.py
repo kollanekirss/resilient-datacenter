@@ -17,7 +17,7 @@ class RestoreError(ValueError):
     def __init__(self,recovered,*,committed=False):
         self.recovered=recovered;self.committed=committed
         super().__init__('Restoration needs attention. '+('The restored state was committed; do not roll it back after clients may have written data.' if committed else
-                         'Previous data and service recovery '+('verified.' if recovered else 'NOT verified; ingress remains isolated.')))
+                         'Previous data and service recovery '+('verified.' if recovered else 'NOT verified. Keep the replacement independently isolated and use restore-recover.')))
 
 
 def atomic_json(path,data):

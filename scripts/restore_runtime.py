@@ -51,15 +51,19 @@ def install_guards(owner):
 
 def isolation_rules(role,identifier):
     if role not in ('controller','relay','peer') or not re.fullmatch('[a-f0-9]{32}',identifier): raise ValueError('Invalid restore isolation identity')
-    rules='iifname "lo" accept; '
-    if role=='peer': rules+='iifname "tailscale0" drop; '
+    rules=['iifname "lo" accept']
+    if role=='peer': rules.append('iifname "tailscale0" drop')
     else:
-        rules+='tcp dport 443 drop; '
-        if role=='relay': rules+='udp dport 3478 drop; '
-    forward='iifname "tailscale0" drop; ' if role=='peer' else ''
-    return ('create table inet rdc_restore { comment "rdc-restore:'+identifier+'";\n'
-            'chain input { type filter hook input priority -200; policy accept; '+rules+'}\n'
-            'chain forward { type filter hook forward priority -200; policy accept; '+forward+'}\n}\n')
+        rules.append('tcp dport 443 drop')
+        if role=='relay': rules.append('udp dport 3478 drop')
+    # Explicit commands in one atomic nft batch. On Ubuntu's nft version,
+    # `create table` with nested chains creates only the table itself.
+    commands=['create table inet rdc_restore { comment "rdc-restore:'+identifier+'"; }',
+              'add chain inet rdc_restore input { type filter hook input priority -200; policy accept; }',
+              'add chain inet rdc_restore forward { type filter hook forward priority -200; policy accept; }']
+    commands+=['add rule inet rdc_restore input '+rule for rule in rules]
+    if role=='peer': commands.append('add rule inet rdc_restore forward iifname "tailscale0" drop')
+    return '\n'.join(commands)+'\n'
 
 
 def rules_digest(data,identifier):
@@ -125,7 +129,12 @@ class Runtime(Services):
             record={'schema_version':1,'transaction_id':identifier,'role':owner['role'],'digest':None}
             atomic_json(ISOLATION,record)
             self.nft('-f','-',input=isolation_rules(owner['role'],identifier))
-            digest=rules_digest(self.table(),identifier)
+            current=self.table()
+            digest=rules_digest(current,identifier)
+        chains=[e['chain']['name'] for e in current['nftables'] if 'chain' in e]
+        rules=[e['rule'] for e in current['nftables'] if 'rule' in e]
+        if sorted(chains)!=['forward','input'] or len(rules)!=(2 if owner['role']=='controller' else 3):
+            raise ValueError('Recovery ingress rules were not installed completely')
         record['digest']=digest;atomic_json(ISOLATION,record)
     def allow_validation(self):
         if PERMIT.exists() or PERMIT.is_symlink():

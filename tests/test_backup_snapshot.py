@@ -102,3 +102,13 @@ def test_transitional_service_state_is_not_treated_as_stopped(monkeypatch):
     def run(*args,**kwargs): return subprocess.CompletedProcess(args[0],3,stdout='deactivating\n')
     monkeypatch.setattr(api().subprocess,'run',run)
     with pytest.raises(ValueError): api().Services().is_active('headscale')
+
+
+def test_snapshot_refuses_pending_restore_before_stopping_services(tmp_path):
+    from test_restore_transaction import fixture
+    owner,root,stage=fixture(tmp_path)
+    (root/'etc/rdc-restore-pending.json').write_text('{}')
+    services=Services()
+    with pytest.raises(ValueError,match='pending restore'):
+        api().capture(root,tmp_path/'blocked',owner,services=services)
+    assert not (tmp_path/'blocked').exists()
