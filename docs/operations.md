@@ -1,8 +1,8 @@
 # Guided operations
 
-The `rdc` command is the common interface to this experimental networking pilot. It prepares configurations, checks/deploys the offsite controller and relay, and installs/enrolls local Ubuntu nodes. Matrix/Element, Nextcloud, backup/recovery, certificate automation and managed upgrades are separate future increments.
+The `rdc` command is the common interface to this experimental networking pilot. It prepares configurations, checks/deploys the offsite controller and relay, and installs/enrolls local Ubuntu nodes. The development source also includes experimental Matrix/Element, encrypted backups, guarded recovery and certificate workflows. Nextcloud, regional gateways and managed application upgrades remain in development. See [Matrix services](matrix-services.md), [backups](backups.md) and [managed infrastructure certificates](managed-certificates.md). These additions are not in the older 0.2.0-alpha.1 download.
 
-Local checks and continuous integration do not establish successful server deployment, NAT traversal or resilience. Continue to treat this as a disposable pilot until the [live acceptance checklist](local-install-acceptance.md) has been exercised.
+Disposable Ubuntu tests exercise actual service startup and recovery; they do not establish home NAT traversal, physical site separation or institutional acceptance. Continue to treat this as a disposable pilot until the [live acceptance checklist](local-install-acceptance.md) has been exercised.
 
 ## Get started
 
@@ -48,6 +48,22 @@ Apply shows the reviewed targets, asks for confirmation and deploys through the 
 ```
 
 Arbitrary Ansible arguments, partial target selection and user-supplied execution overrides are not supported. Only controller and relay are managed; planned local nodes are never SSH targets.
+
+## Approve a device-to-service connection
+
+Run this on the operator computer with the current infrastructure inventory. Both endpoints must be declared enrollment nodes with distinct tags:
+
+```sh
+./rdc access setup inventories/lab/setup/infrastructure.yml --output-file inventories/lab/setup/infrastructure-access.json
+./rdc infrastructure check inventories/lab/setup/infrastructure-access.json
+./rdc infrastructure apply inventories/lab/setup/infrastructure-access.json
+```
+
+The wizard asks for the connecting node, destination node, service and whether to allow or remove access. `https` allows TCP 443; `backup` allows TCP 2222. The first command only writes a private proposed inventory. Check and apply use the existing reviewed deployment process. Keep the new inventory as your current configuration; deploying an older one would restore its older access rules.
+
+Each permission applies to the declared node tag. The administrator must assign tags only to their intended nodes. HTTPS access does not create an application account or grant room/file permissions. It does not grant reverse access or management SSH. Remove the permission through the same wizard and apply the resulting inventory to withdraw future network access.
+
+For a joining organisation, its network administrator owns this step. A node manifest alone cannot authorize access. The current wizard requires the nodes to have been declared during infrastructure setup; it does not silently enroll an unknown device.
 
 ## Local node: run on the intended Ubuntu machine
 

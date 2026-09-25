@@ -165,6 +165,10 @@ class Runtime(Services):
                       'headscale_hostname':owner['controller_hostname'],'node_tag':owner['node_tag']}
             checks=inspect_local_checks(manifest,require_owned=True,check_tls=False)
             if any(c.outcome!='pass' for c in checks) or not any(c.code=='client.verified' for c in checks): raise ValueError('Restored networking identity could not be verified')
+            if 'applications' in owner:
+                from service_runtime import read_settings,ready,UNITS
+                settings=read_settings()
+                for name in reversed(list(UNITS)): ready(name,settings)
         else:
             from cryptography import x509
             from cryptography.hazmat.primitives import hashes

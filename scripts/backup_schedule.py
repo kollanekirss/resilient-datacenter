@@ -13,8 +13,9 @@ BASE=Path('/etc/rdc-backup')
 RUNTIME=Path('/opt/rdc-backup-runtime')
 UNIT=Path('/etc/systemd/system/rdc-backup.service')
 TIMER=Path('/etc/systemd/system/rdc-backup.timer')
-FILES=('backup_runner.py','backup_schedule.py','backup_operations.py','backup_contracts.py','backup_snapshot.py','backup_transport.py',
+LEGACY_FILES=('backup_runner.py','backup_schedule.py','backup_operations.py','backup_contracts.py','backup_snapshot.py','backup_transport.py',
        'profile_config.py','setup_contracts.py','validate_inventory.py','validate_tls.py')
+FILES=LEGACY_FILES+('backup_scope.py','service_contracts.py','service_images.json','service_runtime.py','service_backup.py','service_rendering.py')
 CALENDARS={'hourly':'*-*-* *:00:00 UTC','daily':'*-*-* 02:00:00 UTC'}
 
 
@@ -76,14 +77,54 @@ def verify_runtime(directory=RUNTIME,*,require_root=True):
     directory=Path(directory);info=directory.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid!=(0 if require_root else os.geteuid()) or info.st_mode&0o077: raise ValueError('Unsafe scheduled backup runtime directory')
     data=read_private(directory/'manifest.json',require_root=require_root)
-    if set(data)!={'schema_version','files'} or data['schema_version']!=1 or not isinstance(data['files'],dict) or set(data['files'])!=set(FILES):
+    if set(data)!={'schema_version','files'} or data['schema_version']!=1 or not isinstance(data['files'],dict) or set(data['files']) not in (set(FILES),set(LEGACY_FILES)):
         raise ValueError('Unknown scheduled backup runtime manifest')
-    if set(p.name for p in directory.iterdir())!=set(FILES)|{'manifest.json'}: raise ValueError('Unexpected scheduled runtime files')
+    if set(p.name for p in directory.iterdir())!=set(data['files'])|{'manifest.json'}: raise ValueError('Unexpected scheduled runtime files')
     for name,digest in data['files'].items():
         path=directory/name;info=path.lstat()
         if not stat.S_ISREG(info.st_mode) or info.st_uid!=(0 if require_root else os.geteuid()) or info.st_mode&0o077 or hashlib.sha256(path.read_bytes()).hexdigest()!=digest:
             raise ValueError('Scheduled runtime code changed; backup is blocked pending review')
     return data
+
+
+def refresh_runtime(source,*,require_root=True):
+    """Explicit scope transition only; caller holds the backup/recovery lock.
+
+    Keep the previous verified directory and a durable intent across both
+    renames. A crash in between blocks execution and can resume the same source.
+    """
+    source=Path(source);candidate=RUNTIME.parent/'.rdc-backup-runtime-next'
+    previous=RUNTIME.parent/'.rdc-backup-runtime-previous';marker=BASE/'runtime-update.json'
+    desired={'schema_version':1,'files':{name:hashlib.sha256((source/name).read_bytes()).hexdigest() for name in FILES}}
+    verify=lambda path:verify_runtime(path,require_root=require_root)
+    if marker.exists() or marker.is_symlink():
+        intent=read_private(marker,require_root=require_root)
+        if set(intent)!={'schema_version','previous','desired'} or intent['schema_version']!=1 or intent['desired']!=desired:
+            raise ValueError('Resume the backup runtime transition from its original reviewed source')
+    else:
+        old=verify(RUNTIME)
+        if old==desired:return
+        if previous.exists() or previous.is_symlink():raise ValueError('A retained previous runtime requires review before another upgrade')
+        if candidate.exists() or candidate.is_symlink():
+            if verify(candidate)!=desired:raise ValueError('Unknown staged backup runtime')
+        else:create_runtime(source,candidate)
+        intent={'schema_version':1,'previous':old,'desired':desired};private_json(marker,intent)
+    def rename(first,last):
+        os.replace(first,last)
+        fd=os.open(RUNTIME.parent,os.O_RDONLY)
+        try:os.fsync(fd)
+        finally:os.close(fd)
+    if RUNTIME.exists() or RUNTIME.is_symlink():
+        current=verify(RUNTIME)
+        if current==desired:
+            if verify(previous)!=intent['previous']:raise ValueError('Retained backup runtime changed')
+            marker.unlink();return
+        if current!=intent['previous'] or previous.exists() or previous.is_symlink():raise ValueError('Backup runtime transition identity changed')
+        rename(RUNTIME,previous)
+    if verify(previous)!=intent['previous'] or verify(candidate)!=desired:raise ValueError('Backup runtime transition contents changed')
+    rename(candidate,RUNTIME)
+    if verify(RUNTIME)!=desired:raise ValueError('New backup runtime verification failed')
+    marker.unlink()
 
 
 def unit_text():
@@ -112,7 +153,7 @@ def timer_text(frequency):
     return '[Unit]\nDescription=RDC encrypted backup schedule\n[Timer]\nOnCalendar='+CALENDARS[frequency]+'\nRandomizedDelaySec=600\nPersistent=true\nUnit=rdc-backup.service\n[Install]\nWantedBy=timers.target\n'
 
 
-def owned_schedule():
+def owned_schedule(*,check_runtime=True):
     if any(Path(str(p)+'.d').exists() for p in (UNIT,TIMER)): raise ValueError('Unreviewed scheduler drop-ins require explicit administration review')
     data=read_private(BASE/'schedule.json')
     if set(data)!={'schema_version','frequency','ownership'} or data['schema_version']!=1 or data['frequency'] not in CALENDARS: raise ValueError('Unknown backup schedule')
@@ -121,7 +162,7 @@ def owned_schedule():
     for path,content in ((UNIT,unit_text()),(TIMER,timer_text(data['frequency']))):
         info=path.lstat()
         if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_mode&0o022 or path.read_text()!=content: raise ValueError('Backup scheduler units changed')
-    verify_runtime()
+    if check_runtime:verify_runtime()
     return data
 
 

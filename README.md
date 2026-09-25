@@ -1,21 +1,21 @@
-# Server Connectivity — decentralized networking pilot
+# Resilient Datacenter — experimental self-hosting kit
 
 An Ansible connectivity kit for fresh **Ubuntu 24.04 LTS amd64** servers. It now includes two opt-in deployment profiles:
 
 - **Independent:** your own Headscale controller, separate DERP relay and one or more client nodes.
 - **Join:** your client nodes only, with explicit enrollment approval from an existing network administrator.
 
-Start with the [common command interface](docs/operations.md) and [guided setup and local installation](docs/guided-setup.md) to answer questions and prepare an offsite network plus local-node manifests. The new local installer is designed for home/private-network Ubuntu machines without public management SSH; actual Linux installation and NAT behaviour are still unverified.
+Start with the [common command interface](docs/operations.md) and [guided setup and local installation](docs/guided-setup.md) to answer questions and prepare an offsite network plus local-node manifests. The new local installer is designed for home/private-network Ubuntu machines without public management SSH; home NAT behaviour and the complete beginner journey still require acceptance testing.
 
 See [verified experimental releases](docs/releases.md) for relay downloads with exact source and signed provenance. Downloading never installs or upgrades servers.
 
-The [encrypted backup and recovery guide](docs/backups.md) covers owned network-service data, explicit fencing and guarded restore. It does not yet protect application data.
+The [encrypted backup and recovery guide](docs/backups.md) covers owned network-service data, explicit fencing and guarded restore. The development source adds opt-in [Matrix/Element installation and application recovery](docs/matrix-services.md).
 
-The [deployment-profile operator guide](docs/deployment-profiles.md) remains available for the existing SSH-managed workflows. Matrix/Element, Nextcloud, application recovery and regional gateways are not yet implemented. The guided workflow requires operator-supplied servers and DNS; it accepts supplied certificates or an explicit [managed certificate mode](docs/managed-certificates.md) for fresh infrastructure. Beginner usability has not been validated.
+The [deployment-profile operator guide](docs/deployment-profiles.md) remains available for the existing SSH-managed workflows. Matrix/Element and its recovery workflow are under development with disposable Ubuntu acceptance evidence; Nextcloud and regional gateways remain outstanding. The guided workflow requires operator-supplied servers and DNS; it accepts supplied certificates or an explicit [managed certificate mode](docs/managed-certificates.md) for fresh infrastructure. Beginner usability has not been validated.
 
 The original four-VPS pilot and its existing commands are retained below as the **legacy workflow**. Use one workflow consistently; neither path automatically migrates the other's installations.
 
-**Status: experimental pilot.** Locally tested; actual server deployment has not been tested. No VPSs, DNS records or cloud resources have been created. This is the connectivity foundation, not a production autonomous data centre. Local validation cannot establish interoperability, failover or uninterrupted relocation; those require the live acceptance tests.
+**Status: experimental development.** Disposable Ubuntu runners have exercised actual network-service and Matrix recovery; full multi-site deployments have not been accepted. No VPSs, DNS records or cloud resources have been created. This is the connectivity foundation, not a production autonomous data centre. Local validation cannot establish interoperability, failover or uninterrupted relocation; those require the live acceptance tests.
 
 ## Start here
 
@@ -33,7 +33,7 @@ Run `./rdc` for the interactive menu, `./rdc doctor /absolute/path/node-NAME.yml
 
 Choose **independent** to prepare your own controller/relay or **join** to prepare a node for an existing network. The wizard asks for names, addresses and configuration paths, and can save a draft while you gather prerequisites. Preparation does not install anything on servers.
 
-Follow the [guided setup instructions](docs/guided-setup.md) for the separate deployment, local installation and enrollment commands. Local installation supports **Ubuntu 24.04 amd64 with systemd**. Servers, DNS names, certificates and administrator approval are still required. This release does not yet provide Element, Nextcloud or automatic failover.
+Follow the [guided setup instructions](docs/guided-setup.md) for the separate deployment, local installation and enrollment commands. Local installation supports **Ubuntu 24.04 amd64 with systemd**. Servers, DNS names, certificates and administrator approval are still required. The development checkout includes the experimental Matrix/Element package. The published 0.2.0-alpha.1 archive predates it. Nextcloud and automatic failover are not available.
 
 See [validation status](docs/validation-status.md) for completed local checks and unperformed live tests, and [contributing](CONTRIBUTING.md) to help improve the pilot. The project code is available under the [MIT license](LICENSE); third-party software keeps its own licenses.
 
@@ -135,11 +135,11 @@ Successful live checks write separate per-server JSON reports under `artifacts/`
 
 ## What is deliberately still pending
 
-- All real deployments and live acceptance checks, including the pinned Headscale runtime parser.
+- Real multi-site and home-NAT deployments, disconnected-operation acceptance and colleague usability. Disposable runtime tests are recorded in the validation guide.
 - Multiple controllers/relays, resilient bootstrap DNS, identity-service recovery and institutional trust governance.
-- OPNsense, Unbound, SSO, Matrix/Element, Nextcloud and their application-specific replication/restore designs.
+- Nextcloud, regional application federation, resilient DNS, optional institutional SSO and integration guidance for existing routers such as OPNsense.
 - A supported client-device installer and fleet lifecycle management.
-- Production security review, monitoring, certificate automation, offsite backups and evidence-based availability commitments.
+- Production security review, external monitoring/alerts, physical offsite acceptance, controlled application upgrades and measured availability commitments.
 
 There is one controller and one relay. The relay checks new client admission against the controller and fails closed. Existing direct sessions may continue during controller loss, but new enrollment, policy distribution and fresh relay admission are affected. There is no claim of high availability or disruption-free relocation. Tagged machine identities require explicit revocation and lifecycle management; the configured default expiry for untagged nodes does not imply tagged servers expire automatically.
 

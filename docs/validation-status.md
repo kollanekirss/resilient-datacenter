@@ -103,3 +103,18 @@ The strengthened [recovery run](https://github.com/kollanekirss/resilient-datace
 The installed systemd backup entry point passed against the actual controller and encrypted SFTP storage in the [disposable scheduler run](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36128533462). It verifies successful capture/upload, a failed attempt preserving the last success, and a successful retry. The timer executes a root-managed code copy and performs no automatic upgrades or pruning. Physical offsite operation and alert delivery are not established by this test.
 
 Subsequent local checks pass **362 tests** and all **16 playbook syntax checks**, including overdue exit status and graceful termination that runs cleanup. Combining recovery and scheduling also added rejection of an existing shared recovery-journal parent. Actual scheduled runs use the same serialized backup path and refuse a pending restore.
+
+
+## Matrix/Element application increment (development source)
+
+The [application and issuer run 36133719119](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36133719119) passed actual pinned PostgreSQL, Synapse, Element and Caddy startup; trusted HTTPS; local account creation and login; private-room denial before invitation; message and media operations; and blocked external administration/federation routes. Enforced AppArmor remained active on all four containers.
+
+The same run exercised a frozen scheduled backup against real restricted SFTP storage, network-to-application backup scope transition, selected snapshot restoration, preserved credentials/sessions/media/signing identity, certificate activation/rollback and repeated installation. Actual Chromium verified Element login, restored chat history and sending. A fresh browser recovered encrypted history using an independently held recovery key; the server-held event remained encrypted. No recovery key was printed to CI output.
+
+The installed certificate timer activated a new trusted leaf and reported a simulated provider outage while retaining current HTTPS. DNS/provider/ACME issuance was simulated at the external boundary. It has not been demonstrated against an operator's real provider account.
+
+The [controller run 36133848306](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36133848306) accepted the guided HTTPS and backup grants through the actual pinned Headscale policy parser. This proves syntax/controller acceptance, not VPN packet enforcement. Local checks at this increment pass 415 tests; the 16 playbook syntax checks also passed.
+
+An intermittent restart failure in runs 36132971329 and 36135765895 occurred while inspecting a container after shutdown. The runtime now retains stopped containers and explicitly validates/removes them before launch, eliminating competing automatic removal. The [updated runtime run 36137009834](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36137009834) passed 20 consecutive verified proxy restarts, ten real failed TLS activations with recovery of the previous live certificate, and the complete application/browser/backup/issuer suite. Its restore service verification took 12.76 seconds in this fixture; this is not a site-recovery guarantee.
+
+These fixtures do not demonstrate real VPN enrollment, home NAT, physical site separation, Nextcloud, regional gateways or beginner acceptance. The older network-only statements above describe their historical increments.

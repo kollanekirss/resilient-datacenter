@@ -7,17 +7,32 @@ import re
 import shlex
 import shutil
 import stat
+import socket
 import subprocess
 import tempfile
+import time
 from backup_contracts import validate,repository
 
 SNAPSHOT=re.compile('[a-f0-9]{64}')
 
 
 class Restic:
-    def __init__(self,profile,*,base=Path('/etc/rdc-backup'),binary=Path('/usr/local/bin/rdc-restic')):
+    def __init__(self,profile,*,base=Path('/etc/rdc-backup'),binary=Path('/usr/local/bin/rdc-restic'),scope='network'):
         if validate(profile): raise ValueError('Invalid backup profile')
+        if scope not in ('network','matrix'): raise ValueError('Unknown backup scope')
+        self.scope=scope
         self.profile=profile; self.base=Path(base); self.binary=Path(binary)
+
+    def wait_ready(self):
+        # A peer snapshot restarts its network daemon before upload. This probe
+        # only waits for transport; SSH still verifies the pinned host key.
+        # No repository write is retried.
+        for attempt in range(10):
+            try:
+                with socket.create_connection((self.profile['backup_host'],self.profile['backup_port']),timeout=3):return
+            except OSError:
+                if attempt==9:raise ValueError('Backup storage did not become reachable after service restart') from None
+                time.sleep(1)
 
     def known_hosts(self):
         host=self.profile['backup_host'];port=self.profile['backup_port']
@@ -62,7 +77,8 @@ class Restic:
         captured=datetime.fromisoformat(json.loads((Path(stage)/'snapshot.json').read_text())['captured_at'])
         if captured.tzinfo is None: raise ValueError('Snapshot capture time must include a timezone')
         timestamp=captured.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-        text=self.execute(['backup','--time',timestamp,'--json','--host',self.profile['node_name'],'--tag','rdc-v1','.'],cwd=stage)
+        tags=['--tag','rdc-v1']+(['--tag','rdc-matrix-v1'] if self.scope=='matrix' else [])
+        text=self.execute(['backup','--time',timestamp,'--json','--host',self.profile['node_name'],*tags,'.'],cwd=stage)
         records=[json.loads(line) for line in text.splitlines() if line.strip()]
         summaries=[r for r in records if isinstance(r,dict) and r.get('message_type')=='summary']
         if len(summaries)!=1 or not isinstance(summaries[0].get('snapshot_id'),str) or not SNAPSHOT.fullmatch(summaries[0]['snapshot_id']):
@@ -70,7 +86,8 @@ class Restic:
         return summaries[0]['snapshot_id']
 
     def snapshots(self):
-        data=json.loads(self.execute(['--no-lock','snapshots','--json','--host',self.profile['node_name'],'--tag','rdc-v1'],timeout=120))
+        tags='rdc-v1,rdc-matrix-v1' if self.scope=='matrix' else 'rdc-v1'
+        data=json.loads(self.execute(['--no-lock','snapshots','--json','--host',self.profile['node_name'],'--tag',tags],timeout=120))
         if not isinstance(data,list) or len(data)>10000: raise ValueError('Invalid snapshot listing')
         for item in data:
             if not isinstance(item,dict) or not isinstance(item.get('id'),str) or not SNAPSHOT.fullmatch(item['id']) or not isinstance(item.get('time'),str):

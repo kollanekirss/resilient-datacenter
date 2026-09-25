@@ -49,6 +49,13 @@ def parser():
         command=infra_actions.add_parser(action)
         command.add_argument('inventory',type=Path)
         if action=='apply': command.add_argument('--ask-become-pass',action='store_true')
+    access=commands.add_parser('access',help='Prepare explicit application access without editing network policy by hand')
+    accesses=access.add_subparsers(dest='access_action',required=True)
+    for mode in ('setup','prepare'):
+        command=accesses.add_parser(mode);command.add_argument('inventory',type=Path);command.add_argument('--output-file',type=Path,required=True)
+        if mode=='prepare':
+            command.add_argument('--source',required=True);command.add_argument('--destination',required=True)
+            command.add_argument('--service',choices=('https','backup'),required=True);command.add_argument('--remove',action='store_true')
     node=commands.add_parser('node',help='Operate on THIS Ubuntu computer only')
     node_actions=node.add_subparsers(dest='action',required=True)
     for action in ('check','apply','enroll','status'):
@@ -63,7 +70,7 @@ def parser():
     configure.add_argument('profile',type=Path)
     configure.add_argument('--recovery-password-file',type=Path)
     configure.add_argument('--recovery-ssh-key-file',type=Path)
-    for action in ('initialize','run','status','restore-recover'): backup_commands.add_parser(action)
+    for action in ('initialize','run','status','restore-recover','include-services'): backup_commands.add_parser(action)
     backup_commands.add_parser('restore-stage',help='Decrypt a specific snapshot into private staging; never promote').add_argument('snapshot')
     for action in ('restore-plan','restore-apply'):
         backup_commands.add_parser(action,help='Review or explicitly promote an already staged snapshot').add_argument('snapshot')
@@ -75,6 +82,20 @@ def parser():
     targets=target.add_subparsers(dest='target_action',required=True)
     targets.add_parser('prepare').add_argument('manifest',type=Path)
     targets.add_parser('authorize').add_argument('public_key',type=Path)
+    services=commands.add_parser('services',help='Prepare and operate the experimental local Matrix package')
+    service_commands=services.add_subparsers(dest='action',required=True)
+    service_commands.add_parser('setup').add_argument('--output-file',type=Path,required=True)
+    for action in ('check','apply'): service_commands.add_parser(action).add_argument('profile',type=Path)
+    service_commands.add_parser('status')
+    service_commands.add_parser('account').add_argument('--admin',action='store_true')
+    certificate=service_commands.add_parser('certificate',help='Validate and activate replacement TLS for both service names')
+    certificate.add_argument('--certificate',type=Path,required=True)
+    certificate.add_argument('--private-key',type=Path,required=True)
+    issuer=service_commands.add_parser('issuer',help='Optional DNS-based service certificates without public inbound HTTP')
+    issuers=issuer.add_subparsers(dest='issuer_action',required=True)
+    issuers.add_parser('setup').add_argument('--output-file',type=Path,required=True)
+    issue=issuers.add_parser('issue');issue.add_argument('profile',type=Path);issue.add_argument('--token-file',type=Path)
+    for action in ('enable','status'):issuers.add_parser(action)
     release=commands.add_parser('release',help='Download and verify an experimental release; never install')
     fetch=release.add_subparsers(dest='action',required=True).add_parser('fetch')
     fetch.add_argument('version')
@@ -126,22 +147,41 @@ def doctor_exit(checks):
     return Exit.SUCCESS
 
 
+def service_action(args):
+    from service_operations import action
+    return action(args)
+
+
 def backup_action(args):
     from backup_operations import action
     return action(args)
 
 
 def dispatch(args) -> ActionResult:
+    if args.command=='access':
+        from service_access import action
+        try:outcome=action(args)
+        except ValueError as error:
+            print('Access preparation blocked: '+str(error));return result_for_state('blocked')
+        print(json.dumps(outcome,indent=2));return result_for_state(outcome['state'])
     if args.command=='setup':
         state=run_wizard(args.output_dir,resume=args.resume,input_fn=input)
         return result_for_state(state)
+    if args.command=='services':
+        try: outcome=service_action(args)
+        except ValueError as error:
+            print('Application action blocked: '+str(error));return result_for_state('blocked')
+        print(json.dumps(outcome,indent=2))
+        if outcome.get('expires_within_14_days') or outcome.get('serving_verified') is False or outcome.get('state') in ('issuance-failed','renewal-failed'):
+            return result_for_state('blocked')
+        return result_for_state({'prepared':'prepared','cancelled':'cancelled'}.get(outcome.get('state'),'checks-passed'))
     if args.command=='backup':
         try: outcome=backup_action(args)
         except ValueError as error:
             print('Backup action blocked: '+str(error))
             return result_for_state('blocked')
         print(json.dumps(outcome,indent=2))
-        return result_for_state({'no-backup':'blocked','backup-unreachable':'blocked','backup-overdue':'blocked','cancelled':'cancelled','prepared':'prepared'}.get(outcome.get('state'),'checks-passed'))
+        return result_for_state({'no-backup':'blocked','backup-unreachable':'blocked','backup-overdue':'blocked','application-backup-missing':'blocked','cancelled':'cancelled','prepared':'prepared'}.get(outcome.get('state'),'checks-passed'))
     if args.command=='release':
         try: fetch_release(args.version,args.commit,args.output_dir)
         except ValueError as error:

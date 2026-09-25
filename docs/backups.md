@@ -1,6 +1,6 @@
-# Encrypted network-service backups and recovery
+# Encrypted backups and guarded recovery
 
-This experimental workflow protects the kit's Headscale controller, DERP identity or enrolled networking client. It does **not** yet protect Matrix, Nextcloud or arbitrary directories. It briefly stops the owned service to make a consistent private local copy, restarts it, then encrypts and uploads the copy using pinned Restic 0.19.1. Allow local free space for that copy. During recovery, allow additional space for both the candidate and previous data.
+This experimental workflow protects the kit's Headscale controller, DERP identity or enrolled networking client. The development source can explicitly extend an enrolled node’s backup scope to the [Matrix package](matrix-services.md#add-chat-to-encrypted-backups), including its database, media and signing identity. It does **not** yet protect Nextcloud or arbitrary directories. Existing network-only snapshots do not become application backups. It briefly stops the owned service to make a consistent private local copy, restarts it, then encrypts and uploads the copy using pinned Restic 0.19.1. Allow local free space for that copy. During recovery, allow additional space for both the candidate and previous data.
 
 The commands below run on the relevant **Ubuntu 24.04 amd64 server**, from a project checkout with its dependencies prepared. `sudo ./rdc` uses that checkout's Python environment. Keep administrative access independent of the network being recovered: provider console, local console or a separately managed SSH connection. Restoring a client can interrupt an SSH session carried by that client; use the independent connection.
 
@@ -14,7 +14,7 @@ The guided storage target is a dedicated, already enrolled local node. It listen
 sudo ./rdc backup target prepare /absolute/path/node-storage.yml
 ```
 
-Save the returned endpoint, port and **public** SSH host key. Verify these directly with the storage administrator; accepting an unverified key defeats host authentication. Separately authorize only the intended writer to the storage node's TCP 2222 in the controller policy. Merely joining the same network does not grant access.
+Save the returned endpoint, port and **public** SSH host key. Verify these directly with the storage administrator; accepting an unverified key defeats host authentication. Use the [guided access workflow](operations.md#approve-a-device-to-service-connection) to authorize only the intended writer to the storage node’s `backup` service (TCP 2222), then apply the reviewed inventory. Merely joining the same network does not grant access.
 
 The offsite controller and relay in the infrastructure-only deployment are not overlay clients. They cannot reach this private storage endpoint automatically. Their administrator must provide a separately reachable SFTP endpoint with the same dedicated user `rdc-backup`, chroot layout `/data`, Ed25519 key authentication and independently verified host key. This release does not silently enroll infrastructure machines or expose the guided storage daemon publicly.
 

@@ -80,7 +80,9 @@ def capture(root,destination,owner,*,services=None):
     if pending.exists() or pending.is_symlink(): raise ValueError('Resolve the pending restore before taking a new backup')
     try: actual=json.loads((Path(root)/'etc/server-connectivity-profile.json').read_text())
     except (OSError,ValueError): raise ValueError('Cannot verify snapshot ownership') from None
-    if actual!=owner: raise ValueError('Snapshot ownership differs from the installed role')
+    from backup_scope import network_owner,verify_installed
+    if actual!=network_owner(owner): raise ValueError('Snapshot ownership differs from the installed role')
+    verify_installed(root,owner)
     with certificate_lock(root) if owner.get('tls_mode')=='managed-acme' else nullcontext():
         return _capture(root,destination,owner,services=services)
 
@@ -106,7 +108,14 @@ def _capture(root,destination,owner,*,services=None):
     daemon={'controller':'usr/bin/headscale','relay':'usr/local/bin/sc-derper','peer':'usr/local/bin/tailscaled'}[owner['role']]
     if hasattr(services,'verify_binary'):
         for name,active in original.items():
-            if active: services.verify_binary(name,components[daemon])
+            if active:
+                if name.startswith('rdc-'):
+                    from service_runtime import read_settings,inspect_container,verify_image,UNITS
+                    settings=read_settings();component=next(k for k,v in UNITS.items() if v==name)
+                    verify_image(component,settings)
+                    record=inspect_container(component,settings)
+                    if record is None or not record.get('State',{}).get('Running'): raise ValueError('Application container identity is not verified')
+                else:services.verify_binary(name,components[daemon])
     recovery=[]
     try:
         for name,active in original.items():
@@ -119,6 +128,9 @@ def _capture(root,destination,owner,*,services=None):
         inspect_resources(root,catalogue.paths)
         destination.mkdir(mode=0o700)
         for name in catalogue.paths: copy_resource(root/name,destination/'data'/name)
+        if 'applications' in owner:
+            from service_backup import validate_data
+            validate_data(destination/'data',owner['applications'])
         metadata={'schema_version':1,'captured_at':captured_at,
                   'ownership':owner,'binary_sha256':components,'paths':list(catalogue.paths),'services_originally_active':original}
         (destination/'snapshot.json').write_text(json.dumps(metadata,indent=2)+'\n')
@@ -128,7 +140,7 @@ def _capture(root,destination,owner,*,services=None):
         raise
     finally:
         failed=[]
-        for name in recovery:
+        for name in reversed(recovery):
             try:
                 services.start(name)
                 if not services.is_active(name): failed.append(name)
