@@ -9,7 +9,7 @@ This follows the active resilient-services product design. User authorization is
 - Consistent encrypted offsite transport, opt-in scheduled backups, fenced and journaled restoration.
 - Matrix/Element and Nextcloud packages with private HTTPS, account separation, real operations and replacement recovery. Browser recovery of encrypted Matrix history is separately tested.
 - Bilateral signed approvals, restricted regional gateway transport, expiry/revocation including established streams, interrupted-change recovery and periodic clock/membership checks.
-- Actual Matrix exchange across two independent internal networks and one regional network; internal chat after regional loss. Evidence: run 36145734658. File federation is still being implemented.
+- Actual Matrix exchange across two independent internal networks and one regional network; internal chat after regional loss. Evidence: run 36145734658. Actual Nextcloud federation, destination restrictions and internal file use after regional loss are also verified (run 36151160141).
 
 These are bounded disposable acceptance results. Consult validation-status.md for evidence and limitations rather than inferring complete product support.
 
@@ -20,7 +20,7 @@ These are bounded disposable acceptance results. Consult validation-status.md fo
 3. Expose the reviewed file connector through the same public service-link export and guided local attachment flow as chat. Verify interrupted attachment resumes safely and internal files remain available after failed activation. Use one backup-first operation lock for each application.
 4. Add gateway certificate lifecycle using the existing validated generation/activation mechanism. Test expiry reporting, actual certificate replacement, failed activation and retained working material. Real DNS-provider issuance still requires external credentials and acceptance.
 5. Add gateway backup/recovery. Restore public approval identity, monotonic revocation history and owned secrets under a closed transport boundary. Require current local partnership review before reopening; a historical backup cannot prove no later revocation existed.
-6. Review the complete increment, update current CLI/docs/evidence, then merge passing source. Do not describe a passing Matrix test alone as a complete regional journey.
+6. Close the fresh-replacement network bootstrap gap documented in the peer-recovery-bootstrap design. A prepared-host restore cannot establish the ability to reconstruct a fresh installation with its original VPN identity. Review the complete increment, update current CLI/docs/evidence, then merge passing source. Do not describe a passing Matrix test alone as a complete regional journey.
 
 ## Complete operator lifecycle and infrastructure resilience
 

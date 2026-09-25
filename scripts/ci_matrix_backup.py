@@ -59,14 +59,15 @@ def snapshot(network_snapshot):
     return snapshots[0]['id']
 
 
-def restore(identifier):
+def restore(identifier,*,staged=False):
     guard()
     from backup_operations import configured,stage_restore,WORK
     from restore_runtime import Runtime
     from restore_transaction import apply
     from backup_scope import application_runtime
     from backup_contracts import resources
-    data,_=configured();stage_restore(identifier)
+    data,_=configured()
+    if not staged:stage_restore(identifier)
     class ApplicationRuntime(Runtime):
         def verify(self,owner):
             # Actual applications are verified; dummy transport cannot prove VPN.

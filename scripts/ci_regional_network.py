@@ -117,7 +117,7 @@ def client(name,controller_name,index):
     auth=folder/'one-use-auth.key';auth.write_text(key['key']);auth.chmod(0o600)
     socket=str(folder/'tailscale.sock')
     environment=dict(os.environ,TS_NO_LOGS_NO_SUPPORT='true')
-    spawn('client-'+name,['ip','netns','exec',name,str(ROOT/'tailscaled'),'--state='+str(folder/'tailscaled.state'),'--socket='+socket,'--tun=tailscale0','--port=41641'],env=environment)
+    process=spawn('client-'+name,['ip','netns','exec',name,str(ROOT/'tailscaled'),'--state='+str(folder/'tailscaled.state'),'--socket='+socket,'--tun=tailscale0','--port=41641'],env=environment)
     for _ in range(60):
         if Path(socket).exists():break
         time.sleep(.25)
@@ -127,8 +127,45 @@ def client(name,controller_name,index):
     status=json.loads(run(*command,'status','--json'));prefs=json.loads(run(*command,'debug','prefs'))
     if status['BackendState']!='Running' or prefs['ControlURL'].rstrip('/')!='https://'+control['hostname'] or prefs.get('AdvertiseRoutes'):raise ValueError('Actual client membership differs from its one selected controller')
     address=next(value for value in status['Self']['TailscaleIPs'] if '.' in value)
-    result={'name':name,'controller':controller_name,'command':command,'address':address,'public_key':status['Self']['PublicKey'],'folder':folder}
+    result={'name':name,'controller':controller_name,'command':command,'address':address,'public_key':status['Self']['PublicKey'],'folder':folder,'process':process}
     NODES[name]=result;return result
+
+
+def replace_client(name,replacement,index):
+    """Fence an actual client and restore its state on a different lab machine.
+
+    The transport here is a local private copy. Encrypted catalogue extraction
+    and restore journalling are tested separately by the backup acceptance.
+    """
+    require_ci();old=NODES[name]
+    before=json.loads(run(*old['command'],'status','--json'))
+    old['process'].terminate();old['process'].wait(timeout=15)
+    assert old['process'].poll() is not None
+    namespace(replacement,index);folder=ROOT/replacement;folder.mkdir(mode=0o700)
+    shutil.copy2(old['folder']/'tailscaled.state',folder/'tailscaled.state')
+    (folder/'tailscaled.state').chmod(0o600)
+    shutil.copyfile(Path('/etc/netns')/name/'hosts',Path('/etc/netns')/replacement/'hosts')
+    socket=str(folder/'tailscale.sock');command=['ip','netns','exec',replacement,str(ROOT/'tailscale'),'--socket='+socket]
+    process=spawn('client-'+replacement,['ip','netns','exec',replacement,str(ROOT/'tailscaled'),
+                  '--state='+str(folder/'tailscaled.state'),'--socket='+socket,'--tun=tailscale0','--port=41641'],
+                  env=dict(os.environ,TS_NO_LOGS_NO_SUPPORT='true'))
+    for _ in range(60):
+        if process.poll() is not None:raise ValueError('Replacement client failed to start')
+        if Path(socket).exists():
+            result=subprocess.run([*command,'status','--json'],capture_output=True,text=True,timeout=10)
+            if result.returncode==0:
+                status=json.loads(result.stdout)
+                if status.get('BackendState')=='Running':break
+        time.sleep(.5)
+    else:raise ValueError('Restored client did not recover its enrolled state')
+    prefs=json.loads(run(*command,'debug','prefs'))
+    assert prefs['ControlURL'].rstrip('/')=='https://'+CONTROLLERS[old['controller']]['hostname']
+    assert status['Self']['PublicKey']==before['Self']['PublicKey']
+    assert status['Self']['TailscaleIPs']==before['Self']['TailscaleIPs']
+    result=dict(old,name=replacement,folder=folder,command=command,process=process)
+    NODES[name]=result
+    print('Actual enrolled client restored on a distinct namespace after fencing the old process: original node key, overlay addresses and controller retained without new enrollment PASS. This state transfer is private local fixture data, not offsite storage.',flush=True)
+    return result
 
 
 def prepare():

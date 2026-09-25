@@ -66,7 +66,25 @@ def exercise(identifier,document,fixture):
         shutil.copyfile(issued/name,destination);destination.chmod(0o600)
     assert operations.install(profile,identity)['partners']==0
     gateway_backup.include_services()
-    restore(identifier)
+    from backup_operations import stage_restore,WORK
+    from restore_transaction import RestoreError
+    import gateway_backup_runtime
+    from backup_contracts import resources
+    data,_=configured();stage_restore(identifier)
+    before=store.state()
+    class FailureAfterReadiness(Runtime):
+        failed=False
+        def verify(self,owner):
+            assert all(self.is_active(name) for name in resources(owner).services)
+            gateway_backup_runtime.ready('gateway',gateway_backup_runtime.read_settings())
+            if not self.failed:
+                self.failed=True;raise ValueError('Injected gateway restore validation failure')
+    try:apply(WORK/'restores'/identifier,data['ownership'],runtime=FailureAfterReadiness(data['ownership']))
+    except RestoreError as error:assert error.recovered
+    else:raise AssertionError('Injected restore failure did not roll back')
+    assert store.state()==before and store.recovery_pending()
+    assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
+    restore(identifier,staged=True)
     assert store.recovery_pending()
     assert (store.base/'tls/active/tls.crt').read_bytes()==(issued/'tls.crt').read_bytes()
     assert not Path('/etc/rdc-service-acme').exists()

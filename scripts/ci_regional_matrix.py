@@ -249,6 +249,18 @@ def main():
         local_event=api(app['user'],'PUT',app['hostname'],'/_matrix/client/v3/rooms/'+local+'/send/m.room.message/internal-only',{'msgtype':'m.text','body':'Internal chat survives regional loss'},token)['event_id']
         assert wait_event(app,local_room,local_event,token)['content']['body']=='Internal chat survives regional loss'
     print('Actual regional revocation prevents later cross-institution delivery while retained messages remain readable. Loss of regional controller and gateways leaves both internal networks and local chat operations available PASS.',flush=True)
+    replacement=network.replace_client('north-user','north-user-replacement',8)
+    north['user']=replacement['name']
+    for _ in range(30):
+        response=request(north['user'],'GET','https://'+north['hostname']+'/_matrix/client/v3/account/whoami',token=alice,timeout=3)
+        if response['status']==200:break
+        time.sleep(1)
+    else:raise ValueError('Replacement network identity could not reach its original internal application')
+    local_room=api(north['user'],'POST',north['hostname'],'/_matrix/client/v3/createRoom',{'preset':'private_chat','creation_content':{'m.federate':False}},alice)['room_id']
+    local=urllib.parse.quote(local_room,safe='')
+    restored_event=api(north['user'],'PUT',north['hostname'],'/_matrix/client/v3/rooms/'+local+'/send/m.room.message/replacement-proof',{'msgtype':'m.text','body':'Restored VPN identity reaches internal chat'},alice)['event_id']
+    assert wait_event(north,local_room,restored_event,alice)['content']['body']=='Restored VPN identity reaches internal chat'
+    print('Actual restored client performs authenticated internal Matrix write/read after regional loss PASS. Full server/bootstrap recovery and physical sites are separate acceptance boundaries.',flush=True)
     print('Physical multi-site/home NAT, production relay placement, Nextcloud federation, encrypted cross-institution browser exchange and beginner acceptance are NOT established by this run.',flush=True)
 
 
