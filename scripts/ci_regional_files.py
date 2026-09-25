@@ -145,6 +145,30 @@ def gateway(institution,index,identity,document,tls):
     return profile
 
 
+def verify_application_egress(app):
+    """Use Nextcloud's actual HTTP client, not a separate curl proxy test."""
+    targets=['https://files.south.ci.test/ocm-provider/',
+             'https://unapproved.example.invalid/ocm-provider/',
+             'https://files.south.ci.test:8443/ocm-provider/',
+             'http://files.south.ci.test/ocm-provider/',
+             'https://100.64.0.1/ocm-provider/',
+             'http://10.203.1.1/', 'http://127.0.0.1/']
+    encoded=base64.b64encode(json.dumps(targets).encode()).decode()
+    probe=('require "/var/www/html/lib/base.php";'
+           '$c=\\OCP\\Server::get(\\OCP\\Http\\Client\\IClientService::class)->newClient();'
+           '$urls=json_decode(base64_decode("'+encoded+'"),true);$out=[];'
+           'foreach($urls as $url){try{$r=$c->get($url,["timeout"=>10,"allow_redirects"=>false]);'
+           '$out[]=["status"=>$r->getStatusCode()];}'
+           'catch(\\Throwable $e){$out[]=["class"=>get_class($e),"status"=>(int)$e->getCode()];}}'
+           'echo json_encode($out);')
+    rows=json.loads(network.run('nsenter','--net=/var/run/netns/'+app['node'],
+        'podman','exec','--user','33:33','north-nextcloud','php','-r',probe,timeout=100))
+    assert rows[0]=={'status':200},rows
+    for row in rows[1:]:
+        assert 'class' in row and (row['status']==403 or row['class'].endswith('LocalServerException')),rows
+    print('Actual Nextcloud HTTP client reaches its approved HTTPS peer and denies unknown names, alternate ports, HTTP fallback, literal regional/private/loopback targets PASS.',flush=True)
+
+
 def main():
     network.prepare()
     for image in {item['image'] for item in contracts.image_pins().values()}|{gateway_contracts.image_pins()['gateway']['image']}:network.run('podman','pull',image,timeout=600)
@@ -161,6 +185,7 @@ def main():
     for node in ('north-gateway','south-gateway','outsider'):
         with (Path('/etc/netns')/node/'hosts').open('a') as stream:
             for institution in ('north','south'):stream.write(network.NODES[institution+'-gateway']['address']+' files.'+institution+'.ci.test\n')
+    verify_application_egress(apps['north'])
     north,south=apps['north'],apps['south'];content=b'Approved cross-institution file '+os.urandom(128)
     own(north,'PUT','/remote.php/dav/files/alice/proof.txt',content)
     own(north,'PUT','/remote.php/dav/files/alice/private.txt',b'Unshared institutional data')
@@ -172,8 +197,11 @@ def main():
     mounted='/remote.php/dav/files/alice/'+urllib.parse.quote(accepted['mountpoint'].lstrip('/'))
     assert own(south,'GET',mounted)==content
     assert request('south-gateway','GET','https://'+north['hostname']+'/remote.php/dav/files/alice/private.txt',timeout=5)[0] in (403,404)
-    for path in ('/index.php/login','/ocs/v2.php/cloud/users','/index.php/settings/admin'):
-        assert request('south-gateway','GET','https://'+north['hostname']+path,timeout=5)[0] in (403,404)
+    for path in ('/index.php/login','/ocs/v2.php/cloud/users','/index.php/settings/admin',
+                 '/public.php/webdav/../../index.php/login',
+                 '/public.php/webdav/%2e%2e/%2e%2e/index.php/login',
+                 '/public.php/webdav%2f..%2f..%2findex.php/login'):
+        assert request('south-gateway','GET','https://'+north['hostname']+path,timeout=5)[0] in (400,403,404)
     assert request('outsider','GET','https://'+north['hostname']+'/ocm-provider/',timeout=3)[0]==0
     # A well-formed application share without the sender's signature is denied
     # even though its source gateway has transport approval.
