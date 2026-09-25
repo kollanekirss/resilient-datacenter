@@ -39,6 +39,12 @@ Previously connected clients can retain useful state during a controller outage,
 
 The proposed domestic design therefore needs several independently reachable rendezvous locations, pre-provisioned trust and an authenticated way to update bootstrap addresses without the failed public DNS path. Multiple DERPs provide relay alternatives; they do not make one Headscale controller highly available. If every known endpoint moves and no discovery channel survives, automatic remote reconnection cannot be promised. Local island operation is the fallback in that case.
 
+## Modular portable deployment direction
+
+The agreed reference deployment is **Proxmox on the physical host, with separate OPNsense, Unbound, NGINX, Synapse/Element, Nextcloud and partner-connector VMs**. Service guests retain their own operating systems; Proxmox does not replace Linux inside those VMs. Prepare services, accounts and certificates during normal operation so local use does not require outside services during a crisis.
+
+This is a planned profile, not a capability of the current installer. Read the [reference architecture](docs/architecture/portable-proxmox.md) and [delivery roadmap](docs/architecture/portable-proxmox-roadmap.md). The next implementation is a validated site plan and preview, followed by provisioning and disconnected local access. The existing Ubuntu deployment remains available.
+
 ## Example hardware for a small institutional pilot
 
 These are **planning examples, not measured user-capacity guarantees or a shopping list**. Reuse existing equipment first and size it against actual data, concurrent users and the recovery window. The supported deployment target remains fresh Ubuntu 24.04 amd64 VMs or machines; a hypervisor such as Proxmox is optional and is administered separately.
