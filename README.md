@@ -7,6 +7,8 @@ An Ansible connectivity kit for fresh **Ubuntu 24.04 LTS amd64** servers. It now
 
 Start with the [common command interface](docs/operations.md) and [guided setup and local installation](docs/guided-setup.md) to answer questions and prepare an offsite network plus local-node manifests. The new local installer is designed for home/private-network Ubuntu machines without public management SSH; actual Linux installation and NAT behaviour are still unverified.
 
+See [verified experimental releases](docs/releases.md) for relay downloads with exact source and signed provenance. Downloading never installs or upgrades servers.
+
 The [deployment-profile operator guide](docs/deployment-profiles.md) remains available for the existing SSH-managed workflows. Matrix/Element, Nextcloud, application recovery and regional gateways are not yet implemented. The guided workflow still requires operator-supplied servers, DNS and certificates; beginner usability has not been validated.
 
 The original four-VPS pilot and its existing commands are retained below as the **legacy workflow**. Use one workflow consistently; neither path automatically migrates the other's installations.

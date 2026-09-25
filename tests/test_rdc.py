@@ -107,3 +107,11 @@ def test_report_write_failure_does_not_hide_diagnostics(tmp_path,monkeypatch,cap
 def test_doctor_pending_returns_pending_exit_code():
     from operation_results import Check
     assert api().doctor_exit((Check('client.awaiting_enrollment','unknown','contact-controller-admin'),))==4
+
+
+def test_release_download_requires_exact_identity_and_never_deploys(tmp_path,monkeypatch,capsys):
+    m=api(); calls=[]
+    monkeypatch.setattr(m,'fetch_release',lambda version,commit,dest: calls.append((version,commit,dest)))
+    assert m.main(['release','fetch','0.2.0-alpha.1','--commit','a'*40,'--output-dir',str(tmp_path/'release')])==0
+    assert calls==[('0.2.0-alpha.1','a'*40,tmp_path/'release')]
+    assert 'No servers' in capsys.readouterr().out

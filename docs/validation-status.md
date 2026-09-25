@@ -79,3 +79,7 @@ Review added regression coverage for noninteractive status, exact runtime node n
 The read-only GitHub Local checks workflow is configured with reviewed immutable action pins and an Ubuntu 24.04 / Python 3.12 runner. Consult the actual pull-request checks for hosted execution results; workflow configuration alone is not a passing CI run. See [operations](operations.md) for the command and exit-code contract.
 
 Certificate issuance/renewal, verified binary distribution, managed upgrades, application services and live acceptance remain outside this increment. No automatic release or main-branch merge is included.
+
+## Verified-release increment (2026-09-25)
+
+The release downloader rejects source/publisher mismatches, failed attestations, corrupt hashes, missing/unexpected files and unsafe filesystem entries. The relay cross-build and dependency-license collection ran locally. These checks do not yet constitute verification of a published artifact; that requires the tagged GitHub release workflow followed by an actual download and attestation check. The release remains experimental and does not alter the unperformed deployment/recovery acceptance tests above.
