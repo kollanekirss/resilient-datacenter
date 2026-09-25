@@ -114,3 +114,21 @@ Finally, test an actual client connection and the operations your institution de
 See [validation status](validation-status.md) and the pull request's actual checks. Disposable tests exercise real Restic/SFTP encrypted round trips and real Headscale/DERP lifecycle recovery. They do not establish physical offsite placement, power-loss durability on your storage hardware, home-network reachability, an enrolled client's recovery, institutional policy acceptance or beginner usability. The old-instance fencing decision remains with the operator.
 
 Restic's [backup documentation](https://restic.readthedocs.io/en/stable/040_backup.html) and [restore documentation](https://restic.readthedocs.io/en/stable/050_restore.html) describe the underlying backup tool. Its [repository preparation guide](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html) explains recovery credentials and storage access.
+
+## Regional gateway recovery (development)
+
+The development gateway package extends `backup include-services` to the pinned public institution identity, partner agreements, revocations, gateway profile and managed TLS data. It also archives validated optional DNS issuer account data in root-private `/var/lib/rdc-gateway-recovery`, outside the proxy container's mounts. No approval signing key belongs on the gateway. Keep that key, its passphrase, repository password and emergency storage access independently recoverable.
+
+Disable the backup timer before initially adding the gateway. After installation, run `sudo ./rdc backup include-services`, take a new backup, check its age, and re-enable the reviewed schedule. Existing network-only snapshots cannot recover the gateway. Capture refuses unfinished policy, certificate or recovery changes and briefly stops the gateway before encrypted upload.
+
+Use the existing stage, plan, fence and apply procedure on a replacement with the same signed gateway identity, exact profile and compatible component bytes. The replacement must have a verified current certificate. Restoration retains that certificate, combines snapshot and replacement revocations, and keeps partner access closed. A persistent approval timestamp prevents replaying historical permission. The marker survives restart, certificate maintenance and rollback. `gateway status` reports the required review; ordinary service readiness is not permission to share.
+
+After recovery, independently review partners and exchange newly issued bilateral agreements, then explicitly apply them with `sudo ./rdc gateway policy --agreement /absolute/path/new-agreement.json`. An empty reviewed policy grants no partner access. Revoked agreement identifiers remain revoked. Check an actual partner operation afterward.
+
+Archived issuer data is never installed automatically. If needed, export its provider token to a new file in an existing private root-owned directory:
+
+```sh
+sudo ./rdc gateway recovery export-token --output-file /root/private-recovery/dns-token
+```
+
+Review or rotate the token, then use the explicit gateway issuer setup/issue/enable workflow. The export never prints the secret. It does not reopen the gateway or replace an active issuer account. Full disposable encrypted gateway acceptance is being run on the development branch; consult the current validation ledger before relying on it.

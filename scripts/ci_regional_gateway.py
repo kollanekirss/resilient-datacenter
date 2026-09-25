@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import shutil
 import gateway_contracts as contracts
 import gateway_rendering as rendering
 import regional_agreements as agreements
@@ -144,8 +145,13 @@ def runtime_acceptance(profile,own,document):
     executable=Path('/usr/local/bin/tailscale')
     if executable.exists():raise ValueError('Synthetic gateway fixture requires no existing VPN client')
     executable.write_text('#!/usr/bin/python3\nimport json,sys\nprint(json.dumps('+repr(status)+' if sys.argv[1:]==["status","--json"] else '+repr(prefs)+'))\n');executable.chmod(0o755)
-    Path('/etc/systemd/system/tailscaled.service').write_text('[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/true\n')
+    shutil.copy2('/usr/bin/sleep','/usr/local/bin/tailscaled')
+    Path('/var/lib/tailscale').mkdir(mode=0o700)
+    Path('/var/lib/tailscale/ci-identity').write_text('explicitly synthetic gateway network identity')
+    Path('/etc/systemd/system/tailscaled.service').write_text('[Service]\nType=simple\nExecStart=/usr/local/bin/tailscaled infinity\n')
     run('systemctl','daemon-reload');run('systemctl','start','tailscaled')
+    from ci_matrix_backup import prepare_backup
+    network_snapshot=prepare_backup(network,address='100.64.1.12')
     import gateway_operations as operations
     import gateway_runtime as runtime
     import gateway_transition
@@ -199,6 +205,49 @@ def runtime_acceptance(profile,own,document):
     assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
     print('Actual gateway installer/frozen runtime: initially closed, approved policy, repeated installation, systemd restart, interrupted revocation, closed restart, explicit resume and replay denial PASS. VPN identity remains a synthetic fixture.',flush=True)
     recovery_boundary_acceptance(store,document)
+    encrypted_recovery_acceptance(store,document,network_snapshot)
+
+
+def encrypted_recovery_acceptance(store,document,network_snapshot):
+    from ci_matrix_backup import snapshot,restore
+    import gateway_operations as operations
+    import gateway_runtime as runtime
+    from gateway_backup import ARCHIVE,validate_archive,export_token
+    from gateway_store import decode
+    from regional_workspace import private_read
+    from backup_operations import configured
+    from backup_schedule import status
+    def issued():
+        now=int(time.time());own=store.identity();peer=document['offer']['payload']['recipient']
+        offered=agreements.offer(APPROVAL_KEYS['north'],own,peer,['matrix'],now=now,expires_at=now+1800,expected_peer=agreements.fingerprint(peer))
+        return agreements.accept(APPROVAL_KEYS['south'],offered,now=now,expected_peer=agreements.fingerprint(own))
+    old=issued();operations.change([old])
+    identifier=snapshot(network_snapshot)
+    assert status(0)['attempts']['last_success']['snapshot_id']==identifier
+    application=configured()[0]['ownership']['applications']
+    assert validate_archive(ARCHIVE,application)['issuer_snapshot']
+    mounts=runtime.inspect(store.identity())['Mounts']
+    assert not any(item.get('Source')==str(ARCHIVE) or item.get('Source')=='/etc/rdc-service-acme' for item in mounts)
+    cert=(store.base/'tls/active/tls.crt').read_bytes()
+    revoked=old['offer']['payload']['agreement_id'];operations.change(None,[revoked])
+    time.sleep(2)
+    restore(identifier)
+    assert revoked in store.state()['revoked_ids'] and store.recovery_pending()
+    assert (store.base/'tls/active/tls.crt').read_bytes()==cert
+    run('systemctl','restart',runtime.UNIT)
+    assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
+    try:operations.change([old])
+    except ValueError:pass
+    else:raise AssertionError('Restored historical agreement bypassed fresh review')
+    output=ROOT/'recovered-provider-token'
+    export_token(ARCHIVE,application,output)
+    assert output.stat().st_mode&0o777==0o600
+    output.unlink()
+    assert operations.change([issued()])['partners']==1
+    assert not store.recovery_pending() and revoked in store.state()['revoked_ids']
+    assert curl('rdc-peer','/_matrix/federation/v1/version').stdout=='fixture:/_matrix/federation/v1/version'
+    assert operations.install(store.profile(),store.identity())['partners']==1
+    print('Actual encrypted gateway recovery: scheduled SFTP/Restic capture, retained later revocation and TLS, closed restored approvals across restart, private issuer archive outside Envoy, explicit fresh consent reopens PASS. Network enrollment remains synthetic.',flush=True)
 
 
 def recovery_boundary_acceptance(store,document):

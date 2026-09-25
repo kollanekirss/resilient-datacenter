@@ -23,13 +23,13 @@ def prepare_network():
     subprocess.run(['systemctl','daemon-reload'],check=True);subprocess.run(['systemctl','start','tailscaled'],check=True)
 
 
-def prepare_backup(network):
+def prepare_backup(network,*,address='100.64.0.12'):
     guard()
     from backup_target import provision_storage,authorize
     from backup_operations import configure,configured,backup_now
     from backup_schedule import enable,disable
-    subprocess.run(['ip','address','add','100.64.0.12/32','dev','lo'],check=True)
-    endpoint=provision_storage(network,'100.64.0.12')
+    subprocess.run(['ip','address','add',address+'/32','dev','lo'],check=True)
+    endpoint=provision_storage(network,address)
     profile={'kind':'backup-profile','schema_version':1,'institution_id':network['institution_id'],'node_name':network['node_name'],'role':'peer',
              **{k:endpoint[k] for k in ('backup_host','backup_port','backup_host_key')}}
     configure(profile);authorize(Path('/etc/rdc-backup/ssh_key.pub'))

@@ -101,6 +101,10 @@ def parser():
     for action in ('enable','status'):file_issuers.add_parser(action)
     gateway=commands.add_parser('gateway',help='Experimental dedicated regional transport for approved chat and file services')
     gateway_actions=gateway.add_subparsers(dest='gateway_action',required=True)
+    gateway_recovery=gateway_actions.add_parser('recovery',help='Recover private certificate issuer material without enabling partner access')
+    gateway_recovery_actions=gateway_recovery.add_subparsers(dest='gateway_recovery_action',required=True)
+    gateway_recovery_export=gateway_recovery_actions.add_parser('export-token')
+    gateway_recovery_export.add_argument('--output-file',type=Path,required=True)
     gateway_issuer=gateway_actions.add_parser('issuer',help='Fixed DNS certificate issuance and renewal for the pinned gateway')
     gateway_issuer.set_defaults(certificate_package='gateway')
     gateway_issuers=gateway_issuer.add_subparsers(dest='issuer_action',required=True)
@@ -232,7 +236,7 @@ def dispatch(args) -> ActionResult:
         except ValueError as error:
             print('Gateway action blocked: '+str(error));return result_for_state('blocked')
         print(json.dumps(outcome,indent=2))
-        if outcome.get('state') in ('gateway-change-pending','gateway-enforcement-unverified') or outcome.get('network_identity_verified') is False or outcome.get('proxy_running') is False:return result_for_state('blocked')
+        if outcome.get('state') in ('gateway-change-pending','gateway-enforcement-unverified','gateway-recovery-review-required') or outcome.get('network_identity_verified') is False or outcome.get('proxy_running') is False:return result_for_state('blocked')
         return result_for_state({'prepared':'prepared','cancelled':'cancelled'}.get(outcome.get('state'),'checks-passed'))
     if args.command=='regional':
         from regional_operations import action

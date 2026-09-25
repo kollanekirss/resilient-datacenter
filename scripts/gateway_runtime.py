@@ -48,12 +48,21 @@ def validate_network(profile,identity,network,status,prefs):
         raise ValueError('Gateway must use one regional controller without advertised subnets or an exit node')
 
 
+def check_restore_boundary(store,pending=Path('/etc/rdc-restore-pending.json'),permit=Path('/run/rdc-restore-validation')):
+    if not (pending.exists() or pending.is_symlink()):return
+    if not store.recovery_pending():raise ValueError('Fenced gateway recovery requires closed partner review')
+    if not (permit.exists() or permit.is_symlink()):raise ValueError('Complete fenced network recovery before starting the gateway')
+    info=permit.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode&0o077 or info.st_size!=0:
+        raise ValueError('Unsafe fenced gateway validation permit')
+
+
 def network_check(store):
     profile=store.profile();identity=store.identity()
     validate_network(profile,identity,root_json(Path('/etc/server-connectivity-profile.json')),
         json.loads(command('/usr/local/bin/tailscale','status','--json')),json.loads(command('/usr/local/bin/tailscale','debug','prefs')))
     if any(Path(path).read_text().strip()!='0' for path in ('/proc/sys/net/ipv4/ip_forward','/proc/sys/net/ipv6/conf/all/forwarding')):raise ValueError('Disable general IPv4 and IPv6 forwarding on the dedicated gateway')
-    if Path('/etc/rdc-restore-pending.json').exists():raise ValueError('Complete fenced network recovery and review current partners before opening the gateway')
+    check_restore_boundary(store)
 
 
 def lan_interface(profile):

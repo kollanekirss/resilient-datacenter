@@ -80,10 +80,14 @@ def capture(root,destination,owner,*,services=None):
     if pending.exists() or pending.is_symlink(): raise ValueError('Resolve the pending restore before taking a new backup')
     try: actual=json.loads((Path(root)/'etc/server-connectivity-profile.json').read_text())
     except (OSError,ValueError): raise ValueError('Cannot verify snapshot ownership') from None
-    from backup_scope import network_owner,verify_installed
+    from backup_scope import network_owner,verify_installed,package
     if actual!=network_owner(owner): raise ValueError('Snapshot ownership differs from the installed role')
     verify_installed(root,owner)
-    with certificate_lock(root) if owner.get('tls_mode')=='managed-acme' else nullcontext():
+    context=certificate_lock(root) if owner.get('tls_mode')=='managed-acme' else nullcontext()
+    if 'applications' in owner and package(owner['applications'])=='gateway':
+        from gateway_backup import capture_context
+        context=capture_context(root,owner['applications'])
+    with context:
         return _capture(root,destination,owner,services=services)
 
 

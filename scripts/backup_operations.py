@@ -172,7 +172,7 @@ def configure(profile,*,password_file=None,ssh_key_file=None):
     return {'state':'configured-recovery-access' if recovered else 'configured-not-initialized'}
 
 
-def configured():
+def configured(*,recovery=False):
     require_platform()
     data=root_json(BASE/'configuration.json')
     if set(data)!={'schema_version','profile','ownership','restic_version','binary_sha256'} or data['schema_version']!=1 or data['restic_version']!=RESTIC_VERSION:
@@ -180,7 +180,10 @@ def configured():
     owner=root_json(Path('/etc/server-connectivity-profile.json'))
     match_owner(data['profile'],owner,expected=data['ownership'])
     from backup_scope import verify_installed,tag
-    verify_installed(Path('/'),data['ownership'])
+    # A journalled interruption may leave an application directory between its
+    # two renames. Recovery validates the complete journal and component hashes
+    # before restoring that directory; ordinary operations still require it.
+    if not recovery:verify_installed(Path('/'),data['ownership'])
     with BINARY.open('rb') as stream: actual=hashlib.file_digest(stream,'sha256').hexdigest()
     if actual!=data['binary_sha256']: raise ValueError('Installed backup tool differs from the verified version')
     transport=Restic(data['profile'],scope=tag(data['ownership']));transport.check_credentials()
@@ -236,7 +239,7 @@ def action(args):
         return prepare(load_profile(str(args.manifest))) if args.target_action=='prepare' else authorize(args.public_key)
     if args.action=='configure':
         return configure(load_profile(str(args.profile)),password_file=args.recovery_password_file,ssh_key_file=args.recovery_ssh_key_file)
-    data,transport=configured()
+    data,transport=configured(recovery=True) if args.action=='restore-recover' else configured()
     if args.action=='status' or (args.action=='schedule' and args.schedule_action=='status'):
         from backup_schedule import status as schedule_status
         try: summary=status_summary(transport.snapshots())

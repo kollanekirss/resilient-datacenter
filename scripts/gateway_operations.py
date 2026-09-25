@@ -8,6 +8,9 @@ import shutil
 import stat
 import subprocess
 import time
+import fcntl
+from contextlib import contextmanager
+from functools import wraps
 from backup_operations import require_platform
 from certificate_lifecycle import validate_material
 from regional_workspace import private_read,private_write
@@ -24,6 +27,27 @@ GUARD=Path('/etc/systemd/system/rdc-regional-guard.service')
 TIMER=Path('/etc/systemd/system/rdc-regional-guard.timer')
 SYSCTL=Path('/etc/sysctl.d/80-rdc-regional-gateway.conf')
 SYSCTL_TEXT='net.ipv4.ip_forward=0\nnet.ipv6.conf.all.forwarding=0\n'
+
+
+@contextmanager
+def backup_operation(base=Path('/etc/rdc-backup')):
+    if not (base.exists() or base.is_symlink()):
+        yield;return
+    from gateway_backup import private_directory
+    private_directory(base)
+    descriptor=os.open(base/'operation.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+    with os.fdopen(descriptor,'a') as stream:
+        info=os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode&0o077:raise ValueError('Unsafe gateway backup lock')
+        fcntl.flock(stream,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        yield
+
+
+def serialized(function):
+    @wraps(function)
+    def call(*args,**kwargs):
+        with backup_operation():return function(*args,**kwargs)
+    return call
 
 
 def tls_inputs(profile,identity):
@@ -67,7 +91,17 @@ def preflight(profile,identity):
         if Path('/usr/bin/podman').exists() and json.loads(runtime.command('/usr/bin/podman','ps','--all','--format','json')):raise ValueError('Use a dedicated gateway without other root-managed containers')
         if re.search(r':(?:443|3128|9443)\s',runtime.command('/usr/bin/ss','-H','-lntup')):raise ValueError('A gateway listener port is already in use')
         if shutil.disk_usage('/var/lib').free<3*1024**3:raise ValueError('Provide at least 3 GiB free disk for the gateway')
-    if any(Path(str(path)+'.d').exists() or Path(str(path)+'.d').is_symlink() for path in (UNIT,GUARD,TIMER)):raise ValueError('Unreviewed gateway unit overrides are present')
+    from nextcloud_operations import check_overrides
+    from restore_runtime import guard_files
+    from backup_scope import include
+    from gateway_backup import ownership
+    owner=ownership(profile,identity,runtime.root_json(Path('/etc/server-connectivity-profile.json')))
+    check_overrides([Path(str(path)+'.d') for path in (UNIT,GUARD,TIMER)],guard_files(include(owner['network'],owner)))
+    if not existing and Path('/etc/rdc-backup/schedule.json').exists():
+        from backup_schedule import owned_schedule
+        owned_schedule()
+        if subprocess.run(['/bin/systemctl','is-active','rdc-backup.timer'],capture_output=True,timeout=15).returncode!=3:
+            raise ValueError('Disable the backup timer before adding a gateway; include-services and create a new snapshot afterward')
     return {'state':'gateway-preflight-passed','existing':existing,'partner_transport':'not-verified'}
 
 
@@ -82,10 +116,15 @@ def owned_file(path,content,*,mode=0o600):
         path.chmod(mode)
 
 
+@serialized
 def install(profile,identity):
     preflight(profile,identity)
     store=Store(runtime.BASE);store.initialize(profile,identity)
     with store.lock(wait_seconds=10):
+        from gateway_backup import ownership,initialize_archive,ARCHIVE
+        owner=ownership(profile,identity,runtime.root_json(Path('/etc/server-connectivity-profile.json')))
+        private_write(runtime.BASE/'ownership.json',json.dumps(owner).encode())
+        initialize_archive(ARCHIVE,owner)
         # Read the complete frozen catalogue before any package/systemd changes.
         if runtime.INSTALLED.exists():
             info=runtime.INSTALLED.lstat()
@@ -118,9 +157,12 @@ def install(profile,identity):
             'next_step':'Apply independently approved agreements and test application exchange; listener readiness alone proves no federation.'}
 
 
+@serialized
 def change(documents=None,revoked_ids=None,*,resume=False):
     require_platform();runtime.verify_runtime();store=Store(runtime.BASE)
     with store.lock(wait_seconds=10):
+        restore=Path('/etc/rdc-restore-pending.json')
+        if restore.exists() or restore.is_symlink():raise ValueError('Complete fenced recovery before changing gateway policy')
         if certificates.pending(store):raise ValueError('Complete the pending gateway certificate replacement before changing policy')
         if resume:
             candidate=store.pending()
@@ -156,6 +198,14 @@ def action(args):
     from regional_operations import interactive
     import sys
     command=args.gateway_action
+    if command=='recovery':
+        require_platform();runtime.verify_runtime()
+        from gateway_backup import export_token,ARCHIVE
+        from gateway_store import decode
+        with backup_operation():
+            store=Store(runtime.BASE)
+            with store.lock(wait_seconds=10):
+                return export_token(ARCHIVE,decode(private_read(store.base/'ownership.json')),args.output_file)
     if command=='issuer':
         from service_issuer import action as issuer_action
         return issuer_action(args)

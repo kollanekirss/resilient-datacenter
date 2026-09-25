@@ -6,12 +6,35 @@ import re
 import shutil
 import tempfile
 import uuid
+from contextlib import nullcontext
+from functools import wraps
 from backup_contracts import resources
 from backup_snapshot import component_hashes,copy_resource
 from backup_operations import validate_restore
 
 PENDING='etc/rdc-restore-pending.json'
 TRANSACTIONS='var/lib/rdc-backup/transactions'
+
+
+def gateway_owner(owner):
+    from backup_scope import package
+    return 'applications' in owner and package(owner['applications'])=='gateway'
+
+
+def gateway_locked(function):
+    @wraps(function)
+    def call(*args,**kwargs):
+        index=1 if function.__name__=='apply' else 0
+        owner=args[index] if len(args)>index else kwargs['owner']
+        context=nullcontext()
+        if gateway_owner(owner):
+            from gateway_store import Store
+            base=Path(kwargs.get('root','/'))/'etc/rdc-gateway'
+            # Recovery can resume between old/new directory renames. The outer
+            # global backup lock and persistent startup marker still protect it.
+            if function.__name__!='recover' or base.exists() or base.is_symlink():context=Store(base).lock(wait_seconds=10)
+        with context:return function(*args,**kwargs)
+    return call
 
 class RestoreError(ValueError):
     def __init__(self,recovered,*,committed=False):
@@ -66,6 +89,11 @@ def plan(stage,owner,*,root=Path('/')):
     root=Path(root);metadata=validate_restore(stage,owner)
     from backup_scope import verify_installed
     verify_installed(root,owner)
+    if gateway_owner(owner):
+        from gateway_store import Store
+        from gateway_certificates import pending
+        store=Store(root/'etc/rdc-gateway')
+        if store.pending() or pending(store):raise ValueError('Complete pending gateway changes before restoration')
     if component_hashes(root,owner)!=metadata['binary_sha256']: raise ValueError('Restoration requires the exact snapshot component binaries')
     pending=root/PENDING
     if pending.exists() or pending.is_symlink(): raise ValueError('Recover the pending restore transaction before starting another')
@@ -89,6 +117,9 @@ def plan(stage,owner,*,root=Path('/')):
 
 
 def retain_current_settings(root,name,candidate,owner):
+    if name=='etc/rdc-gateway':
+        from gateway_backup import prepare_candidate
+        return prepare_candidate(root,candidate,owner['applications'])
     if name=='etc/headscale':
         keep=['config.yaml','derp-map.yml']
         if owner.get('tls_mode')!='managed-acme': keep+=['tls.crt','tls.key']
@@ -111,7 +142,7 @@ def retain_current_settings(root,name,candidate,owner):
 
 def set_permissions(path,name,owner):
     import pwd,grp
-    if name in ('etc/rdc-services','var/lib/rdc-services','etc/rdc-nextcloud','var/lib/rdc-nextcloud'):
+    if name in ('etc/rdc-services','var/lib/rdc-services','etc/rdc-nextcloud','var/lib/rdc-nextcloud','etc/rdc-gateway','var/lib/rdc-gateway-recovery'):
         from backup_scope import application_backup
         return application_backup(owner['applications']).restore_permissions(path,name)
     group={'controller':'headscale','relay':'sc-derp','peer':'root'}[owner['role']]
@@ -178,6 +209,7 @@ def rollback(root,journal,runtime):
     finish(root,journal,runtime)
 
 
+@gateway_locked
 def apply(stage,owner,*,root=Path('/'),runtime=None,permissions=set_permissions):
     if runtime is None:
         from restore_runtime import Runtime
@@ -200,6 +232,10 @@ def apply(stage,owner,*,root=Path('/'),runtime=None,permissions=set_permissions)
     isolated=False
     try:
         runtime.isolate(owner);isolated=True
+        if gateway_owner(owner):
+            from gateway_backup import begin_restore
+            begin_restore(root,stage,journal['id'])
+            if hasattr(runtime,'close_gateway'):runtime.close_gateway()
         for index,name in enumerate(journal['paths']):
             temporary=workspace(root,name,journal['id'],index);temporary.mkdir(mode=0o700)
             copy_resource(stage/'data'/name,temporary/'new')
@@ -232,6 +268,7 @@ def apply(stage,owner,*,root=Path('/'),runtime=None,permissions=set_permissions)
         raise
 
 
+@gateway_locked
 def recover(owner,*,root=Path('/'),runtime=None):
     if runtime is None:
         from restore_runtime import Runtime
