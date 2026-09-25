@@ -77,9 +77,11 @@ def main():
             binary=Path('/usr/local/bin/rdc-ci-headscale'); shutil.copyfile(temporary/'package/usr/bin/headscale',binary); binary.chmod(0o755)
             configuration=Path('/etc/headscale'); configuration.mkdir(mode=0o750); os.chown(configuration,0,gid)
             for name,content in {'config.yaml':environment.get_template('controller/templates/config.yaml.j2').render(headscale_hostname=HOST,tls_mode='managed-acme'),
-                                 'policy.json':json.dumps({'tagOwners':{},'grants':[]}),
+                                 'policy.json':environment.get_template('controller/templates/policy.json.j2').render(profile_policy={'tagOwners':{'tag:ci-service':['lab-admin@']},'grants':[]}),
                                  'derp-map.yml':environment.get_template('controller/templates/derp-map.yml.j2').render(derp_hostname='relay.ci.test',hostvars={'relay-01':{'ansible_host':'192.0.2.2'}})}.items():
                 p=configuration/name;p.write_text(content);p.chmod(0o640);os.chown(p,0,gid)
+            state=Path('/var/lib/headscale'); state.mkdir(mode=0o700); shutil.chown(state,user=group,group=group)
+            run(['runuser','-u',group,'--',str(binary),'configtest','--config','/etc/headscale/config.yaml'])
             unit=environment.get_template('controller/templates/headscale.service.j2').render().replace('/usr/bin/headscale',str(binary))
         else:
             binary=Path('/usr/local/bin/sc-derper')
