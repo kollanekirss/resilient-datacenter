@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""Actual proxy/firewall boundary fixtures; not evidence of VPN or federation."""
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+import gateway_contracts as contracts
+import gateway_rendering as rendering
+import regional_agreements as agreements
+
+ROOT=Path('/var/lib/rdc-gateway-ci')
+BASE=ROOT/'config'
+PROCESSES=[]
+
+
+def run(*args,**kwargs):return subprocess.run(list(args),check=True,text=True,capture_output=True,**kwargs).stdout
+
+
+def namespace(name,host,remote,host_address,remote_address):
+    run('ip','netns','add',name);run('ip','link','add',host,'type','veth','peer','name',remote)
+    run('ip','link','set',remote,'netns',name)
+    run('ip','address','add',host_address,'dev',host);run('ip','link','set',host,'up')
+    run('ip','netns','exec',name,'ip','address','add',remote_address,'dev',remote)
+    run('ip','netns','exec',name,'ip','link','set',remote,'up');run('ip','netns','exec',name,'ip','link','set','lo','up')
+
+
+def certificates():
+    run('openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(ROOT/'ca.key'),'-out',str(ROOT/'ca.crt'),'-days','2','-subj','/CN=Disposable Gateway CI CA')
+    run('openssl','req','-newkey','rsa:2048','-nodes','-keyout',str(BASE/'tls.key'),'-out',str(ROOT/'leaf.csr'),'-subj','/CN=north.matrix.ci.test')
+    (ROOT/'extensions').write_text('subjectAltName=DNS:north.matrix.ci.test,DNS:south.matrix.ci.test\nextendedKeyUsage=serverAuth\n')
+    run('openssl','x509','-req','-in',str(ROOT/'leaf.csr'),'-CA',str(ROOT/'ca.crt'),'-CAkey',str(ROOT/'ca.key'),'-CAcreateserial','-out',str(BASE/'tls.crt'),'-days','2','-extfile',str(ROOT/'extensions'))
+    Path('/usr/local/share/ca-certificates/rdc-gateway-ci.crt').write_bytes((ROOT/'ca.crt').read_bytes());run('update-ca-certificates')
+    (BASE/'tls.key').chmod(0o600)
+
+
+def documents():
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    a,b=Ed25519PrivateKey.generate().private_bytes_raw(),Ed25519PrivateKey.generate().private_bytes_raw()
+    def identity(key,name,address):return agreements.identity(key,institution_id=name,regional_controller='regional.ci.test',gateway_node=name+'-gateway',gateway_ipv4=address,services={'matrix':name+'.matrix.ci.test'})
+    own,peer=identity(a,'north','100.64.0.10'),identity(b,'south','100.64.0.11');now=int(time.time())
+    offered=agreements.offer(a,own,peer,['matrix'],expected_peer=agreements.fingerprint(peer),now=now-1,expires_at=now+1800)
+    accepted=agreements.accept(b,offered,expected_peer=agreements.fingerprint(own),now=now)
+    profile={'kind':'regional-gateway','schema_version':1,'institution_id':'north','node_name':'north-gateway','regional_controller':'regional.ci.test',
+             'lan_address':'10.203.1.1','lan_subnet':'10.203.1.0/24','identity_file':'/root/identity.json','tls_certificate':str(BASE/'tls.crt'),'tls_private_key':str(BASE/'tls.key'),
+             'upstreams':{'matrix':'10.203.1.10'}}
+    return profile,own,contracts.peer_rules(own,[accepted],[],now=now)
+
+
+def curl(namespace_name,path,*,proxy=False,source=None,host=None,timeout=8,stream=None):
+    host=host or ('south.matrix.ci.test' if proxy else 'north.matrix.ci.test')
+    args=['ip','netns','exec',namespace_name,'curl','--silent','--show-error','--max-time',str(timeout),'--noproxy','' if proxy else '*']
+    if proxy:args+=['--proxy','http://10.203.1.1:3128']
+    else:args+=['--resolve',host+':443:100.64.0.10']
+    if source:args+=['--interface',source]
+    args+=['https://'+host+path]
+    if stream:
+        args+=['--no-buffer','--output',str(stream)];return subprocess.Popen(args,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    return subprocess.run(args,capture_output=True,text=True)
+
+
+def main():
+    if os.geteuid()!=0 or os.environ.get('GITHUB_ACTIONS')!='true' or os.environ.get('RUNNER_ENVIRONMENT')!='github-hosted' or 'VERSION_ID="24.04"' not in Path('/etc/os-release').read_text():raise SystemExit('Disposable GitHub-hosted Ubuntu 24.04 only')
+    ROOT.mkdir(mode=0o700);BASE.mkdir(mode=0o700)
+    namespace('rdc-peer','tailscale0','peer0','100.64.0.10/24','100.64.0.11/24')
+    run('ip','netns','exec','rdc-peer','ip','address','add','100.64.0.12/24','dev','peer0')
+    namespace('rdc-service','rdc-lan','service0','10.203.1.1/24','10.203.1.10/24')
+    run('ip','netns','exec','rdc-service','ip','address','add','10.203.1.11/24','dev','service0')
+    certificates();profile,own,peers=documents()
+    for name,address,port in [('rdc-peer','100.64.0.11',443),('rdc-service','10.203.1.10',8443)]:
+        log=(ROOT/(name+'.log')).open('w')
+        PROCESSES.append(subprocess.Popen(['ip','netns','exec',name,sys.executable,str(Path(__file__).with_name('ci_gateway_endpoint.py')),address,str(port),str(BASE/'tls.crt'),str(BASE/'tls.key')],stdout=log,stderr=log))
+    (BASE/'envoy.json').write_text(json.dumps(rendering.envoy(profile,own,peers)))
+    image=contracts.image_pins()['gateway']['image'];run('podman','pull',image)
+    common=['--runtime','runc','--network','host','--read-only','--cap-drop','ALL','--cap-add','NET_BIND_SERVICE','--security-opt','no-new-privileges',
+            '--user','0:0','--volume',str(BASE)+':/etc/rdc-gateway:ro','--volume','/etc/ssl/certs:/etc/ssl/certs:ro','--entrypoint','/usr/local/bin/envoy',image,'-c','/etc/rdc-gateway/envoy.json','--concurrency','2']
+    run('podman','run','--rm',*common,'--mode','validate')
+    run('nft','-f','-',input=rendering.firewall(profile,peers,lan_interface='rdc-lan',now=int(time.time()),replace=False))
+    run('podman','run','--detach','--name','rdc-gateway-fixture',*common)
+    for _ in range(40):
+        result=curl('rdc-peer','/_matrix/federation/v1/version',timeout=2)
+        if result.returncode==0 and result.stdout=='fixture:/_matrix/federation/v1/version':break
+        time.sleep(.5)
+    else:raise AssertionError('Regional ingress did not reach its verified TLS upstream: '+result.stderr+' '+result.stdout)
+    for path in ('/_matrix/client/versions','/_synapse/admin/v1/users','/remote.php/dav/','/','/%2f_matrix/federation/v1/version'):
+        result=curl('rdc-peer',path);assert not result.stdout.startswith('fixture:'),(path,result.stdout)
+    result=curl('rdc-peer','/_matrix/federation/v1/version',source='100.64.0.12',timeout=2);assert result.returncode!=0
+    result=curl('rdc-service','/_matrix/federation/v1/version',proxy=True)
+    assert result.returncode==0 and result.stdout=='fixture:/_matrix/federation/v1/version',(result.returncode,result.stdout,result.stderr)
+    for host in ('unapproved.ci.test','169.254.169.254','10.203.1.10','100.64.0.11'):
+        assert curl('rdc-service','/',proxy=True,host=host).returncode!=0
+    assert curl('rdc-service','/',proxy=True,source='10.203.1.11',timeout=2).returncode!=0
+    print('Actual Envoy: native configuration validation, trusted upstream HTTPS, approved Matrix paths, denied client/admin paths, denied peer/source and fixed CONNECT destinations PASS. Namespace transport is a fixture, not a VPN.',flush=True)
+    for mode in ('revocation','expiry'):
+        current=[dict(peer,expires_at=int(time.time())+(5 if mode=='expiry' else 1800)) for peer in peers]
+        run('nft','-f','-',input=rendering.firewall(profile,current,lan_interface='rdc-lan',now=int(time.time()),replace=True))
+        downloads=[]
+        for name,proxy in [('rdc-peer',False),('rdc-service',True)]:
+            target=ROOT/(mode+'-'+name+'.stream');process=curl(name,'/_matrix/federation/v1/stream',proxy=proxy,timeout=15,stream=target)
+            PROCESSES.append(process);downloads.append((process,target))
+        deadline=time.monotonic()+4
+        while not all(target.exists() and target.stat().st_size>0 for _,target in downloads):
+            if time.monotonic()>deadline:raise AssertionError('Streams did not start before denial test')
+            time.sleep(.1)
+        if mode=='revocation':run('nft','-f','-',input=rendering.firewall(profile,[],lan_interface='rdc-lan',now=int(time.time()),replace=True))
+        else:time.sleep(6)
+        time.sleep(.5);sizes=[target.stat().st_size for _,target in downloads];time.sleep(2)
+        assert sizes==[target.stat().st_size for _,target in downloads],mode+' allowed an established connection to keep receiving bytes'
+        for process,_ in downloads:process.terminate();process.wait(timeout=5)
+        assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
+        assert curl('rdc-service','/',proxy=True,timeout=2).returncode!=0
+        print('Actual kernel '+mode+': both existing stream directions stop and new access is denied PASS.',flush=True)
+    print('This run does not establish application federation, real Headscale memberships or installation/recovery readiness.',flush=True)
+
+if __name__=='__main__':
+    try:main()
+    finally:
+        for process in PROCESSES:
+            if process.poll() is None:process.terminate()

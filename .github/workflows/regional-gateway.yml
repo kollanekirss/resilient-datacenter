@@ -1,0 +1,33 @@
+name: Disposable regional gateway
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  gateway-boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Prepare disposable runner
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y podman nftables
+      - name: Exercise real proxy and firewall boundaries
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT .venv/bin/python scripts/ci_regional_gateway.py
+      - name: Collect disposable gateway diagnostics on failure
+        if: failure()
+        run: |
+          sudo podman logs --tail 100 rdc-gateway-fixture || true
+          sudo nft list table inet rdc_gateway || true
+          sudo cat /var/lib/rdc-gateway-ci/rdc-peer.log /var/lib/rdc-gateway-ci/rdc-service.log || true
+          sudo journalctl -k --no-pager --lines=100
