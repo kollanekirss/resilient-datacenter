@@ -34,7 +34,7 @@ def test_nextcloud_rejects_unsafe_or_cross_package_inputs(key,value):
 def test_configuration_rendering_preserves_literals_without_executable_input():
     m=importlib.import_module('nextcloud_rendering')
     data={'instanceid':'oc1234567890','passwordsalt':'a'*32,'secret':'b'*48,'version':'35.0.1.0',
-          'dbpassword':'c'*64,'dbuser':'oc_admin','installed':True}
+          'dbpassword':'c'*64,'dbuser':'oc_admin','installed':True,'data_fingerprint':'d'*32}
     output=m.application_config(profile(),data)
     assert 'files.pilot.test' not in output  # Values encoded, never interpolated into PHP code.
     decoded=m.configuration_values(profile(),data)

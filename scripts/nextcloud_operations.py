@@ -120,10 +120,10 @@ def bootstrap(settings,profile,admin_user,admin_password,database_password):
         elif root_json(seeded)!={'image':settings['components']['nextcloud']['image']}:raise ValueError('Existing file-service code identity differs')
         generated=runtime.APP/'config/config.php'
         if not generated.exists():maintenance(settings,'install',{'admin_user':admin_user,'admin_password':admin_password,'database_password':database_password})
-        export='$CONFIG=[];require "/var/www/html/config/config.php";echo json_encode(array_intersect_key($CONFIG,array_flip('+json.dumps(sorted(IDENTITY_FIELDS))+')));'
+        export='$CONFIG=[];require "/var/www/html/config/config.php";echo json_encode(array_intersect_key($CONFIG,array_flip('+json.dumps(sorted(IDENTITY_FIELDS-{'data_fingerprint'}))+')));'
         command=runtime.common(settings)+['--rm','--user=33:33','--entrypoint=php','--volume',str(runtime.APP)+':/var/www/html:ro',settings['components']['nextcloud']['image'],'-r',export]
         result=subprocess.run(command,check=True,capture_output=True,text=True,timeout=30)
-        identity=json.loads(result.stdout);configuration_values(profile,identity)
+        identity=json.loads(result.stdout);identity['data_fingerprint']=secrets.token_hex(16);configuration_values(profile,identity)
         write(completed,json.dumps(identity))
     directory(runtime.BASE/'config',mode=0o700,uid=33,gid=33)
     write(runtime.BASE/'config/config.php',application_config(profile,identity),mode=0o400,uid=33,gid=33)
@@ -136,7 +136,7 @@ def bootstrap(settings,profile,admin_user,admin_password,database_password):
 
 
 def cron_unit():
-    return '[Unit]\nDescription=RDC Nextcloud background jobs\nAfter=rdc-nextcloud.service\nRequisite=rdc-nextcloud.service\n[Service]\nType=oneshot\nExecStart=/usr/bin/python3 -I -B /usr/local/lib/rdc-nextcloud/nextcloud_cron.py\nTimeoutStartSec=300\nUMask=0077\n'
+    return '[Unit]\nDescription=RDC Nextcloud background jobs\nAfter=rdc-nextcloud.service\nPartOf=rdc-nextcloud.service\nRequisite=rdc-nextcloud.service\n[Service]\nType=oneshot\nExecStart=/usr/bin/python3 -I -B /usr/local/lib/rdc-nextcloud/nextcloud_cron.py\nTimeoutStartSec=300\nUMask=0077\n'
 
 
 def cron_timer():return '[Unit]\nDescription=RDC Nextcloud background-job schedule\n[Timer]\nOnBootSec=5m\nOnUnitActiveSec=5m\n[Install]\nWantedBy=timers.target\n'
@@ -178,6 +178,7 @@ def install_or_resume(profile,network,address,admin_user,admin_password):
     subprocess.run(['/bin/systemctl','daemon-reload'],check=True,timeout=30)
     subprocess.run(['/bin/systemctl','start','rdc-nextcloud-postgres.service'],check=True,timeout=180)
     bootstrap(settings,profile,admin_user,admin_password,password)
+    runtime.podman('exec','--user','999:999',runtime.UNITS['postgres'],'psql','-p','5434','-U','nextcloud','-d','nextcloud','-c','ALTER ROLE oc_admin NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION',timeout=30)
     if runtime.TLS.exists() and ((runtime.TLS/'tls.crt').read_bytes()!=cert or (runtime.TLS/'tls.key').read_bytes()!=key):raise ValueError('Use the explicit certificate replacement command')
     activate_certificate(settings,cert,key,initial=True)
     subprocess.run(['/bin/systemctl','start','rdc-nextcloud.service'],check=True,timeout=180)
@@ -194,7 +195,7 @@ def status():
     settings=runtime.read_settings()
     for name in runtime.UNITS:runtime.verify_image(name,settings);runtime.ready(name,settings,attempts=1)
     return {'state':'file-service-listeners-verified','nextcloud_url':'https://'+settings['ownership']['nextcloud_hostname'],
-            'application_login_test':'not-run','application_backup':'not-yet-supported','federation':'disabled'}
+            'application_login_test':'not-run','application_backup':backup_status(),'federation':'disabled'}
 
 
 def action(args):
@@ -242,3 +243,14 @@ def action(args):
         profile=from_owner(settings['ownership']);profile.update(tls_certificate=str(args.certificate),tls_private_key=str(args.private_key))
         cert,key=inputs(profile)
         return activate_certificate(settings,cert,key)
+
+
+def backup_status():
+    result={'state':'not-configured','restore_test':'not-run'}
+    if Path('/etc/rdc-backup/configuration.json').exists():
+        from backup_operations import configured,status_summary
+        data,transport=configured()
+        if 'applications' not in data['ownership']:return dict(result,state='network-only-applications-unprotected')
+        try:return status_summary(transport.snapshots())
+        except (OSError,ValueError,subprocess.SubprocessError):return dict(result,state='backup-unreachable')
+    return result

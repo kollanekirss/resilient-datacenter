@@ -30,6 +30,8 @@ def main():
     Path('/etc/server-connectivity-profile.json').write_text(json.dumps(network))
     import ci_matrix_services as certificate_fixture
     certificate_fixture.MATRIX=HOST;certificate_fixture.ELEMENT='unused.ci.test'
+    from ci_matrix_backup import prepare_backup,snapshot,restore
+    network_snapshot=prepare_backup(network)
     cert,key=certificate_fixture.certificates()
     profile={'kind':'nextcloud-services','schema_version':1,'institution_id':'ci','node_name':'files','nextcloud_hostname':HOST,
              'tls_mode':'supplied','tls_certificate':str(cert),'tls_private_key':str(key)}
@@ -70,6 +72,19 @@ def main():
     apps=json.loads(runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','app:list','--output=json'))
     assert all(name not in apps['enabled'] for name in ('federatedfilesharing','federation','cloud_federation_api'))
     print('Actual Nextcloud: trusted HTTPS, pinned confined containers, two accounts, exact file round trip, unauthorized access denial, approved share and revocation, background jobs and repeated installation PASS.',flush=True)
+    identity_before=json.loads((runtime.BASE/'identity.json').read_text())
+    selected=snapshot(network_snapshot)
+    request('PUT',path,b'Later changes that must not replace the selected backup')
+    request('PUT','/remote.php/dav/files/cialice/later.txt',b'Created after snapshot')
+    restore(selected)
+    assert request('GET',path)[1]==content
+    denied('/remote.php/dav/files/cialice/later.txt')
+    identity_after=json.loads((runtime.BASE/'identity.json').read_text())
+    assert identity_before['data_fingerprint']!=identity_after['data_fingerprint']
+    assert {k:v for k,v in identity_before.items() if k!='data_fingerprint'}=={k:v for k,v in identity_after.items() if k!='data_fingerprint'}
+    assert request('PROPFIND','/remote.php/dav/files/cibob/',username='cibob',password=bob_password)[0]==207
+    print('Actual encrypted scheduled Nextcloud snapshot and fenced restore preserve file bytes, application identity and accounts, remove later files and refresh the client recovery fingerprint PASS.',flush=True)
+
     from ci_element_browser import session
     from playwright.sync_api import expect
     with session() as page:
@@ -80,6 +95,6 @@ def main():
         page.wait_for_url('**/apps/**')
         page.goto('https://'+HOST+'/apps/files/')
         expect(page.get_by_text('proof.txt',exact=True).first).to_be_visible()
-    print('Actual Nextcloud browser login and uploaded file visibility PASS. File-service recovery, real VPN/home NAT and physical offsite placement NOT YET RUN.',flush=True)
+    print('Actual Nextcloud browser login and uploaded file visibility PASS. Real VPN/home NAT and physical offsite placement NOT RUN.',flush=True)
 
 if __name__=='__main__':main()

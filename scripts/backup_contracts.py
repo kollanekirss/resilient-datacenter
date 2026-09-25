@@ -60,8 +60,13 @@ def resources(owner):
     paths,services=catalogue[owner['role']]
     paths+=('etc/server-connectivity-profile.json',)
     if 'applications' in owner:
-        paths+=('etc/rdc-services','var/lib/rdc-services')
-        services=('rdc-service-proxy','rdc-element','rdc-synapse','rdc-postgres')+services
+        from backup_scope import package
+        if package(owner['applications'])=='nextcloud':
+            paths+=('etc/rdc-nextcloud','var/lib/rdc-nextcloud')
+            services=('rdc-nextcloud-cron.timer','rdc-nextcloud-proxy','rdc-nextcloud','rdc-nextcloud-postgres')+services
+        else:
+            paths+=('etc/rdc-services','var/lib/rdc-services')
+            services=('rdc-service-proxy','rdc-element','rdc-synapse','rdc-postgres')+services
     if owner.get('tls_mode')=='managed-acme': paths+=('etc/rdc-tls','etc/letsencrypt')
     elif 'tls_mode' in owner: raise ValueError('Unknown certificate ownership mode')
     return Resources(paths,services)
@@ -72,5 +77,10 @@ def binary_paths(owner):
                'peer':('usr/local/bin/tailscale','usr/local/bin/tailscaled')}
     resources(owner)
     paths=catalogue[owner['role']]
-    if 'applications' in owner: paths+=('usr/local/lib/rdc-services/service_runtime.py','usr/local/lib/rdc-services/service_images.json')
+    if 'applications' in owner:
+        from backup_scope import package
+        if package(owner['applications'])=='nextcloud':
+            paths+=tuple('usr/local/lib/rdc-nextcloud/'+n for n in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py'))
+            paths+=tuple('etc/systemd/system/'+n for n in ('rdc-nextcloud.service','rdc-nextcloud-postgres.service','rdc-nextcloud-proxy.service','rdc-nextcloud-cron.service','rdc-nextcloud-cron.timer'))
+        else:paths+=('usr/local/lib/rdc-services/service_runtime.py','usr/local/lib/rdc-services/service_images.json')
     return paths

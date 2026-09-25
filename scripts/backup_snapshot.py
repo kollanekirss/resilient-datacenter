@@ -110,10 +110,12 @@ def _capture(root,destination,owner,*,services=None):
         for name,active in original.items():
             if active:
                 if name.startswith('rdc-'):
-                    from service_runtime import read_settings,inspect_container,verify_image,UNITS
-                    settings=read_settings();component=next(k for k,v in UNITS.items() if v==name)
-                    verify_image(component,settings)
-                    record=inspect_container(component,settings)
+                    if name.endswith('.timer'):continue  # Its fixed unit bytes are included in component_hashes.
+                    from backup_scope import application_runtime
+                    runtime=application_runtime(owner['applications']);settings=runtime.read_settings()
+                    component=next(k for k,v in runtime.UNITS.items() if v==name)
+                    runtime.verify_image(component,settings)
+                    record=runtime.inspect_container(component,settings)
                     if record is None or not record.get('State',{}).get('Running'): raise ValueError('Application container identity is not verified')
                 else:services.verify_binary(name,components[daemon])
     recovery=[]
@@ -129,8 +131,8 @@ def _capture(root,destination,owner,*,services=None):
         destination.mkdir(mode=0o700)
         for name in catalogue.paths: copy_resource(root/name,destination/'data'/name)
         if 'applications' in owner:
-            from service_backup import validate_data
-            validate_data(destination/'data',owner['applications'])
+            from backup_scope import application_backup
+            application_backup(owner['applications']).validate_data(destination/'data',owner['applications'])
         metadata={'schema_version':1,'captured_at':captured_at,
                   'ownership':owner,'binary_sha256':components,'paths':list(catalogue.paths),'services_originally_active':original}
         (destination/'snapshot.json').write_text(json.dumps(metadata,indent=2)+'\n')
