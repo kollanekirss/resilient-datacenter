@@ -162,6 +162,17 @@ def main():
         with (Path('/etc/netns')/node/'hosts').open('a') as stream:
             for institution in ('north','south'):stream.write(network.NODES[institution+'-gateway']['address']+' files.'+institution+'.ci.test\n')
     north,south=apps['north'],apps['south'];content=b'Approved cross-institution file '+os.urandom(128)
+    # Exercise the actual application client, including its signed-request TLS
+    # behavior. A missing-arguments response is expected for this empty payload.
+    probe=('require "/var/www/html/lib/base.php";'
+           '$s=\\OCP\\Server::get(\\OCP\\OCM\\IOCMDiscoveryService::class);'
+           'try{$p=$s->discover("https://files.south.ci.test");'
+           'echo json_encode(["enabled"=>$p->isEnabled(),"endpoint"=>$p->getEndPoint()])."\\n";'
+           '$s->requestRemoteOcmEndpoint(null,"https://files.south.ci.test","/shares",[],"post",null,["verify"=>true]);'
+           '}catch(\\Throwable $e){echo json_encode(["class"=>get_class($e),"error"=>$e->getMessage()])."\\n";}')
+    diagnostic=network.run('nsenter','--net=/var/run/netns/north-service','podman','exec','--user','33:33','north-nextcloud','php','-r',probe,timeout=60)
+    from ci_nextcloud_diagnostics import safe_message
+    print('Application signed-request probe: '+safe_message(diagnostic),flush=True)
     own(north,'PUT','/remote.php/dav/files/alice/proof.txt',content)
     own(north,'PUT','/remote.php/dav/files/alice/private.txt',b'Unshared institutional data')
     assert own(north,'GET','/remote.php/dav/files/alice/proof.txt')==content

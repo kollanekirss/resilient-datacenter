@@ -42,3 +42,17 @@ def test_application_administration_blocks_pending_restore_and_concurrent_work(t
         with pytest.raises(BlockingIOError):
             with m.operation_lock():pass
     with m.operation_lock():assert lock.exists()
+
+
+def test_file_connector_uses_file_operation_lock_and_checks_restore(tmp_path,monkeypatch):
+    import fcntl
+    m=importlib.import_module('service_certificates')
+    pending=tmp_path/'pending';backup=tmp_path/'backup';file_lock=tmp_path/'files.lock'
+    monkeypatch.setattr(m,'PENDING',pending);monkeypatch.setattr(m,'BACKUP',backup)
+    with file_lock.open('a') as held:
+        fcntl.flock(held,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        with pytest.raises(BlockingIOError):
+            with m.operation_lock(lock_path=file_lock):pass
+    pending.write_text('{}')
+    with pytest.raises(ValueError,match='pending restore'):
+        with m.operation_lock(lock_path=file_lock):pass

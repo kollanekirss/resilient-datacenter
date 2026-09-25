@@ -85,8 +85,9 @@ def regional_controls_command(settings,config):
     # No credentials or operator-provided PHP enter process arguments.
     code=('$d=json_decode(file_get_contents("php://stdin"),true,512,JSON_THROW_ON_ERROR);'
           'require "/var/www/html/lib/base.php";$a=\\OCP\\Server::get(\\OCP\\IAppConfig::class);'
-          'foreach($d as $k=>$v){$a->setValueString("files_sharing",$k,$v);}'
-          '$a->setValueString("core","shareapi_allow_links","no");'
+          '$c=\\OCP\\Server::get(\\OCP\\IConfig::class);'
+          'foreach($d as $k=>$v){$c->setAppValue("files_sharing",$k,$v);}'
+          '$c->setAppValue("core","shareapi_allow_links","no");'
           '$a->setValueBool("core",\\OC\\OCM\\OCMSignatoryManager::APPCONFIG_SIGN_ENFORCED,true);'
           '$a->setValueBool("core",\\OC\\OCM\\OCMSignatoryManager::APPCONFIG_SIGN_DISABLED,false);'
           'echo "rdc-regional-controls-applied\\n";')

@@ -43,9 +43,9 @@ def replace(certificate,private_key):
 
 
 @contextmanager
-def operation_lock():
+def operation_lock(*,lock_path=None):
     with ExitStack() as stack:
-        paths=[LOCK]
+        paths=[LOCK if lock_path is None else lock_path]
         if BACKUP.exists():paths.insert(0,BACKUP/'operation.lock')
         for path in paths:
             fd=os.open(path,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
