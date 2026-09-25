@@ -100,6 +100,8 @@ server.socket=context.wrap_socket(server.socket,server_side=True);server.serve_f
     before={client['name']:(client['public_key'],client['address']) for client in clients}
     run('systemctl','stop','headscale')
     assert subprocess.run(['systemctl','is-active','headscale'],capture_output=True).returncode!=0
+    await_traffic(clients[0],service['address'],hostname,seconds=15)
+    print('Existing enrolled clients retained useful HTTPS through established relay sessions during the short controller outage PASS; fresh enrollment and new relay admission still require control.',flush=True)
     # Simulate loss of the controller's persistent state after fencing its sole
     # process. The same prepared OS/TLS baseline is retained, not a fresh-host ISO.
     state=Path('/var/lib/headscale');state.rename(root/'fenced-controller-state');state.mkdir(mode=0o700);shutil.chown(state,user='headscale',group='headscale')
