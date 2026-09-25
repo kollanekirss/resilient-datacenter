@@ -78,3 +78,10 @@ def test_inspection_handles_auto_removed_container_only_after_confirmed_absence(
     if expected_absent:assert m.inspect_container('proxy',settings()) is None
     else:
         with pytest.raises(subprocess.CalledProcessError):m.inspect_container('proxy',settings())
+
+
+def test_owned_service_cleanup_is_synchronous_not_automatic():
+    # systemd can restart while --rm still tears down container storage. The
+    # next launch already validates ownership and removes the stopped record.
+    for name in api().UNITS:
+        assert '--rm' not in api().container_command(name,settings())
