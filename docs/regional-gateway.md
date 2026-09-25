@@ -61,7 +61,7 @@ sudo ./rdc gateway resume
 
 Policy changes journal their intent before activation and close traffic before replacing configuration. An activation failure leaves the pending transition in place and attempts to verify closure. A restart with that pending transition stays closed. Use `resume` after correcting the reported cause; it retries the exact pending change. If the command says closure could not be verified, isolate the gateway before retrying. It never reopens an earlier policy merely to undo a failed revocation.
 
-Do not treat an ordinary network-only backup as a gateway backup. Extend its scope explicitly with `backup include-services`. The [gateway recovery procedure](backups.md#regional-gateway-recovery-development) preserves validated issuer recovery material outside the proxy and requires fresh partner approval after restoration. Encrypted recovery of a prepared gateway has disposable evidence; clean replacement bootstrap is being accepted separately. Keep the institution approval signing key independently recoverable and off the gateway.
+Do not treat an ordinary network-only backup as a gateway backup. Extend its scope explicitly with `backup include-services`. The [gateway recovery procedure](backups.md#regional-gateway-recovery-development) preserves validated issuer recovery material outside the proxy and requires fresh partner approval after restoration. Encrypted recovery and clean replacement bootstrap have disposable evidence, including a failed-restore rollback. Gateway lifecycle uses a synthetic VPN fixture; actual client identity relocation is tested separately. Keep the institution approval signing key independently recoverable and off the gateway.
 
 ## Evidence
 
