@@ -65,3 +65,16 @@ def test_runtime_failure_identifies_phase_without_external_secrets(monkeypatch,c
     output=capsys.readouterr().err
     assert 'phase=inspect-container' in output and 'CalledProcessError' in output
     assert 'exit=125' in output and 'DO-NOT-LOG-SECRET' not in output
+
+
+@pytest.mark.parametrize('remaining,expected_absent',[(1,True),(0,False),(125,False)])
+def test_inspection_handles_auto_removed_container_only_after_confirmed_absence(monkeypatch,remaining,expected_absent):
+    import subprocess
+    from types import SimpleNamespace
+    m=api();codes=iter([0,remaining])
+    monkeypatch.setattr(m.subprocess,'run',lambda *a,**kw:SimpleNamespace(returncode=next(codes)))
+    def disappeared(*args,**kwargs):raise subprocess.CalledProcessError(125,['podman','container','inspect'])
+    monkeypatch.setattr(m,'podman',disappeared)
+    if expected_absent:assert m.inspect_container('proxy',settings()) is None
+    else:
+        with pytest.raises(subprocess.CalledProcessError):m.inspect_container('proxy',settings())
