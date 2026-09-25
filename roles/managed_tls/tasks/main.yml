@@ -1,0 +1,75 @@
+- name: Require explicit managed certificate contract
+  ansible.builtin.assert:
+    that:
+      - schema_version == 3
+      - tls_mode == 'managed-acme'
+      - acme_terms_accepted is sameas true
+      - expected_profile_ownership.tls_mode == 'managed-acme'
+      - expected_profile_ownership.role in ['controller', 'relay']
+- name: Derive fixed service certificate identity
+  ansible.builtin.set_fact:
+    managed_tls_hostname: '{{ headscale_hostname if expected_profile_ownership.role == "controller" else derp_hostname }}'
+    managed_tls_group: '{{ "headscale" if expected_profile_ownership.role == "controller" else "sc-derp" }}'
+- name: Install Ubuntu-supported certificate tools
+  ansible.builtin.apt:
+    name: [certbot, python3-cryptography, ca-certificates, openssl]
+    state: present
+    update_cache: true
+- name: Use only the managed renewal schedule on this fresh dedicated host
+  ansible.builtin.systemd_service:
+    name: certbot.timer
+    enabled: false
+    state: stopped
+- name: Create protected certificate administration directory
+  ansible.builtin.file:
+    path: /etc/rdc-tls
+    state: directory
+    owner: root
+    group: '{{ managed_tls_group }}'
+    mode: '0750'
+- name: Record fixed certificate configuration
+  ansible.builtin.copy:
+    content: '{{ {"schema_version": 1, "hostname": managed_tls_hostname, "role": expected_profile_ownership.role, "institution_id": institution_id, "controller_hostname": headscale_hostname} | to_nice_json }}'
+    dest: /etc/rdc-tls/config.json
+    owner: root
+    group: '{{ managed_tls_group }}'
+    mode: '0640'
+- name: Install reviewed certificate lifecycle helper
+  ansible.builtin.copy:
+    src: '{{ playbook_dir }}/../scripts/certificate_lifecycle.py'
+    dest: /usr/local/sbin/rdc-certificate
+    owner: root
+    group: root
+    mode: '0755'
+- name: Obtain or retain the named certificate with explicit operator terms acceptance
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/certbot
+      - certonly
+      - --standalone
+      - --preferred-challenges
+      - http
+      - --non-interactive
+      - --agree-tos
+      - --email
+      - '{{ acme_email }}'
+      - --server
+      - https://acme-v02.api.letsencrypt.org/directory
+      - --cert-name
+      - rdc-managed
+      - --keep-until-expiring
+      - --domain
+      - '{{ managed_tls_hostname }}'
+      - --no-directory-hooks
+  changed_when: false
+- name: Stage a verified certificate before initial service installation
+  ansible.builtin.command: /usr/local/sbin/rdc-certificate stage
+  changed_when: false
+- name: Install fixed renewal service and schedule
+  ansible.builtin.template:
+    src: '{{ item }}.j2'
+    dest: '/etc/systemd/system/{{ item }}'
+    owner: root
+    group: root
+    mode: '0644'
+  loop: [rdc-certificate-renew.service, rdc-certificate-renew.timer]

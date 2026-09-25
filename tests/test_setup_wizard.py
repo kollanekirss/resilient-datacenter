@@ -39,7 +39,7 @@ def test_independent_wizard_generates_infrastructure_and_two_manifests(tmp_path,
     # Wizard test isolates prerequisite availability; TLS/file checks are tested separately.
     original=m.validate_infrastructure
     monkeypatch.setattr(m,'validate_infrastructure',lambda d,check_files=True:original(d,check_files=False))
-    replies=iter(['independent','my-home','control.pilot.test','1.1.1.1','ubuntu','relay.pilot.test','8.8.8.8','ubuntu','lab-admin','/local/control.crt','/local/control.key','/local/relay.crt','/local/relay.key','/local/derper','a'*64,'2','home-services','tag:home-services','recovery-services','tag:recovery-services','yes'])
+    replies=iter(['independent','my-home','control.pilot.test','1.1.1.1','ubuntu','relay.pilot.test','8.8.8.8','ubuntu','lab-admin','supplied','/local/control.crt','/local/control.key','/local/relay.crt','/local/relay.key','/local/derper','a'*64,'2','home-services','tag:home-services','recovery-services','tag:recovery-services','yes'])
     assert m.run_wizard(tmp_path,input_fn=lambda _:next(replies),output_fn=lambda _:None)=='prepared'
     infra=yaml.safe_load((tmp_path/'infrastructure.yml').read_text())
     assert set(infra['all']['children'])=={'controller','relay'}
@@ -47,7 +47,7 @@ def test_independent_wizard_generates_infrastructure_and_two_manifests(tmp_path,
     assert (tmp_path/'node-home-services.yml').exists() and (tmp_path/'node-recovery-services.yml').exists()
 
 def test_missing_infrastructure_files_save_draft_not_ready_output(tmp_path):
-    replies=iter(['independent','my-home','control.pilot.test','1.1.1.1','ubuntu','relay.pilot.test','8.8.8.8','ubuntu','lab-admin','/absent/control.crt','/absent/control.key','/absent/relay.crt','/absent/relay.key','/absent/derper','a'*64,'1','home-services','tag:home-services'])
+    replies=iter(['independent','my-home','control.pilot.test','1.1.1.1','ubuntu','relay.pilot.test','8.8.8.8','ubuntu','lab-admin','supplied','/absent/control.crt','/absent/control.key','/absent/relay.crt','/absent/relay.key','/absent/derper','a'*64,'1','home-services','tag:home-services'])
     assert wizard().run_wizard(tmp_path,input_fn=lambda _:next(replies),output_fn=lambda _:None)=='draft'
     assert not (tmp_path/'infrastructure.yml').exists()
 
@@ -60,3 +60,19 @@ def test_final_review_can_save_draft(tmp_path):
     replies=iter(['join','south','control.pilot.test','home-services','tag:home-services',':save'])
     assert wizard().run_wizard(tmp_path,input_fn=lambda _:next(replies),output_fn=lambda _:None)=='draft'
     assert (tmp_path/'draft.yml').exists()
+
+
+def test_managed_wizard_records_explicit_terms_without_requesting_keys(tmp_path,monkeypatch):
+    m=wizard(); original=m.validate_infrastructure
+    monkeypatch.setattr(m,'validate_infrastructure',lambda d,check_files=True:original(d,check_files=False))
+    replies=iter(['independent','my-home','control.pilot.test','1.1.1.1','ubuntu','relay.pilot.test','8.8.8.8','ubuntu','lab-admin','managed-acme','admin@institution.test','accept','/local/derper','a'*64,'1','home-services','tag:home-services','yes'])
+    assert m.run_wizard(tmp_path,input_fn=lambda _:next(replies),output_fn=lambda _:None)=='prepared'
+    infra=yaml.safe_load((tmp_path/'infrastructure.yml').read_text())
+    assert infra['all']['vars']['schema_version']==3 and infra['all']['vars']['acme_terms_accepted'] is True
+    assert 'tls_private_key' not in (tmp_path/'infrastructure.yml').read_text()
+
+
+def test_acme_terms_require_literal_acceptance():
+    assert wizard().acceptable('terms','accept')
+    assert not wizard().acceptable('terms','yes')
+    assert not wizard().acceptable('terms','')

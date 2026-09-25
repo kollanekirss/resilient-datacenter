@@ -1,0 +1,9 @@
+- name: Verify the running service presents the managed certificate
+  ansible.builtin.command: /usr/local/sbin/rdc-certificate activate
+  changed_when: false
+- name: Enable managed renewal only after verified service activation
+  ansible.builtin.systemd_service:
+    name: rdc-certificate-renew.timer
+    enabled: true
+    state: started
+    daemon_reload: true

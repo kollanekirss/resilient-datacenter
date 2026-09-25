@@ -18,7 +18,12 @@ def questions(answers):
     fields=[('purpose','Create your own network or join one? Type independent or join','choice'),('institution_id','Environment/institution identifier (lowercase, e.g. my-home)','id'),('headscale_hostname','Controller DNS name (no https:// prefix)','hostname')]
     if answers.get('purpose')=='independent':
         fields += [('control_ip','Offsite controller public IPv4 address','ip'),('control_user','Controller SSH username','user'),('derp_hostname','Relay DNS name','hostname'),('relay_ip','Relay public IPv4 address','ip'),('relay_user','Relay SSH username','user'),('enrollment_admin','Headscale enrollment administrator name','admin')]
-        fields += [(name,label,'path') for name,label in [('control_cert','Absolute path to controller certificate chain'),('control_key','Absolute path to controller private key'),('relay_cert','Absolute path to relay certificate chain'),('relay_key','Absolute path to relay private key'),('derper_artifact','Absolute path to the built Linux relay executable')]]
+        fields += [('tls_mode','Certificates: type supplied or managed-acme (public HTTP port 80 required)','tls-mode')]
+        if answers.get('tls_mode')=='managed-acme':
+            fields += [('acme_email','Email for your Let\'s Encrypt account','email'),('acme_terms','Review https://letsencrypt.org/repository/ and accept the current subscriber agreement; type accept to authorize issuance','terms')]
+        else:
+            fields += [(name,label,'path') for name,label in [('control_cert','Absolute path to controller certificate chain'),('control_key','Absolute path to controller private key'),('relay_cert','Absolute path to relay certificate chain'),('relay_key','Absolute path to relay private key')]]
+        fields += [('derper_artifact','Absolute path to the verified or locally built Linux relay executable','path')]
         fields += [('derper_sha256','Relay executable SHA256 from its build metadata','sha'),('node_count','How many local nodes? Enter 1–32','count')]
         for index in range(int(answers.get('node_count','0'))):
             fields += [(f'node{index}_name',f'Local node {index+1} name (no public IP needed)','id'),(f'node{index}_tag',f'Local node {index+1} requested tag, starting tag:','tag')]
@@ -29,6 +34,9 @@ def questions(answers):
 
 def acceptable(kind,value):
     if not isinstance(value,str) or not value or not _safe_values(value): return False
+    if kind=='tls-mode': return value in ('supplied','managed-acme')
+    if kind=='terms': return value=='accept'
+    if kind=='email': return bool(re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9._+%-]{0,63}@[a-zA-Z0-9](?:[a-zA-Z0-9.-]{0,251}[a-zA-Z0-9])?\.[a-zA-Z]{2,63}',value))
     if kind=='choice': return value in ('join','independent')
     if kind=='id': return _identifier(value) and value not in RESERVED
     if kind=='admin': return bool(re.fullmatch(r'[a-z][a-z0-9-]{0,30}',value))
@@ -50,9 +58,11 @@ def configuration(answers):
     if a['purpose']=='join':
         return {'kind':'local-node','schema_version':1,**{k:a[k] for k in ['institution_id','headscale_hostname','node_name','node_tag']}}
     variables={'schema_version':2,'deployment_mode':'independent',**{k:a[k] for k in ['institution_id','headscale_hostname','derp_hostname','enrollment_admin','derper_artifact','derper_sha256']},'enrollment_nodes':[{'name':a[f'node{i}_name'],'node_tag':a[f'node{i}_tag']} for i in range(int(a['node_count']))]}
+    managed=a.get('tls_mode')=='managed-acme'
+    if managed: variables.update(schema_version=3,tls_mode='managed-acme',acme_email=a['acme_email'],acme_terms_accepted=a['acme_terms']=='accept')
     groups={}
     for group,prefix in [('controller','control'),('relay','relay')]:
-        groups[group]={'hosts':{prefix+'-offsite':{'ansible_host':a[prefix+'_ip'],'ansible_user':a[prefix+'_user'],'tls_certificate':a[prefix+'_cert'],'tls_private_key':a[prefix+'_key']}}}
+        groups[group]={'hosts':{prefix+'-offsite':{'ansible_host':a[prefix+'_ip'],'ansible_user':a[prefix+'_user'],**({} if managed else {'tls_certificate':a[prefix+'_cert'],'tls_private_key':a[prefix+'_key']})}}}
     return {'all':{'vars':variables,'children':groups}}
 
 
@@ -105,7 +115,7 @@ def run_wizard(directory: Path, *, resume=None, input_fn=input, output_fn=print)
             if not acceptable(kind,value):
                 output_fn('That answer is not valid. Use the format in the question, or :save to return later.'); continue
             answers[key]=value
-            if key=='purpose':
+            if key in ('purpose','tls_mode'):
                 permitted={k for k,_,_ in questions(answers)}
                 answers={k:v for k,v in answers.items() if k in permitted}
             if key=='node_count':

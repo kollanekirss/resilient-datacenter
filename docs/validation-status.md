@@ -83,3 +83,5 @@ Certificate issuance/renewal, verified binary distribution, managed upgrades, ap
 ## Verified-release increment (2026-09-25)
 
 The release downloader rejects source/publisher mismatches, failed attestations, corrupt hashes, missing/unexpected files and unsafe filesystem entries. The relay cross-build and dependency-license collection ran locally. These checks do not yet constitute verification of a published artifact; that requires the tagged GitHub release workflow followed by an actual download and attestation check. The release remains experimental and does not alter the unperformed deployment/recovery acceptance tests above.
+
+Verified release evidence: [v0.2.0-alpha.1](https://github.com/kollanekirss/resilient-datacenter/releases/tag/v0.2.0-alpha.1) was built and attested by [run 36123391525](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36123391525), then downloaded using `rdc release fetch` and verified against source commit `f6bff457bf2d925d24e39fea6301ca7f96c6bc50`. No downloaded program was executed on the developer computer.

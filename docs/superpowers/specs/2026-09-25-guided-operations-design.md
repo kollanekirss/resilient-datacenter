@@ -1,7 +1,7 @@
 # Guided installation and maintenance
 
 Date: 2026-09-25
-Status: approved; increment A implemented with local verification. B/C/D and live acceptance remain separate work.
+Status: approved; A and B delivered, including a verified published prerelease. C is under implementation; D and full live acceptance remain separate work.
 Repository: https://github.com/kollanekirss/resilient-datacenter
 Baseline: published commit 6a0a2ce, 184 local tests, 16 playbook syntax checks. No live deployment evidence.
 

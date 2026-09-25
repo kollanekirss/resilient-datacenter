@@ -75,11 +75,19 @@ def _validate_managed_inventory(data: dict, *, check_files: bool, infrastructure
     if infrastructure_only and mode != 'independent':
         return ['Infrastructure setup requires independent mode']
     required = BASE_VARS | (INDEPENDENT_VARS if mode == 'independent' else set())
+    managed_acme=infrastructure_only and type(v.get('schema_version')) is int and v['schema_version']==3
+    if managed_acme:
+        required |= {'tls_mode','acme_email','acme_terms_accepted'}
+        if v.get('tls_mode')!='managed-acme': errors.append('Schema 3 requires explicit managed-acme certificate mode')
+        if v.get('acme_terms_accepted') is not True: errors.append('Review and explicitly accept the ACME issuer terms before deployment')
+        email=v.get('acme_email')
+        if not isinstance(email,str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9._+%-]{0,63}@[a-zA-Z0-9](?:[a-zA-Z0-9.-]{0,251}[a-zA-Z0-9])?\.[a-zA-Z]{2,63}',email):
+            errors.append('A valid ACME account email is required')
     if infrastructure_only:
         required |= {'enrollment_nodes'}
     if not required <= set(v) or set(v) - required - (set() if infrastructure_only else {'connectivity_test'}):
         errors.append('Missing or unsupported profile variables; join cannot contain controller/relay management settings')
-    if type(v.get('schema_version')) is not int or v['schema_version'] != (2 if infrastructure_only else 1):
+    if type(v.get('schema_version')) is not int or v['schema_version'] != (3 if managed_acme else 2 if infrastructure_only else 1):
         errors.append('Unsupported inventory schema_version for this entry point')
     if not _identifier(v.get('institution_id')):
         errors.append('Invalid institution_id')
@@ -127,8 +135,8 @@ def _validate_managed_inventory(data: dict, *, check_files: bool, infrastructure
             if not isinstance(h, dict):
                 errors.append('Host must be a mapping')
                 continue
-            required_host = {'ansible_host', 'ansible_user'} | ({'node_tag'} if group == 'peers' else TLS_FIELDS)
-            allowed_host = HOST_BASE | ({'node_tag'} if group == 'peers' else TLS_FIELDS)
+            required_host = {'ansible_host', 'ansible_user'} | ({'node_tag'} if group == 'peers' else set() if managed_acme else TLS_FIELDS)
+            allowed_host = HOST_BASE | ({'node_tag'} if group == 'peers' else set() if managed_acme else TLS_FIELDS)
             if name in pair and group == 'peers':
                 required_host |= TEST_FIELDS
                 allowed_host |= TEST_FIELDS
@@ -157,7 +165,7 @@ def _validate_managed_inventory(data: dict, *, check_files: bool, infrastructure
                     errors.append('Invalid node_tag')
                 else:
                     tags.append(tag)
-            if group != 'peers' or name in pair:
+            if (group != 'peers' or name in pair) and not managed_acme:
                 for key in TLS_FIELDS:
                     paths.append(('TLS file', h.get(key)))
                 dns = h.get('test_dns_name') if group == 'peers' else v.get('headscale_hostname' if group == 'controller' else 'derp_hostname')

@@ -1,0 +1,13 @@
+[Unit]
+Description=Renew and verify this managed infrastructure certificate
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/rdc-certificate renew
+TimeoutStartSec=15min
+UMask=0077
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/etc/letsencrypt /etc/rdc-tls /var/lib/letsencrypt /var/log/letsencrypt

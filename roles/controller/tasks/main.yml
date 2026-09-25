@@ -1,17 +1,19 @@
 - name: Record that this kit manages the fresh host
   ansible.builtin.copy:
-    content: "server-connectivity pilot\n"
+    content: 'server-connectivity pilot
+
+      '
     dest: /etc/server-connectivity.managed
     mode: '0644'
 - name: Download pinned Headscale package
   ansible.builtin.get_url:
-    url: 'https://github.com/juanfont/headscale/releases/download/v{{ headscale_version }}/headscale_{{ headscale_version }}_linux_amd64.deb'
-    dest: '/var/tmp/headscale-{{ headscale_version }}.deb'
-    checksum: 'sha256:{{ headscale_sha256 }}'
+    url: https://github.com/juanfont/headscale/releases/download/v{{ headscale_version }}/headscale_{{ headscale_version }}_linux_amd64.deb
+    dest: /var/tmp/headscale-{{ headscale_version }}.deb
+    checksum: sha256:{{ headscale_sha256 }}
     mode: '0644'
 - name: Install without starting vendor defaults
   ansible.builtin.apt:
-    deb: '/var/tmp/headscale-{{ headscale_version }}.deb'
+    deb: /var/tmp/headscale-{{ headscale_version }}.deb
     policy_rc_d: 101
 - name: Secure configuration directory
   ansible.builtin.file:
@@ -20,6 +22,10 @@
     owner: root
     group: headscale
     mode: '0750'
+- name: Prepare explicitly managed certificate
+  ansible.builtin.include_role:
+    name: managed_tls
+  when: tls_mode | default('supplied') == 'managed-acme'
 - name: Install supplied certificate chain
   ansible.builtin.copy:
     src: '{{ tls_certificate }}'
@@ -28,6 +34,7 @@
     group: headscale
     mode: '0640'
   notify: Restart controller
+  when: tls_mode | default('supplied') == 'supplied'
 - name: Install private key
   ansible.builtin.copy:
     src: '{{ tls_private_key }}'
@@ -37,6 +44,7 @@
     mode: '0640'
   no_log: true
   notify: Restart controller
+  when: tls_mode | default('supplied') == 'supplied'
 - name: Create protected staging directory
   ansible.builtin.file:
     path: /etc/headscale/staged
@@ -52,8 +60,10 @@
     group: headscale
     mode: '0640'
   loop:
-    - {src: policy.json.j2, dest: /etc/headscale/staged/policy.json}
-    - {src: derp-map.yml.j2, dest: /etc/headscale/staged/derp-map.yml}
+  - src: policy.json.j2
+    dest: /etc/headscale/staged/policy.json
+  - src: derp-map.yml.j2
+    dest: /etc/headscale/staged/derp-map.yml
 - name: Stage controller configuration pointing to staged policy
   ansible.builtin.template:
     src: config.yaml.j2
@@ -77,13 +87,15 @@
   when: not ansible_check_mode
 - name: Activate validated policy and relay map
   ansible.builtin.copy:
-    src: '/etc/headscale/staged/{{ item }}'
-    dest: '/etc/headscale/{{ item }}'
+    src: /etc/headscale/staged/{{ item }}
+    dest: /etc/headscale/{{ item }}
     remote_src: true
     owner: root
     group: headscale
     mode: '0640'
-  loop: [policy.json, derp-map.yml]
+  loop:
+  - policy.json
+  - derp-map.yml
   notify: Restart controller
 - name: Activate controller configuration
   ansible.builtin.template:
@@ -107,3 +119,8 @@
     state: started
 - name: Apply pending restart
   ansible.builtin.meta: flush_handlers
+- name: Verify certificate activation and enable renewal
+  ansible.builtin.include_role:
+    name: managed_tls
+    tasks_from: verify
+  when: tls_mode | default('supplied') == 'managed-acme'

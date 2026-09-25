@@ -46,7 +46,7 @@ def normalize_infrastructure(data: dict) -> dict:
             'roles':roles,'peer_names':[],'test_pair':[],
             'policy':{'tagOwners':{n['node_tag']:[v['enrollment_admin']+'@'] for n in v['enrollment_nodes']},'grants':[]},
             'enrollment_requests':v['enrollment_nodes'],
-            'ownership':{name:{'schema_version':2,'deployment_mode':'independent','institution_id':v['institution_id'],'role':role,'controller_hostname':v['headscale_hostname']} for name,role in roles.items()}}
+            'ownership':{name:{'schema_version':v['schema_version'],**({'tls_mode':'managed-acme','certificate_hostname':v['headscale_hostname' if role=='controller' else 'derp_hostname']} if v['schema_version']==3 else {}),'deployment_mode':'independent','institution_id':v['institution_id'],'role':role,'controller_hostname':v['headscale_hostname']} for name,role in roles.items()}}
 
 
 def local_ownership(manifest: dict) -> dict:
