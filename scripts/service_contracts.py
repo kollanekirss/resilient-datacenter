@@ -24,8 +24,12 @@ def image_pins():
 
 
 def validate(data):
-    if not isinstance(data,dict) or set(data)!=FIELDS or not _safe_values(data): return ['Use only the documented Matrix profile fields; commands, image overrides and secrets are forbidden.']
+    if not isinstance(data,dict) or set(data) not in (FIELDS,FIELDS|{'access'}) or not _safe_values(data): return ['Use only the documented Matrix profile fields; commands, image overrides and secrets are forbidden.']
     errors=[]
+    if 'access' in data:
+        from application_access import validate_access
+        try:validate_access(data['access'])
+        except ValueError:errors.append('Invalid portable access identity.')
     if data['kind']!='matrix-services' or type(data['schema_version']) is not int or data['schema_version']!=1: errors.append('Unsupported service profile.')
     if not all(_identifier(data[k]) for k in ('institution_id','node_name')): errors.append('Invalid institution or node name.')
     if not all(hostname(data[k]) for k in ('matrix_hostname','element_hostname')): errors.append('Provide actual Matrix and Element DNS names.')
@@ -47,7 +51,7 @@ def network_manifest(network):
 
 def ownership(profile,network):
     if validate(profile): raise ValueError('Invalid Matrix profile')
-    network_manifest(network)
+    validate_network(profile,network)
     if any(profile[k]!=network[k] for k in ('institution_id','node_name')): raise ValueError('Service profile differs from the enrolled node identity')
     return {'schema_version':1,'role':'services','institution_id':profile['institution_id'],'node_name':profile['node_name'],
             'network':network,'packages':['matrix'],'matrix_hostname':profile['matrix_hostname'],'element_hostname':profile['element_hostname'],
@@ -57,3 +61,10 @@ def ownership(profile,network):
 def same_installation(profile,network,existing):
     try:return ownership(profile,network)==existing
     except ValueError:return False
+
+
+def validate_network(profile,network):
+    if 'access' in profile:
+        from application_access import portable_owner
+        if network!=portable_owner(profile):raise ValueError('Portable access differs from installed network identity')
+    else:network_manifest(network)

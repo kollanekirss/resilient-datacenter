@@ -34,6 +34,9 @@ def tls_inputs(profile):
 
 
 def installed_address(network):
+    if network.get('role')=='portable':
+        from application_access import verify_local_address
+        return verify_local_address(network)
     from local_checks import inspect_local_checks
     checks=inspect_local_checks(network_manifest(network),require_owned=True,check_tls=False)
     if any(c.outcome!='pass' for c in checks) or not any(c.code=='client.verified' for c in checks): raise ValueError('Enroll and verify this owned local node before installing applications')
@@ -65,7 +68,7 @@ def preflight(profile):
         if active.returncode!=3:raise ValueError('Disable the backup schedule before adding applications; include-services and a new verified snapshot are required before re-enabling it')
     for hostname in (profile['matrix_hostname'],profile['element_hostname']):
         answers={r[4][0] for r in socket.getaddrinfo(hostname,443,type=socket.SOCK_STREAM)}
-        if answers!={address}:raise ValueError('Both service DNS names must resolve only to this node overlay IPv4; review local DNS and disable public proxying')
+        if answers!={network.get('access',{}).get('frontend_address',address)}:raise ValueError('Both service DNS names must resolve only to the declared access frontend; review local DNS and disable public proxying')
     existing=runtime.BASE/'ownership.json'
     if existing.exists() or existing.is_symlink():
         if not same_installation(profile,network,root_json(existing)):raise ValueError('Application identity/version differs; migration requires a reviewed path')
@@ -173,11 +176,11 @@ def install_or_resume(profile,network,address):
             raise ValueError('Use services certificate to replace an existing TLS identity')
     activate_pair(TLSBASE,settings,cert,key,initial=True)
     hashes={}
-    for name in ('service_runtime.py','service_images.json','service_regional.py'):
+    for name in ('service_runtime.py','service_images.json','service_regional.py')+(('application_access.py',) if network['role']=='portable' else ()):
         content=(SOURCE/name).read_bytes();write(runtime.INSTALLED/name,content,mode=0o644);hashes[name]=hashlib.sha256(content).hexdigest()
     write(runtime.INSTALLED/'manifest.json',json.dumps({'schema_version':1,'files':hashes}))
-    for name,unit_name in runtime.UNITS.items():write(Path('/etc/systemd/system')/(unit_name+'.service'),runtime.unit(name),mode=0o644)
-    write(TARGET,'[Unit]\nDescription=RDC Matrix services\nAfter=tailscaled.service\nWants=rdc-service-proxy.service\n[Install]\nWantedBy=multi-user.target\n',mode=0o644)
+    for name,unit_name in runtime.UNITS.items():write(Path('/etc/systemd/system')/(unit_name+'.service'),runtime.unit(name,network=network),mode=0o644)
+    write(TARGET,'[Unit]\nDescription=RDC Matrix services\nAfter='+(('network.target' if network['role']=='portable' else 'tailscaled.service'))+'\nWants=rdc-service-proxy.service\n[Install]\nWantedBy=multi-user.target\n',mode=0o644)
     runtime.application_ingress(settings,create=True)
     subprocess.run(['/bin/systemctl','daemon-reload'],check=True,timeout=30)
     subprocess.run(['/bin/systemctl','enable','rdc-services.target'],check=True,timeout=30)

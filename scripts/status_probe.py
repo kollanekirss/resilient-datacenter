@@ -37,6 +37,9 @@ def discover(root=Path('/'),*,require_root=True):
     if not isinstance(network,dict):raise ValueError('Invalid network record')
     role=network.get('role')
     if role=='peer':network_manifest(network)
+    elif role=='portable':
+        from application_access import validate_portable_owner
+        validate_portable_owner(network)
     elif role in ('controller','relay'):
         fields={'schema_version','deployment_mode','institution_id','role','controller_hostname'}
         managed=network.get('schema_version')==3
@@ -50,7 +53,7 @@ def discover(root=Path('/'),*,require_root=True):
     application=None;package=None;owner=network
     if directories:
         package,base=directories[0];info=base.lstat()
-        if role!='peer' or not stat.S_ISDIR(info.st_mode) or info.st_uid!=(0 if require_root else os.geteuid()) or info.st_mode&0o022:
+        if role not in ('peer','portable') or not stat.S_ISDIR(info.st_mode) or info.st_uid!=(0 if require_root else os.geteuid()) or info.st_mode&0o022:
             raise ValueError('Unsafe application directory')
         if not present(base/'ownership.json'):raise ValueError('Incomplete application installation')
         application=owned_json(base/'ownership.json',require_root=require_root,private=package=='gateway')
@@ -60,6 +63,10 @@ def discover(root=Path('/'),*,require_root=True):
 
 
 def network_status(found):
+    if found['role']=='portable':
+        from application_access import verify_local_address
+        verify_local_address(found['network'])
+        return {'state':'local-address-verified','controller_required':False}
     if found['role']=='peer':
         from service_contracts import network_manifest
         from local_enrollment import NativeRuntime,enrollment_action
@@ -88,7 +95,7 @@ def applications(found):
 
 
 def certificates(found):
-    if found['application'] is None:return {'state':'not-applicable'} if found['role']=='peer' else infrastructure_certificate(found)
+    if found['application'] is None:return {'state':'not-applicable'} if found['role'] in ('peer','portable') else infrastructure_certificate(found)
     import service_issuer
     if present(service_issuer.BASE):
         result=service_issuer.status()

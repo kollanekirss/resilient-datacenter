@@ -26,7 +26,7 @@ def validate(data):
     errors=[]
     if data['kind']!='backup-profile' or type(data['schema_version']) is not int or data['schema_version']!=1: errors.append('Unsupported backup profile.')
     if not all(_identifier(data[k]) for k in ('institution_id','node_name')): errors.append('Invalid institution/node identifier.')
-    if data['role'] not in ('controller','relay','peer'): errors.append('Unsupported backup role.')
+    if data['role'] not in ('controller','relay','peer','portable'): errors.append('Unsupported backup role.')
     host=data['backup_host']
     try:
         address=ipaddress.ip_address(host)
@@ -55,8 +55,12 @@ def resources(owner):
         validate_scope(owner)
     catalogue={'controller':(('etc/headscale','var/lib/headscale'),('headscale',)),
                'relay':(('etc/sc-derp','var/lib/sc-derp'),('sc-derp',)),
-               'peer':(('var/lib/tailscale',),('tailscaled',))}
+               'peer':(('var/lib/tailscale',),('tailscaled',)), 'portable':((),())}
     if not isinstance(owner,dict) or owner.get('role') not in catalogue: raise ValueError('Unknown ownership role')
+    if owner['role']=='portable':
+        from application_access import validate_portable_owner
+        from backup_scope import network_owner
+        validate_portable_owner(network_owner(owner))
     paths,services=catalogue[owner['role']]
     paths+=('etc/server-connectivity-profile.json',)
     if 'applications' in owner:
@@ -77,7 +81,7 @@ def resources(owner):
 
 def binary_paths(owner):
     catalogue={'controller':('usr/bin/headscale',),'relay':('usr/local/bin/sc-derper',),
-               'peer':('usr/local/bin/tailscale','usr/local/sbin/tailscaled')}
+               'peer':('usr/local/bin/tailscale','usr/local/sbin/tailscaled'),'portable':()}
     resources(owner)
     paths=catalogue[owner['role']]
     if 'applications' in owner:
@@ -91,4 +95,7 @@ def binary_paths(owner):
             paths+=tuple('usr/local/lib/rdc-nextcloud/'+n for n in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py','nextcloud_regional.py','service_regional.py','regional_http.py'))
             paths+=tuple('etc/systemd/system/'+n for n in ('rdc-nextcloud.service','rdc-nextcloud-postgres.service','rdc-nextcloud-proxy.service','rdc-nextcloud-cron.service','rdc-nextcloud-cron.timer'))
         else:paths+=('usr/local/lib/rdc-services/service_runtime.py','usr/local/lib/rdc-services/service_images.json','usr/local/lib/rdc-services/service_regional.py')
+    if owner['role']=='portable' and 'applications' in owner:
+        base='rdc-services' if owner['applications']['packages']==['matrix'] else 'rdc-nextcloud'
+        paths+=('usr/local/lib/'+base+'/application_access.py',)
     return paths

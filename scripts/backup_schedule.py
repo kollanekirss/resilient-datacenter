@@ -19,7 +19,8 @@ MATRIX_FILES=LEGACY_FILES+('backup_scope.py','service_contracts.py','service_ima
 APPLICATION_FILES=MATRIX_FILES+('nextcloud_contracts.py','nextcloud_images.json','nextcloud_rendering.py','nextcloud_runtime.py','nextcloud_backup.py','nextcloud_regional.py','service_regional.py','regional_http.py')
 from service_issuer import FILES as ISSUER_FILES
 GATEWAY_FILES=APPLICATION_FILES+tuple(name for name in ISSUER_FILES if name not in APPLICATION_FILES)+('gateway_backup.py','gateway_backup_runtime.py')
-FILES=GATEWAY_FILES+('application_catalogue.py','upgrade_images.json')
+PRE_PORTABLE_FILES=GATEWAY_FILES+('application_catalogue.py','upgrade_images.json')
+FILES=PRE_PORTABLE_FILES+('application_access.py',)
 CALENDARS={'hourly':'*-*-* *:00:00 UTC','daily':'*-*-* 02:00:00 UTC'}
 
 
@@ -81,7 +82,7 @@ def verify_runtime(directory=RUNTIME,*,require_root=True):
     directory=Path(directory);info=directory.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid!=(0 if require_root else os.geteuid()) or info.st_mode&0o077: raise ValueError('Unsafe scheduled backup runtime directory')
     data=read_private(directory/'manifest.json',require_root=require_root)
-    if set(data)!={'schema_version','files'} or data['schema_version']!=1 or not isinstance(data['files'],dict) or set(data['files']) not in (set(FILES),set(GATEWAY_FILES),set(APPLICATION_FILES),set(MATRIX_FILES),set(LEGACY_FILES)):
+    if set(data)!={'schema_version','files'} or data['schema_version']!=1 or not isinstance(data['files'],dict) or set(data['files']) not in (set(FILES),set(PRE_PORTABLE_FILES),set(GATEWAY_FILES),set(APPLICATION_FILES),set(MATRIX_FILES),set(LEGACY_FILES)):
         raise ValueError('Unknown scheduled backup runtime manifest')
     if set(p.name for p in directory.iterdir())!=set(data['files'])|{'manifest.json'}: raise ValueError('Unexpected scheduled runtime files')
     for name,digest in data['files'].items():

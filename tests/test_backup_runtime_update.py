@@ -29,3 +29,15 @@ def test_runtime_transition_can_resume_after_old_directory_is_retained(tmp_path,
     assert not (base/'runtime-update.json').exists()
     assert (tmp_path/'.rdc-backup-runtime-previous').exists()
     m.refresh_runtime(source,require_root=False)  # Already-current resume is harmless.
+
+
+def test_pre_portable_runtime_can_be_verified_and_refreshed(tmp_path):
+    import hashlib,json
+    m=importlib.import_module('backup_schedule')
+    source=Path(__file__).resolve().parents[1]/'scripts';runtime=tmp_path/'runtime'
+    m.create_runtime(source,runtime)
+    manifest=json.loads((runtime/'manifest.json').read_text())
+    manifest['files'].pop('application_access.py')
+    (runtime/'application_access.py').unlink()
+    m.private_json(runtime/'manifest.json',manifest)
+    assert m.verify_runtime(runtime,require_root=False)==manifest

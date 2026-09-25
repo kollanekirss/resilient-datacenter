@@ -19,7 +19,8 @@ def application_profile(application):
     if package(application)=='nextcloud':
         from nextcloud_contracts import from_owner
         return from_owner(application)
-    return {'kind':'matrix-services','schema_version':1,
+    from application_access import access_profile
+    return {**access_profile(application),'kind':'matrix-services','schema_version':1,
             **{k:application.get(k) for k in ('institution_id','node_name','matrix_hostname','element_hostname','tls_mode')},
             'tls_certificate':'/etc/rdc-service-tls/active/tls.crt','tls_private_key':'/etc/rdc-service-tls/active/tls.key'}
 

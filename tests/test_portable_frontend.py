@@ -1,0 +1,64 @@
+import importlib
+import json
+from pathlib import Path
+import sys
+import pytest
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
+ROOT=Path(__file__).resolve().parents[1]
+
+
+def fixture():
+    plan=json.loads((ROOT/'examples/portable-site.json').read_text())
+    plan['domains']={name:name+'.south.test' for name in ('chat','element','files')}
+    network=json.loads((ROOT/'examples/portable-network.json').read_text())
+    return plan,network
+
+
+def api():return importlib.import_module('portable_frontend')
+
+
+def test_frontend_pins_tls_names_addresses_and_replaces_spoofable_headers():
+    plan,network=fixture();config=api().configuration(plan,network)
+    text=api().nginx(config)
+    assert 'proxy_ssl_verify on;' in text and 'proxy_ssl_server_name on;' in text
+    for name in ('chat','element','files'):
+        assert 'server_name '+plan['domains'][name]+';' in text
+        assert 'proxy_ssl_name '+plan['domains'][name]+';' in text
+    assert 'proxy_pass https://10.76.40.10;' in text
+    assert 'proxy_pass https://10.76.40.11;' in text
+    assert 'proxy_set_header X-Forwarded-For $remote_addr;' in text
+    assert '$proxy_add_x_forwarded_for' not in text
+    assert 'ssl_reject_handshake on;' in text
+    assert 'if ($ssl_server_name != $host) { return 421; }' in text
+    assert 'proxy_set_header Forwarded "";' in text
+    assert 'resolver ' not in text
+
+
+def test_frontend_firewall_keeps_admin_and_staff_separate_from_backends():
+    config=api().configuration(*fixture())
+    entries=api().firewall(config)
+    text=json.dumps(entries)
+    assert '"addr": "10.76.20.0", "len": 24' in text
+    assert '10.76.10.20' in text
+    assert '10.76.40.10' in text and '10.76.40.11' in text
+    for name in ('input','output','forward'):
+        chain=next(item['chain'] for item in entries if item.get('chain',{}).get('name')==name)
+        assert chain['policy']=='drop'
+
+
+def test_configuration_binds_plan_settings_and_exact_shapes():
+    m=api();config=m.configuration(*fixture())
+    assert m.validate(config)==config
+    for changed in (dict(config,backend='8.8.8.8'),dict(config,address='0.0.0.0'),dict(config,schema_version=True)):
+        with pytest.raises(ValueError):m.validate(changed)
+
+
+def test_application_kit_verifies_rendered_files_and_rejects_tampering(tmp_path):
+    import portable_application_bundle as bundle
+    plan,settings=fixture();tmp_path.chmod(0o700);target=tmp_path/'kit'
+    assert bundle.prepare(plan,settings,target)['state']=='applications-prepared'
+    assert bundle.verify(target,plan,settings)['state']=='application-kit-verified'
+    assert (target/'chat.json').is_file() and (target/'nginx.conf').is_file()
+    (target/'nginx.conf').write_text('proxy_ssl_verify off;')
+    with pytest.raises(ValueError):bundle.verify(target,plan,settings)
+    with pytest.raises(ValueError):bundle.prepare(plan,settings,target)

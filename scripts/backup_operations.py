@@ -33,7 +33,11 @@ def match_owner(profile,owner,*,expected=None):
     if validate(profile) or not isinstance(owner,dict) or not _safe_values(owner): raise ValueError('Invalid backup ownership')
     if owner.get('role')!=profile['role'] or owner.get('institution_id')!=profile['institution_id']:
         raise ValueError('Backup profile does not match this installed institution and role')
-    if owner['role']=='peer':
+    if owner['role']=='portable':
+        from application_access import validate_portable_owner
+        validate_portable_owner(owner)
+        if owner['node_name']!=profile['node_name']:raise ValueError('Portable backup node differs')
+    elif owner['role']=='peer':
         manifest={'kind':'local-node','schema_version':1,'institution_id':owner.get('institution_id'),'node_name':owner.get('node_name'),
                   'headscale_hostname':owner.get('controller_hostname'),'node_tag':owner.get('node_tag')}
         if validate_local_manifest(manifest) or local_ownership(manifest)!=owner or owner['node_name']!=profile['node_name']:
