@@ -11,7 +11,7 @@ import sys
 import tempfile
 
 DIMENSIONS=('network','applications','certificates','backup','recovery','partners')
-COMMON={'unknown','blocked','not-configured','not-applicable','change-pending','restore-pending'}
+COMMON={'unknown','blocked','not-configured','not-applicable','change-pending','restore-pending','upgrade-pending'}
 STATES={
     'network':COMMON|{'enrolled','enrolled-controller-unreachable','awaiting-enrollment','stopped','service-running'},
     'applications':COMMON|{'service-listeners-verified','stopped'},
@@ -36,6 +36,7 @@ COUNTS={'backup_age_seconds','approved_peers'}
 def sanitize(name,value):
     if not isinstance(value,dict) or value.get('state') not in STATES[name]:value={'state':'unknown'}
     result={'state':value['state'],'next_step':NEXT[name]}
+    if value['state']=='upgrade-pending':result['next_step']='Run upgrade recover from the same reviewed project source on this node before other maintenance.'
     for key in BOOLEANS:
         if type(value.get(key)) is bool:result[key]=value[key]
     for key in COUNTS:

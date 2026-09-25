@@ -12,6 +12,7 @@ from regional_http import NEXTCLOUD_ROUTES
 
 BASE=Path('/etc/rdc-nextcloud-regional')
 RESTORE=Path('/etc/rdc-restore-pending.json')
+UPGRADE=Path('/etc/rdc-upgrade-pending.json')
 
 
 def validate(config,settings):
@@ -67,7 +68,7 @@ def configured(settings):
 
 def active(settings):
     if not directory_exists():return None
-    if any(path.exists() or path.is_symlink() for path in (BASE/'disabled.json',BASE/'pending.json',RESTORE)):return None
+    if any(path.exists() or path.is_symlink() for path in (BASE/'disabled.json',BASE/'pending.json',RESTORE,UPGRADE)):return None
     config=configured(settings)
     if config is None or not any(int(time.time())<peer['expires_at'] for peer in config['peers']):return None
     return config
@@ -77,7 +78,7 @@ def materialize(settings,original,application_config=None):
     if not directory_exists():
         BASE.mkdir(mode=0o750);BASE.chmod(0o750)
         if os.geteuid()==0:os.chown(BASE,0,33)
-    if RESTORE.exists() or RESTORE.is_symlink():write(BASE/'disabled.json',json.dumps({'reason':'application-restore-requires-current-partner-review'}),mode=0o600)
+    if RESTORE.exists() or RESTORE.is_symlink() or UPGRADE.exists() or UPGRADE.is_symlink():write(BASE/'disabled.json',json.dumps({'reason':'application-restore-requires-current-partner-review'}),mode=0o600)
     config=active(settings)
     directory=BASE/'runtime-config'
     if not directory.exists():directory.mkdir(mode=0o750);directory.chmod(0o750)

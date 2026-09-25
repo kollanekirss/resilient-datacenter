@@ -41,6 +41,8 @@ def parser():
     result=Parser(prog='rdc',description=__doc__)
     commands=result.add_subparsers(dest='command',required=True)
     commands.add_parser('status',help='Read separate local operational evidence').add_argument('--json',action='store_true')
+    upgrade=commands.add_parser('upgrade',help='Check, apply or recover a reviewed local application upgrade')
+    upgrade.add_argument('upgrade_action',choices=('check','apply','recover'))
     start=commands.add_parser('start',help='Plan personal, institutional or regional services; changes no servers')
     start.add_argument('--resume',type=Path)
     start.add_argument('--output-dir',type=Path,default=ROOT/'inventories/lab/journey')
@@ -235,6 +237,14 @@ def backup_action(args):
 
 
 def dispatch(args) -> ActionResult:
+    if args.command=='upgrade':
+        from upgrade_runtime import action
+        try:outcome=action(args,input_fn=input)
+        except ValueError as error:
+            print('Upgrade needs attention: '+str(error));return result_for_state('blocked')
+        print(json.dumps(outcome,indent=2))
+        state='cancelled' if outcome['state']=='cancelled' else ('blocked' if outcome['state']=='upgrade-pending' else 'checks-passed')
+        return result_for_state(state)
     if args.command=='status':
         from product_status import collect,render,needs_attention
         evidence=collect()

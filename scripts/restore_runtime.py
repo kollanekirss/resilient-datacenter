@@ -13,14 +13,17 @@ from backup_snapshot import Services
 from backup_operations import root_json
 
 PENDING=Path('/etc/rdc-restore-pending.json')
+UPGRADE_PENDING=Path('/etc/rdc-upgrade-pending.json')
 ISOLATION=Path('/etc/rdc-restore-isolation.json')
 PERMIT=Path('/run/rdc-restore-validation')
 GUARD=Path('/usr/local/sbin/rdc-restore-guard')
 TIMER='rdc-certificate-renew.timer'
 
 
-def guard_script(pending=PENDING,permit=PERMIT):
-    return '#!/bin/sh\nset -eu\nif [ -e '+shlex.quote(str(pending))+' ] && [ ! -f '+shlex.quote(str(permit))+' ]; then\n  echo "A pending RDC restore blocks automatic startup; use restore-recover." >&2\n  exit 1\nfi\n'
+def guard_script(pending=PENDING,permit=PERMIT,*,upgrade=UPGRADE_PENDING):
+    original='#!/bin/sh\nset -eu\nif [ -e '+shlex.quote(str(pending))+' ] && [ ! -f '+shlex.quote(str(permit))+' ]; then\n  echo "A pending RDC restore blocks automatic startup; use restore-recover." >&2\n  exit 1\nfi\n'
+    if upgrade is None:return original
+    return original+'if [ -e '+shlex.quote(str(upgrade))+' ] && [ ! -f '+shlex.quote(str(permit))+' ]; then\n  echo "A pending RDC upgrade blocks automatic startup; use upgrade recover." >&2\n  exit 1\nfi\n'
 
 
 def guard_files(owner):
@@ -37,12 +40,25 @@ def check_guard(path,content):
         raise ValueError('Restore startup guard differs from the owned installation')
 
 
-def install_guards(owner):
+def install_guards(owner,*,upgrade_compat=False):
     entries=guard_files(owner)
+    replace_guard=False
     for path,(content,mode) in entries.items():
-        if path.exists() or path.is_symlink(): check_guard(path,content)
+        if path.exists() or path.is_symlink():
+            if path==GUARD and upgrade_compat and path.read_text()==guard_script(upgrade=None):
+                check_guard(path,guard_script(upgrade=None));replace_guard=True
+            else:check_guard(path,content)
         if path.parent.is_symlink(): raise ValueError('Linked service drop-in directory is unsupported')
     for path,(content,mode) in entries.items():
+        if path==GUARD and replace_guard:
+            import tempfile
+            fd,temporary=tempfile.mkstemp(prefix='.rdc-guard-',dir=path.parent)
+            try:
+                with os.fdopen(fd,'w') as stream:stream.write(content);stream.flush();os.fsync(stream.fileno())
+                os.chmod(temporary,mode);os.replace(temporary,path)
+            finally:
+                if os.path.exists(temporary):os.unlink(temporary)
+            continue
         if path.exists(): continue
         path.parent.mkdir(mode=0o755,parents=True,exist_ok=True)
         fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,mode)
@@ -53,7 +69,9 @@ def install_guards(owner):
 def isolation_rules(role,identifier):
     if role not in ('controller','relay','peer') or not re.fullmatch('[a-f0-9]{32}',identifier): raise ValueError('Invalid restore isolation identity')
     rules=['iifname "lo" accept']
-    if role=='peer': rules.append('iifname "tailscale0" drop')
+    if role=='peer':
+        rules.append('iifname "tailscale0" drop')
+        rules.append('tcp dport { 443, 8443, 3128 } drop')
     else:
         rules.append('tcp dport 443 drop')
         if role=='relay': rules.append('udp dport 3478 drop')
@@ -102,7 +120,9 @@ class Runtime(Services):
         from gateway_store import Store
         gateway_runtime.Runtime(Store(gateway_runtime.BASE)).close()
 
-    def __init__(self,owner):
+    def __init__(self,owner,*,pending=PENDING):
+        if pending not in (PENDING,UPGRADE_PENDING):raise ValueError('Unknown maintenance marker')
+        self.pending=pending
         self.owner=owner;self.lock=None;self.timer_active=False;self.prepared=False;self.identifier=None
     def nft(self,*args,input=None):
         result=subprocess.run(['/usr/sbin/nft',*args],input=input,capture_output=True,text=True,timeout=15)
@@ -135,7 +155,7 @@ class Runtime(Services):
         return {'certificate_timer_active':self.timer_active}
     def isolate(self,owner):
         from restore_transaction import atomic_json
-        marker=root_json(PENDING);identifier=marker.get('transaction_id')
+        marker=root_json(self.pending);identifier=marker.get('transaction_id')
         if not isinstance(identifier,str) or not re.fullmatch('[a-f0-9]{32}',identifier): raise ValueError('Missing restore transaction identity')
         self.identifier=identifier
         record=None
@@ -155,7 +175,7 @@ class Runtime(Services):
             digest=rules_digest(current,identifier)
         chains=[e['chain']['name'] for e in current['nftables'] if 'chain' in e]
         rules=[e['rule'] for e in current['nftables'] if 'rule' in e]
-        if sorted(chains)!=['forward','input'] or len(rules)!=(2 if owner['role']=='controller' else 3):
+        if sorted(chains)!=['forward','input'] or len(rules)!={'controller':2,'relay':3,'peer':4}[owner['role']]:
             raise ValueError('Recovery ingress rules were not installed completely')
         record['digest']=digest;atomic_json(ISOLATION,record)
     def allow_validation(self):

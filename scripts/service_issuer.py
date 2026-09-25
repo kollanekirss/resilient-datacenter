@@ -92,6 +92,7 @@ def operation_lock(profile=None):
             from gateway_store import Store
             if gateway_runtime.BASE.exists() or gateway_runtime.BASE.is_symlink():stack.enter_context(Store(gateway_runtime.BASE).lock(wait_seconds=10))
         if Path('/etc/rdc-restore-pending.json').exists():raise ValueError('A pending restore blocks certificate issuance and activation')
+        if Path('/etc/rdc-upgrade-pending.json').exists() or Path('/etc/rdc-upgrade-pending.json').is_symlink():raise ValueError('Run upgrade recover before certificate issuance or activation')
         yield
 
 

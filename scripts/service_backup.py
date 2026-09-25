@@ -18,8 +18,9 @@ def validate_data(root,application):
     if any(p.is_symlink() for parent in (base,state) for p in parent.rglob('*')):
         raise ValueError('Application snapshots do not support linked configuration or data')
     generated=json.loads((base/'secrets.json').read_text());profile=application_profile(application)
+    from application_catalogue import for_owner
     settings=json.loads((base/'runtime.json').read_text())
-    if set(settings)!={'schema_version','ownership','bind_address','components'} or settings['schema_version']!=1 or settings['ownership']!=application or settings['components']!=image_pins():
+    if set(settings)!={'schema_version','ownership','bind_address','components'} or settings['schema_version']!=1 or settings['ownership']!=application or settings['components']!=for_owner(application):
         raise ValueError('Snapshot application component identity differs')
     expected={'synapse/homeserver.yaml':synapse(profile,generated),'synapse/log.config':logging_config(),
               'element.json':element(profile),'element-nginx.conf':element_nginx(),

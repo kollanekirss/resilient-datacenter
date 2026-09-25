@@ -13,7 +13,7 @@ def main():
     descriptor=os.open('/run/rdc-nextcloud-operation.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
     with os.fdopen(descriptor,'a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        if Path('/etc/rdc-restore-pending.json').exists():raise ValueError('Restore pending')
+        if any(Path(name).exists() for name in ('/etc/rdc-restore-pending.json','/etc/rdc-upgrade-pending.json')):raise ValueError('Maintenance pending')
         settings=read_settings();record=inspect_container('nextcloud',settings)
         if record is None or not record.get('State',{}).get('Running'):raise ValueError('File service unavailable')
         result=subprocess.run(['/usr/bin/podman','exec','--user','33:33',UNITS['nextcloud'],'php','-f','/var/www/html/cron.php'],capture_output=True,timeout=240)

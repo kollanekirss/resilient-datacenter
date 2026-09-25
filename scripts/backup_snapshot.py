@@ -75,9 +75,17 @@ def certificate_lock(root):
         yield
 
 
-def capture(root,destination,owner,*,services=None):
+def capture(root,destination,owner,*,services=None,upgrade_id=None):
     pending=Path(root)/'etc/rdc-restore-pending.json'
     if pending.exists() or pending.is_symlink(): raise ValueError('Resolve the pending restore before taking a new backup')
+    upgrade=Path(root)/'etc/rdc-upgrade-pending.json'
+    if upgrade.exists() or upgrade.is_symlink():
+        if upgrade_id is None:raise ValueError('Run upgrade recover before ordinary backup operations')
+        from upgrade_transaction import pending as upgrade_pending
+        journal=upgrade_pending(Path(root))
+        expected=journal['source_owner'] if journal['phase']=='preparing' else journal['target_owner']
+        if journal['id']!=upgrade_id or journal['phase'] not in ('preparing','committed') or expected!=owner:raise ValueError('Snapshot does not belong to this upgrade phase and owner')
+    elif upgrade_id is not None:raise ValueError('Upgrade snapshot requires its owned pending transaction')
     try: actual=json.loads((Path(root)/'etc/server-connectivity-profile.json').read_text())
     except (OSError,ValueError): raise ValueError('Cannot verify snapshot ownership') from None
     from backup_scope import network_owner,verify_installed,package
