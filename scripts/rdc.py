@@ -95,6 +95,21 @@ def parser():
     file_issuers.add_parser('setup').add_argument('--output-file',type=Path,required=True)
     file_issue=file_issuers.add_parser('issue');file_issue.add_argument('profile',type=Path);file_issue.add_argument('--token-file',type=Path)
     for action in ('enable','status'):file_issuers.add_parser(action)
+    regional=commands.add_parser('regional',help='Prepare independent institutional approvals; transport remains separate')
+    regional_actions=regional.add_subparsers(dest='regional_action',required=True)
+    regional_actions.add_parser('setup').add_argument('--output-file',type=Path,required=True)
+    regional_actions.add_parser('inspect').add_argument('document',type=Path)
+    for action in ('init','export-identity','approve','offer','accept','import-agreement','export-agreement','revoke','status'):
+        operation=regional_actions.add_parser(action)
+        operation.add_argument('--workspace',type=Path,required=True)
+        if action=='init':operation.add_argument('profile',type=Path)
+        if action in ('approve','accept','import-agreement'):operation.add_argument('document',type=Path)
+        if action in ('export-identity','offer','accept','export-agreement'):operation.add_argument('--output-file',type=Path,required=True)
+        if action in ('revoke','export-agreement'):operation.add_argument('agreement_id')
+        if action=='offer':
+            operation.add_argument('--peer-fingerprint',required=True)
+            operation.add_argument('--services',nargs='+',choices=('matrix','nextcloud'),required=True)
+            operation.add_argument('--days',type=int,default=30)
     services=commands.add_parser('services',help='Prepare and operate the experimental local Matrix package')
     service_commands=services.add_subparsers(dest='action',required=True)
     service_commands.add_parser('setup').add_argument('--output-file',type=Path,required=True)
@@ -180,6 +195,13 @@ def dispatch(args) -> ActionResult:
     if args.command=='setup':
         state=run_wizard(args.output_dir,resume=args.resume,input_fn=input)
         return result_for_state(state)
+    if args.command=='regional':
+        from regional_operations import action
+        try:outcome=action(args)
+        except ValueError as error:
+            print('Regional approval blocked: '+str(error));return result_for_state('blocked')
+        print(json.dumps(outcome,indent=2))
+        return result_for_state({'prepared':'prepared','cancelled':'cancelled'}.get(outcome.get('state'),'checks-passed'))
     if args.command=='files':
         from nextcloud_operations import action
         try:outcome=action(args)
