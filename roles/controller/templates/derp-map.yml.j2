@@ -1,3 +1,20 @@
+{% if profile_relays is defined %}
+regions:
+{% for relay in profile_relays %}
+  {{ relay.region_id }}:
+    regionid: {{ relay.region_id }}
+    regioncode: rdc{{ relay.region_id }}
+    regionname: {{ relay.host }}
+    nodes:
+      - name: rdc{{ relay.region_id }}-1
+        regionid: {{ relay.region_id }}
+        hostname: {{ relay.hostname }}
+        ipv4: {{ relay.address }}
+        ipv6: none
+        stunport: 3478
+        derpport: 443
+{% endfor %}
+{% else %}
 regions:
   901:
     regionid: 901
@@ -11,3 +28,4 @@ regions:
         ipv6: none
         stunport: 3478
         derpport: 443
+{% endif %}

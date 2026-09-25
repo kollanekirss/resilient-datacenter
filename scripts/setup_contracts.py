@@ -20,7 +20,8 @@ def validate_local_manifest(data: dict) -> list[str]:
 
 
 def validate_infrastructure(data: dict, *, check_files: bool = True) -> list[str]:
-    errors=_validate_managed_inventory(data,check_files=check_files,infrastructure_only=True)
+    from relay_locations import validate
+    errors=validate(data,check_files=check_files)
     if errors: return errors
     v=data['all']['vars']; groups=data['all']['children']; nodes=v['enrollment_nodes']
     if not isinstance(nodes,list) or not nodes: return ['enrollment_nodes must contain at least one node request']
@@ -53,15 +54,17 @@ def validate_infrastructure(data: dict, *, check_files: bool = True) -> list[str
 def normalize_infrastructure(data: dict) -> dict:
     if validate_infrastructure(data,check_files=False): raise ValueError('Invalid infrastructure input')
     v=data['all']['vars']; groups=data['all']['children']
+    from relay_locations import catalogue
+    relays=catalogue(data);relay_hostnames={entry['host']:entry['hostname'] for entry in relays}
     roles={name:group for group,section in groups.items() for name in section['hosts']}
     tags={n['name']:n['node_tag'] for n in v['enrollment_nodes']}
     grants=[{'src':[tags[a['source']]],'dst':[tags[a['destination']]],'ip':[SERVICE_PORTS[a['service']]]} for a in v.get('service_access',[])]
     return {'mode':'independent','institution_id':v['institution_id'],'controller_hostname':v['headscale_hostname'],
-            'controller_host':next(iter(groups['controller']['hosts'])),'relay_host':next(iter(groups['relay']['hosts'])),
+            'controller_host':next(iter(groups['controller']['hosts'])),'relay_host':relays[0]['host'],'relays':relays,'relay_hostnames':relay_hostnames,
             'roles':roles,'peer_names':[],'test_pair':[],
             'policy':{'tagOwners':{n['node_tag']:[v['enrollment_admin']+'@'] for n in v['enrollment_nodes']},'grants':grants},
             'enrollment_requests':v['enrollment_nodes'],
-            'ownership':{name:{'schema_version':v['schema_version'],**({'tls_mode':'managed-acme','certificate_hostname':v['headscale_hostname' if role=='controller' else 'derp_hostname']} if v['schema_version']==3 else {}),'deployment_mode':'independent','institution_id':v['institution_id'],'role':role,'controller_hostname':v['headscale_hostname']} for name,role in roles.items()}}
+            'ownership':{name:{'schema_version':v['schema_version'],**({'tls_mode':'managed-acme','certificate_hostname':(v['headscale_hostname'] if role=='controller' else relay_hostnames[name])} if v['schema_version']==3 else {}),'deployment_mode':'independent','institution_id':v['institution_id'],'role':role,'controller_hostname':v['headscale_hostname']} for name,role in roles.items()}}
 
 
 def local_ownership(manifest: dict) -> dict:

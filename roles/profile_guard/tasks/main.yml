@@ -8,6 +8,12 @@
 - name: Derive expected ownership from validated input
   ansible.builtin.set_fact:
     expected_profile_ownership: '{{ hostvars["localhost"].profile.ownership[inventory_hostname] }}'
+- name: Derive this relay certificate name from the validated topology
+  ansible.builtin.set_fact:
+    derp_hostname: '{{ hostvars["localhost"].profile.relay_hostnames[inventory_hostname] }}'
+  when:
+    - expected_profile_ownership.role == 'relay'
+    - hostvars['localhost'].profile.relay_hostnames is defined
 - name: Read target platform facts
   ansible.builtin.setup:
     gather_subset: [min]
