@@ -93,7 +93,6 @@ def bootstrap(settings,profile,admin_user,admin_password,database_password):
     completed=runtime.BASE/'identity.json'
     if completed.exists():
         identity=root_json(completed);configuration_values(profile,identity)
-        if identity['dbpassword']!=database_password:raise ValueError('File-service database identity changed')
     else:
         if not re.fullmatch(r'[a-z][a-z0-9_-]{2,31}',admin_user) or not isinstance(admin_password,str) or len(admin_password)<12:
             raise ValueError('Use a lowercase administrator name and a password of at least 12 characters')
@@ -113,7 +112,6 @@ def bootstrap(settings,profile,admin_user,admin_password,database_password):
         command=runtime.common(settings)+['--rm','--user=33:33','--entrypoint=php','--volume',str(runtime.APP)+':/var/www/html:ro',settings['components']['nextcloud']['image'],'-r',export]
         result=subprocess.run(command,check=True,capture_output=True,text=True,timeout=30)
         identity=json.loads(result.stdout);configuration_values(profile,identity)
-        if identity['dbpassword']!=database_password:raise ValueError('Initialized database password differs')
         write(completed,json.dumps(identity))
     directory(runtime.BASE/'config',mode=0o700,uid=33,gid=33)
     write(runtime.BASE/'config/config.php',application_config(profile,identity),mode=0o400,uid=33,gid=33)
@@ -185,3 +183,50 @@ def status():
     for name in runtime.UNITS:runtime.verify_image(name,settings);runtime.ready(name,settings,attempts=1)
     return {'state':'file-service-listeners-verified','nextcloud_url':'https://'+settings['ownership']['nextcloud_hostname'],
             'application_login_test':'not-run','application_backup':'not-yet-supported','federation':'disabled'}
+
+
+def action(args):
+    import getpass
+    import sys
+    from profile_config import load_profile
+    if args.action=='setup':
+        from nextcloud_setup import wizard
+        return wizard(args.output_file)
+    require_platform()
+    if args.action=='status':return status()
+    if args.action=='check':return dict(preflight(load_profile(str(args.profile))),state='checks-passed')
+    profile=None;username=password=None
+    if args.action=='apply':
+        profile=load_profile(str(args.profile));preflight(profile)
+        phrase='INSTALL NEXTCLOUD ON '+profile['node_name']
+        print('Install the pinned file service on THIS node: '+profile['node_name']+'. Local accounts, private HTTPS and background jobs will be configured.')
+        if not sys.stdin.isatty() or input('Type '+phrase+' to continue: ').strip()!=phrase:return {'state':'cancelled'}
+        if not (runtime.BASE/'identity.json').exists():
+            username=input('Initial administrator name (lowercase, 3–32 characters): ').strip()
+            password=getpass.getpass('Initial administrator password (at least 12 characters): ')
+            if password!=getpass.getpass('Repeat administrator password: '):raise ValueError('Passwords did not match')
+        else:username=password='unused'
+    elif args.action=='account':
+        if not sys.stdin.isatty():raise ValueError('Create application accounts through an interactive local terminal')
+        username=input('New ordinary account name (lowercase, 3–32 characters): ').strip()
+        password=getpass.getpass('Account password (at least 12 characters): ')
+        if not re.fullmatch(r'[a-z][a-z0-9_-]{2,31}',username) or len(password)<12:raise ValueError('Use a valid account name and a password of at least 12 characters')
+        if password!=getpass.getpass('Repeat account password: '):raise ValueError('Passwords did not match')
+    elif args.action!='certificate':raise ValueError('Unsupported file-service operation')
+    with ExitStack() as stack:
+        locks=[Path('/run/rdc-nextcloud-operation.lock')]
+        if Path('/etc/rdc-backup').exists():locks.insert(0,Path('/etc/rdc-backup/operation.lock'))
+        for path in locks:
+            descriptor=os.open(path,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+            lock=stack.enter_context(os.fdopen(descriptor,'a'));fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        if Path('/etc/rdc-restore-pending.json').exists():raise ValueError('Complete pending recovery before administering the file service')
+        if args.action=='apply':
+            review=preflight(profile)
+            return install_or_resume(profile,review['ownership']['network'],review['address'],username,password)
+        settings=runtime.read_settings()
+        if args.action=='account':
+            maintenance(settings,'account',{'username':username,'password':password})
+            return {'state':'account-created','username':username,'administrator':False}
+        profile=from_owner(settings['ownership']);profile.update(tls_certificate=str(args.certificate),tls_private_key=str(args.private_key))
+        cert,key=inputs(profile)
+        return activate_certificate(settings,cert,key)

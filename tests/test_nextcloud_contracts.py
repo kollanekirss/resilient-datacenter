@@ -34,11 +34,28 @@ def test_nextcloud_rejects_unsafe_or_cross_package_inputs(key,value):
 def test_configuration_rendering_preserves_literals_without_executable_input():
     m=importlib.import_module('nextcloud_rendering')
     data={'instanceid':'oc1234567890','passwordsalt':'a'*32,'secret':'b'*48,'version':'35.0.1.0',
-          'dbpassword':'c'*64,'installed':True}
+          'dbpassword':'c'*64,'dbuser':'oc_admin','installed':True}
     output=m.application_config(profile(),data)
     assert 'files.pilot.test' not in output  # Values encoded, never interpolated into PHP code.
     decoded=m.configuration_values(profile(),data)
     assert decoded['trusted_domains']==['files.pilot.test'] and decoded['trusted_proxies']==['127.0.0.1']
+    assert decoded['dbuser']=='oc_admin' and decoded['dbpassword']==data['dbpassword']
     assert decoded['config_is_read_only'] and not decoded['appstoreenabled']
     assert decoded['datadirectory']=='/var/www/data' and decoded['overwriteprotocol']=='https'
     with pytest.raises(ValueError):m.application_config(profile(),dict(data,extra='executable'))
+
+
+def test_file_service_wizard_only_prepares_private_configuration(tmp_path):
+    m=importlib.import_module('nextcloud_setup')
+    answers=iter(['south','home-services','files.pilot.test','/root/chain.crt','/root/key.pem','SAVE'])
+    path=tmp_path/'files.json'
+    result=m.wizard(path,input_fn=lambda _:next(answers),output_fn=lambda _:None)
+    assert result['state']=='prepared' and result['installation']=='not-performed'
+    assert json.loads(path.read_text())==profile()
+    assert path.stat().st_mode&0o077==0
+
+
+def test_file_service_wizard_cancel_writes_nothing(tmp_path):
+    m=importlib.import_module('nextcloud_setup');path=tmp_path/'files.json'
+    assert m.wizard(path,input_fn=lambda _:':cancel',output_fn=lambda _:None)['state']=='cancelled'
+    assert not path.exists()
