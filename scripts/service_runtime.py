@@ -104,7 +104,7 @@ def container_command(name,settings):
                        'postgres','-c','listen_addresses=127.0.0.1','-c','port=5433','-c','max_connections=50','-c','shared_buffers=128MB']
     if name=='synapse':
         extra=[]
-        if regional:extra=['--volume',str(service_regional.BASE)+':/regional:ro','--volume','/etc/ssl/certs:/etc/ssl/certs:ro']
+        if regional:extra=['--volume',str(service_regional.BASE)+':/regional:ro','--volume','/etc/ssl/certs:/etc/ssl/certs:ro','--env','SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
         arguments=['run','--config-path','/config/homeserver.yaml','--config-path','/regional/synapse.json'] if regional else []
         return common+extra+['--user=991:991','--memory=2g','--volume',str(STATE/'synapse')+':/data:rw',
                        '--volume',str(BASE/'synapse')+':/config:ro','--env','SYNAPSE_CONFIG_PATH=/config/homeserver.yaml',

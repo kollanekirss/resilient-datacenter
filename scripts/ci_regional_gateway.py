@@ -48,10 +48,10 @@ def documents():
     return profile,own,contracts.peer_rules(own,[accepted],[],now=now),accepted
 
 
-def curl(namespace_name,path,*,proxy=False,source=None,host=None,timeout=8,stream=None):
+def curl(namespace_name,path,*,proxy=False,source=None,host=None,timeout=8,stream=None,proxy10=False):
     host=host or ('south.matrix.ci.test' if proxy else 'north.matrix.ci.test')
     args=['ip','netns','exec',namespace_name,'curl','--silent','--show-error','--max-time',str(timeout),'--noproxy','' if proxy else '*']
-    if proxy:args+=['--proxy','http://10.203.1.1:3128']
+    if proxy:args+=['--proxy1.0' if proxy10 else '--proxy','http://10.203.1.1:3128']
     else:args+=['--resolve',host+':443:100.64.0.10']
     if source:args+=['--interface',source]
     args+=['https://'+host+path]
@@ -88,6 +88,9 @@ def main():
     result=curl('rdc-peer','/_matrix/federation/v1/version',source='100.64.0.12',timeout=2);assert result.returncode!=0
     result=curl('rdc-service','/_matrix/federation/v1/version',proxy=True)
     assert result.returncode==0 and result.stdout=='fixture:/_matrix/federation/v1/version',(result.returncode,result.stdout,result.stderr)
+    legacy=curl('rdc-service','/_matrix/federation/v1/version',proxy=True,proxy10=True)
+    assert legacy.returncode==0 and legacy.stdout=='fixture:/_matrix/federation/v1/version',(legacy.returncode,legacy.stdout,legacy.stderr)
+    assert curl('rdc-service','/',proxy=True,proxy10=True,host='unapproved.ci.test').returncode!=0
     for host in ('unapproved.ci.test','169.254.169.254','10.203.1.10','100.64.0.11'):
         assert curl('rdc-service','/',proxy=True,host=host).returncode!=0
     assert curl('rdc-service','/',proxy=True,source='10.203.1.11',timeout=2).returncode!=0

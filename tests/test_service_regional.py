@@ -22,6 +22,7 @@ def test_connector_keeps_client_config_and_uses_only_reviewed_proxy_and_federati
     assert override['https_proxy']=='http://10.203.1.1:3128'
     assert override['no_proxy_hosts']==[] and override['federation_verify_certificates'] is True
     assert 'database' not in override and 'listeners' not in override
+    assert 'federation_custom_ca_list' not in override  # each entry accepts only one PEM certificate
     assert json.loads(m.synapse(config,now=1800003600))['federation_domain_whitelist']==[]
     original='original internal HTTPS configuration\n'
     text=m.proxy(original,config)
@@ -63,6 +64,7 @@ def test_matrix_runtime_adds_connector_without_replacing_its_home_configuration(
     command=runtime.container_command('synapse',current)
     assert command[-5:]==['run','--config-path','/config/homeserver.yaml','--config-path','/regional/synapse.json']
     assert str(base)+':/regional:ro' in command and '/etc/ssl/certs:/etc/ssl/certs:ro' in command
+    assert 'SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt' in command
     assert str(base/'Caddyfile')+':/etc/caddy/Caddyfile:ro' in runtime.container_command('proxy',current)
     m.write(base/'disabled.json','{}',mode=0o600)
     assert '/regional/synapse.json' not in runtime.container_command('synapse',current)

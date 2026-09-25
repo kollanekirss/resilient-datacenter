@@ -41,7 +41,7 @@ def validate(config,settings):
 def synapse(config,*,now):
     return json.dumps({'federation_domain_whitelist':sorted(peer['hostname'] for peer in config['peers'] if now<peer['expires_at']),
         'http_proxy':'http://'+config['gateway_lan_address']+':3128','https_proxy':'http://'+config['gateway_lan_address']+':3128',
-        'no_proxy_hosts':[],'federation_verify_certificates':True,'federation_custom_ca_list':['/etc/ssl/certs/ca-certificates.crt']},sort_keys=True)+'\n'
+        'no_proxy_hosts':[],'federation_verify_certificates':True},sort_keys=True)+'\n'
 
 
 def proxy(original,config):

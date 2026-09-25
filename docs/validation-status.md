@@ -135,3 +135,12 @@ Review additionally corrected the effective public-link setting and removed boot
 The disposable [gateway boundary run 36140820264](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36140820264) passed with the pinned Envoy image and real Linux network namespaces/nftables: trusted upstream TLS, restricted Matrix federation paths, blocked client/admin routes, denied unapproved peer/source/destination, and revocation/expiry stopping already-open streams in both directions. Namespace links are explicit transport fixtures, not real Tailscale memberships. This does not establish Matrix room federation, Nextcloud federation, gateway installation/recovery, or a supported regional journey. Gateway lifecycle acceptance is being added separately.
 
 The later [gateway lifecycle run 36141569056](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36141569056) also passed actual local installation, a hash-checked frozen runtime, repeated installation, systemd restart, interrupted revocation, closed restart, explicit resume and replay denial. Its VPN status is an explicit synthetic fixture. This adds local lifecycle evidence, not real Headscale or application federation acceptance.
+
+
+## Regional gateway development evidence
+
+The [gateway guard run](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36144496279) passed actual Envoy/nftables/systemd installation, restricted destinations and routes, interruption recovery, revocation of existing streams, expiry, backward-clock closure and periodic detection of abandoned changes. Its VPN facts are explicitly synthetic.
+
+The [independent network run](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36143267057) separately passed three actual Headscale authorities and seven single-membership Tailscale clients, including overlapping institutional address ranges without cross-controller peer visibility. The [Matrix package run](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36144496260) passed actual restricted LAN connector activation and persistent suspension after restoration, alongside internal application/browser/recovery acceptance.
+
+Actual cross-institution chat is still failing during partner discovery as of run 36145145264. Nextcloud federation, gateway certificate renewal and gateway-specific recovery remain unfinished. These results must not be combined into a claim that the regional product journey has passed.
