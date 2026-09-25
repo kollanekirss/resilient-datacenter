@@ -98,6 +98,7 @@
       ansible.builtin.assert:
         that:
           - (rdc_tables.stdout | from_json).nftables | selectattr('table', 'defined') | map(attribute='table.name') | difference(['rdc_dns']) | length == 0
+          - (rdc_tables.stdout | from_json).nftables | selectattr('table', 'defined') | map(attribute='table.family') | difference(['inet']) | length == 0
           - rdc_prior.stat.exists or ((rdc_tables.stdout | from_json).nftables | selectattr('table', 'defined') | list | length == 0)
         fail_msg: Use a dedicated fresh DNS VM. Existing firewalls require independent review; nothing will be flushed.
     - name: Create role directory

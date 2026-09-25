@@ -1,7 +1,7 @@
 name: Disposable portable local network
 on:
   push:
-    branches: [main, feat/portable-local-network]
+    branches: [main]
   pull_request:
 permissions:
   contents: read

@@ -16,3 +16,8 @@ Review focus: clocks without trusted UTC; overlapping service DNS zones; same-br
 
 - Baseline: branch from merged PR19 at53da00a. Native worktree tool unavailable because task cwd is not a repository; isolated git fallback under ignored .work used.
 - Design ruling: deliver roadmap stage3 first, following its explicit separation from stage4, because application access/backup contracts require their own implementation boundary.
+- Tasks 1–5 complete: network contract, deterministic renderers/private kit, guarded DNS/time playbook, bounded probes and wizard/CLI integration. Meaningful regression tests cover unsafe settings, tampering, no-create verification, segmented DNS/TCP and negative-only header refusal.
+- Task 6: 735 tests and complete local check runner passed. Real hosted Linux namespace acceptance passed at5729ada, run36187367660. Final-head checks required before integration.
+- Review ruling: no subagents in this side conversation. Inline author review checked service/guest boundaries, default-deny and same-bridge policy, clock trust, toolkit file validation, guard failure behavior and scope. This is not independent review.
+- Fix evidence: RED→GREEN verification for header-only REFUSED; the actual hosted daemon failure exposed AppArmor's path constraints, fixed by keeping chrony configuration/drift under its distribution-approved directories. No permission bypass or disabling AppArmor.
+- Limitation: console OPNsense steps and real guarded-playbook application require a disposable guest/host. No such host is connected; network preparation and isolated software acceptance do not claim stage3 physical acceptance. NGINX/application access remains the distinct stage4 boundary.
