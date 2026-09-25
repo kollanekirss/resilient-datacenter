@@ -18,8 +18,8 @@ def prepare_network():
     # Test networking identity capture without installing a VPN on this fixture.
     Path('/var/lib/tailscale').mkdir(mode=0o700)
     Path('/var/lib/tailscale/ci-identity').write_text('synthetic network identity')
-    for name in ('tailscale','tailscaled'):shutil.copy2('/usr/bin/sleep','/usr/local/bin/'+name)
-    Path('/etc/systemd/system/tailscaled.service').write_text('[Service]\nType=simple\nExecStart=/usr/local/bin/tailscaled infinity\n')
+    for destination in ('/usr/local/bin/tailscale','/usr/local/sbin/tailscaled'):shutil.copy2('/usr/bin/sleep',destination)
+    Path('/etc/systemd/system/tailscaled.service').write_text('[Service]\nType=simple\nExecStart=/usr/local/sbin/tailscaled infinity\n')
     subprocess.run(['systemctl','daemon-reload'],check=True);subprocess.run(['systemctl','start','tailscaled'],check=True)
 
 

@@ -15,7 +15,8 @@ def fixture(tmp_path):
     (root/'var/lib/tailscale').mkdir(parents=True)
     (root/'var/lib/tailscale/tailscaled.state').write_bytes(b'temporary enrolled identity')
     (root/'usr/local/bin').mkdir(parents=True)
-    for name in ('tailscale','tailscaled'):(root/'usr/local/bin'/name).write_bytes(b'reviewed component')
+    for relative in ('usr/local/bin/tailscale','usr/local/sbin/tailscaled'):
+        (root/relative).parent.mkdir(parents=True,exist_ok=True);(root/relative).write_bytes(b'reviewed component')
     return stage,root
 
 
@@ -40,7 +41,7 @@ def test_bootstrap_refuses_incompatible_or_unsafe_source_before_creating_stage(t
     owner=network();package='gateway'
     if problem=='package':package='nextcloud'
     if problem=='owner':owner=dict(owner,institution_id='other')
-    if problem=='binary':(root/'usr/local/bin/tailscaled').write_bytes(b'unknown version')
+    if problem=='binary':(root/'usr/local/sbin/tailscaled').write_bytes(b'unknown version')
     if problem=='installed':(root/'etc/rdc-gateway').mkdir()
     if problem=='escape':(source/'data/var/lib/tailscale/link').symlink_to('../../../etc/rdc-gateway/state.json')
     with pytest.raises(ValueError):m.derive(source,tmp_path/'network',owner,package,root=root)
