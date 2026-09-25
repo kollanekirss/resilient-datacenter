@@ -68,6 +68,8 @@ def main():
     namespace('rdc-service','rdc-lan','service0','10.203.1.1/24','10.203.1.10/24')
     run('ip','netns','exec','rdc-service','ip','address','add','10.203.1.11/24','dev','service0')
     certificates();profile,own,peers,document=documents()
+    (BASE/'tls/active').mkdir(parents=True,mode=0o700)
+    for name in ('tls.crt','tls.key'):(BASE/'tls/active'/name).write_bytes((BASE/name).read_bytes())
     for name,address,port in [('rdc-peer','100.64.0.11',443),('rdc-service','10.203.1.10',8443)]:
         log=(ROOT/(name+'.log')).open('w')
         PROCESSES.append(subprocess.Popen(['ip','netns','exec',name,sys.executable,str(Path(__file__).with_name('ci_gateway_endpoint.py')),address,str(port),str(BASE/'tls.crt'),str(BASE/'tls.key')],stdout=log,stderr=log))
@@ -156,6 +158,7 @@ def runtime_acceptance(profile,own,document):
     assert curl('rdc-peer','/_matrix/federation/v1/version').stdout=='fixture:/_matrix/federation/v1/version'
     assert operations.install(profile,own)['partners']==1
     store=Store(runtime.BASE);identifier=document['offer']['payload']['agreement_id']
+    certificate_acceptance(store)
     assert run('systemctl','is-active','rdc-regional-guard.timer').strip()=='active'
     from regional_workspace import private_write
     original_clock=(runtime.BASE/'clock.json').read_bytes()
@@ -193,6 +196,60 @@ def runtime_acceptance(profile,own,document):
     assert operations.change([document])['partners']==0
     assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
     print('Actual gateway installer/frozen runtime: initially closed, approved policy, repeated installation, systemd restart, interrupted revocation, closed restart, explicit resume and replay denial PASS. VPN identity remains a synthetic fixture.',flush=True)
+
+
+def certificate_acceptance(store):
+    import hashlib
+    import gateway_certificates as certificates
+    import gateway_runtime as runtime
+    from certificate_lifecycle import ActivationError
+    from regional_workspace import private_write
+    before=(store.base/'state.json').read_bytes()
+    names=sorted(store.identity()['payload']['services'].values())
+    def issued(label):
+        folder=ROOT/label;folder.mkdir(mode=0o700)
+        run('openssl','req','-newkey','rsa:2048','-nodes','-keyout',str(folder/'tls.key'),'-out',str(folder/'request.csr'),'-subj','/CN='+names[0])
+        (folder/'extensions').write_text('subjectAltName='+','.join('DNS:'+name for name in names)+'\nextendedKeyUsage=serverAuth\n')
+        run('openssl','x509','-req','-in',str(folder/'request.csr'),'-CA',str(ROOT/'ca.crt'),'-CAkey',str(ROOT/'ca.key'),'-CAcreateserial','-out',str(folder/'tls.crt'),'-days','30','-extfile',str(folder/'extensions'))
+        (folder/'tls.key').chmod(0o600)
+        return folder
+    def remote_fingerprint():
+        code=('import ssl,socket,hashlib;'
+              's=ssl.create_default_context().wrap_socket(socket.create_connection(("100.64.0.10",443),timeout=5),server_hostname='+repr(names[0])+');'
+              'print(hashlib.sha256(s.getpeercert(binary_form=True)).hexdigest());s.close()')
+        return run('ip','netns','exec','rdc-peer',sys.executable,'-c',code).strip()
+    original=remote_fingerprint();replacement=issued('replacement-certificate')
+    result=certificates.replace(replacement/'tls.crt',replacement/'tls.key')
+    assert result['state']=='active' and result['fingerprint']!=original
+    assert remote_fingerprint()==result['fingerprint']
+    assert certificates.status(store)['serving_certificate_verified']
+    assert curl('rdc-peer','/_matrix/federation/v1/version').stdout=='fixture:/_matrix/federation/v1/version'
+    local=run('curl','--silent','--show-error','--noproxy','*','--resolve',names[0]+':9443:127.0.0.1','--output','/dev/null','--write-out','%{http_code}','https://'+names[0]+':9443/')
+    assert local=='403'
+    for namespace_name,address in (('rdc-peer','100.64.0.10'),('rdc-service','10.203.1.1')):
+        result_probe=subprocess.run(['ip','netns','exec',namespace_name,'curl','--silent','--max-time','2','--noproxy','*','--resolve',names[0]+':9443:'+address,'https://'+names[0]+':9443/'],capture_output=True)
+        assert result_probe.returncode!=0,'TLS check listener is reachable outside loopback'
+    candidate=issued('failed-certificate')
+    class Failure(certificates.Runtime):
+        def __init__(self,store):super().__init__(store);self.fail=True
+        def verify(self,hostname,fingerprint):
+            super().verify(hostname,fingerprint)
+            if self.fail:self.fail=False;raise ValueError('Injected failure after actual TLS replacement')
+    with store.lock(wait_seconds=10):
+        try:certificates.activate_certificate(store,(candidate/'tls.crt').read_bytes(),(candidate/'tls.key').read_bytes(),runtime=Failure(store))
+        except ActivationError as error:assert error.recovered
+        else:raise AssertionError('Failed gateway TLS activation was reported as successful')
+    assert remote_fingerprint()==result['fingerprint']
+    assert not certificates.pending(store)
+    cert,key=certificates.managed_material(store)
+    with store.lock(wait_seconds=10):
+        private_write(store.base/certificates.MARKER,json.dumps({'schema_version':1,'material_digest':hashlib.sha256(cert+key).hexdigest()}).encode())
+    run('systemctl','restart',runtime.UNIT)
+    assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
+    resumed=certificates.replace(replacement/'tls.crt',replacement/'tls.key')
+    assert resumed['state']=='active' and remote_fingerprint()==result['fingerprint']
+    assert (store.base/'state.json').read_bytes()==before
+    print('Actual gateway TLS: new served certificate, loopback-only deny-all verifier, verified rollback after injected failure, closed interrupted restart and exact resume without approval changes PASS.',flush=True)
 
 if __name__=='__main__':
     try:main()

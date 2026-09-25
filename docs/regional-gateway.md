@@ -111,3 +111,14 @@ The initial attachment asks you to confirm the institution's full approval finge
 To suspend the local connector, use `sudo ./rdc files regional disable`. A restored file service stays suspended until current partner approvals are reviewed and attached again. Gateway revocation blocks future delivery but cannot remove copies already downloaded by a recipient.
 
 The current source passed disposable file exchange and destination-denial checks in run36151160141. This does not establish unattended gateway renewal, gateway disaster recovery or physical-site acceptance.
+
+## Replace the gateway certificate
+
+The development source now includes manual managed replacement; its native acceptance is recorded separately in `validation-status.md`. Automatic gateway issuance/renewal is still being built.
+
+```sh
+sudo ./rdc gateway certificate status
+sudo ./rdc gateway certificate replace --certificate /root/renewed.crt --private-key /root/renewed.key
+```
+
+The certificate must name every service in the signed gateway identity and chain to a system-trusted authority. Replacement briefly closes partner transport, checks the new certificate actually served by the proxy, and recovers the previous certificate if activation fails. A dedicated check listener binds only to localhost and denies all HTTP requests. If the operation is interrupted, partner transport stays closed; repeat the replacement with the same certificate/key files to complete it. Resolve a pending partner-policy change before starting a separate certificate change. The development format is not an automatic upgrade of previously installed experimental gateway revisions.

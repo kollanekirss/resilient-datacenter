@@ -16,6 +16,7 @@ from gateway_store import Store
 import gateway_runtime as runtime
 import gateway_transition
 import gateway_contracts as contracts
+import gateway_certificates as certificates
 
 SOURCE=Path(__file__).resolve().parent
 UNIT=Path('/etc/systemd/system')/(runtime.UNIT+'.service')
@@ -44,23 +45,26 @@ def preflight(profile,identity):
     if Path('/etc/rdc-restore-pending.json').exists():raise ValueError('Resolve the pending network restore before configuring regional access')
     runtime.validate_network(profile,identity,runtime.root_json(Path('/etc/server-connectivity-profile.json')),
         json.loads(runtime.command('/usr/local/bin/tailscale','status','--json')),json.loads(runtime.command('/usr/local/bin/tailscale','debug','prefs')))
-    runtime.lan_interface(profile);tls_inputs(profile,identity)
+    runtime.lan_interface(profile)
     existing=runtime.BASE.exists() or runtime.BASE.is_symlink()
     if existing:
         store=Store(runtime.BASE)
         if store.profile()!=profile or store.identity()!=identity:raise ValueError('This gateway has a different pinned identity or network configuration')
         store.state()
-        for name,content in zip(('tls.crt','tls.key'),tls_inputs(profile,identity)):
-            path=runtime.BASE/name
-            if (path.exists() or path.is_symlink()) and private_read(path)!=content:raise ValueError('Use a reviewed certificate replacement; installation does not replace gateway TLS')
+        if certificates.pending(store):raise ValueError('Resume the pending gateway certificate replacement before installation')
+        if not (runtime.BASE/'tls/active').exists() and not (runtime.BASE/'tls/active').is_symlink() and store.state()['generation']==0:
+            cert,key=tls_inputs(profile,identity)  # Resume interrupted first installation.
+        else:cert,key=certificates.managed_material(store)
+        for hostname in identity['payload']['services'].values():validate_material(cert,key,hostname)
     else:
+        tls_inputs(profile,identity)
         reserved=[runtime.INSTALLED,UNIT,Path(str(UNIT)+'.d'),SYSCTL,GUARD,TIMER,Path(str(GUARD)+'.d'),Path(str(TIMER)+'.d')]
         if any(path.exists() or path.is_symlink() for path in reserved):raise ValueError('Unowned gateway resources already exist')
         if Path('/usr/sbin/nft').exists():
             tables=json.loads(runtime.command('/usr/sbin/nft','-j','list','tables'))
             if any(item.get('table',{}).get('name')=='rdc_gateway' for item in tables['nftables']):raise ValueError('A firewall already owns the gateway table name')
         if Path('/usr/bin/podman').exists() and json.loads(runtime.command('/usr/bin/podman','ps','--all','--format','json')):raise ValueError('Use a dedicated gateway without other root-managed containers')
-        if re.search(r':(?:443|3128)\s',runtime.command('/usr/bin/ss','-H','-lntup')):raise ValueError('A gateway listener port is already in use')
+        if re.search(r':(?:443|3128|9443)\s',runtime.command('/usr/bin/ss','-H','-lntup')):raise ValueError('A gateway listener port is already in use')
         if shutil.disk_usage('/var/lib').free<3*1024**3:raise ValueError('Provide at least 3 GiB free disk for the gateway')
     if any(Path(str(path)+'.d').exists() or Path(str(path)+'.d').is_symlink() for path in (UNIT,GUARD,TIMER)):raise ValueError('Unreviewed gateway unit overrides are present')
     return {'state':'gateway-preflight-passed','existing':existing,'partner_transport':'not-verified'}
@@ -90,7 +94,9 @@ def install(profile,identity):
         for name in runtime.RUNTIME_FILES:
             raw=(SOURCE/name).read_bytes();owned_file(runtime.INSTALLED/name,raw,mode=0o644);hashes[name]=hashlib.sha256(raw).hexdigest()
         owned_file(runtime.INSTALLED/'manifest.json',json.dumps({'schema_version':1,'files':hashes},sort_keys=True))
-        for name,raw in zip(('tls.crt','tls.key'),tls_inputs(profile,identity)):owned_file(runtime.BASE/name,raw)
+        if not (runtime.BASE/'tls/active').exists():
+            cert,key=tls_inputs(profile,identity)
+            certificates.activate_certificate(store,cert,key,initial=True)
         owned_file(UNIT,runtime.unit(),mode=0o644);owned_file(SYSCTL,SYSCTL_TEXT,mode=0o644)
         owned_file(GUARD,runtime.guard_unit(),mode=0o644);owned_file(TIMER,runtime.guard_timer(),mode=0o644)
         runtime.command('/usr/bin/apt-get','update','-qq',timeout=300)
@@ -114,6 +120,7 @@ def install(profile,identity):
 def change(documents=None,revoked_ids=None,*,resume=False):
     require_platform();runtime.verify_runtime();store=Store(runtime.BASE)
     with store.lock(wait_seconds=10):
+        if certificates.pending(store):raise ValueError('Complete the pending gateway certificate replacement before changing policy')
         if resume:
             candidate=store.pending()
             if candidate is None:raise ValueError('No gateway transition is pending')
@@ -143,6 +150,10 @@ def action(args):
     from regional_operations import interactive
     import sys
     command=args.gateway_action
+    if command=='certificate':
+        require_platform();runtime.verify_runtime()
+        if args.certificate_action=='status':return certificates.status(Store(runtime.BASE))
+        return certificates.replace(args.certificate,args.private_key)
     if command=='setup':
         from gateway_setup import wizard
         return wizard(imported(args.identity),args.identity,args.output_file)

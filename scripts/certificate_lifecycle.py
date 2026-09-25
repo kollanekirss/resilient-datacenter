@@ -21,7 +21,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 
 BASE=Path('/etc/rdc-tls')
 LINEAGE=Path('/etc/letsencrypt/live/rdc-managed')
-SERVICES={'controller':('headscale','headscale'),'relay':('sc-derp','sc-derp'),'services':('rdc-service-proxy','root'),'nextcloud':('rdc-nextcloud-proxy','root')}
+SERVICES={'gateway':('rdc-regional-gateway','root'),'controller':('headscale','headscale'),'relay':('sc-derp','sc-derp'),'services':('rdc-service-proxy','root'),'nextcloud':('rdc-nextcloud-proxy','root')}
 
 class ActivationError(ValueError):
     def __init__(self,recovered):

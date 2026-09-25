@@ -36,3 +36,11 @@ def test_file_connector_cli_selects_its_own_application_scope():
     args=parser().parse_args(['files','regional','attach','files-link.json'])
     assert args.command=='files' and args.action=='regional' and args.regional_service_action=='attach'
     assert parser().parse_args(['files','regional','disable']).regional_service_action=='disable'
+
+
+def test_gateway_certificate_commands_keep_private_material_out_of_arguments_except_paths():
+    from rdc import parser
+    args=parser().parse_args(['gateway','certificate','replace','--certificate','/root/new.crt','--private-key','/root/new.key'])
+    assert args.gateway_action=='certificate' and args.certificate_action=='replace'
+    assert str(args.certificate)=='/root/new.crt'
+    assert parser().parse_args(['gateway','certificate','status']).certificate_action=='status'

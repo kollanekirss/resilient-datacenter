@@ -74,3 +74,12 @@ def test_clock_checkpoint_serializes_startup_and_guard(tmp_path,monkeypatch):
         assert first.result()==1800000000
         assert second.result()==1800000001
     assert json.loads((store.base/'clock.json').read_text())['latest_utc']==1800000001
+
+
+def test_gateway_cannot_open_while_certificate_activation_is_unverified(tmp_path):
+    from test_gateway_store import fixture
+    from regional_workspace import private_write
+    m=importlib.import_module('gateway_runtime');store,_=fixture(tmp_path)
+    private_write(store.base/'certificate-pending.json',json.dumps({'schema_version':1,'material_digest':'a'*64}).encode())
+    with pytest.raises(ValueError,match='certificate'):
+        m.Runtime(store).open(store.state())

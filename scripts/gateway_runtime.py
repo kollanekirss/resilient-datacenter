@@ -18,6 +18,7 @@ import gateway_rendering as rendering
 from gateway_store import Store,decode
 from regional_workspace import private_read,private_write
 import regional_agreements as agreements
+import gateway_certificates as certificates
 
 BASE=Path('/etc/rdc-gateway')
 INSTALLED=Path('/usr/local/lib/rdc-gateway')
@@ -145,6 +146,7 @@ class Runtime:
     def restart(self):command('/bin/systemctl','restart',UNIT+'.service',timeout=120)
 
     def open(self,candidate):
+        if certificates.pending(self.store):raise ValueError('Complete the pending gateway certificate verification before opening partners')
         network_check(self.store)
         if self.store.state()!=candidate:raise ValueError('Gateway policy changed before activation')
         item=inspect(self.store.identity())
@@ -164,7 +166,7 @@ def verify_runtime():
 
 
 RUNTIME_FILES=('gateway_entry.py','gateway_runtime.py','gateway_store.py','gateway_contracts.py','gateway_images.json','gateway_rendering.py','regional_http.py',
-               'gateway_transition.py','regional_workspace.py','regional_agreements.py','profile_config.py','validate_inventory.py','validate_tls.py')
+               'gateway_transition.py','gateway_certificates.py','certificate_lifecycle.py','regional_workspace.py','regional_agreements.py','profile_config.py','validate_inventory.py','validate_tls.py')
 
 
 def unit():
@@ -203,7 +205,7 @@ def main(action):
         try:
             with store.lock():
                 try:
-                    if store.pending():runtime.close()
+                    if store.pending() or certificates.pending(store):runtime.close()
                     else:runtime.open(store.state())
                 except BaseException:
                     runtime.close();raise
@@ -222,7 +224,7 @@ def main(action):
                 # packet/TLS validation across the boundary belongs to acceptance.
                 listeners=command('/usr/bin/ss','-H','-lntp').splitlines()
                 expected_pid='pid='+str(item['State']['Pid'])+','
-                if all(any(endpoint in line and expected_pid in line for line in listeners) for endpoint in (identity['payload']['gateway_ipv4']+':443',store.profile()['lan_address']+':3128')):return 0
+                if all(any(endpoint in line and expected_pid in line for line in listeners) for endpoint in (identity['payload']['gateway_ipv4']+':443',store.profile()['lan_address']+':3128','127.0.0.1:9443')):return 0
             time.sleep(1)
         raise ValueError('Gateway listeners did not become ready')
     if action!='run':raise ValueError('Unsupported gateway runtime action')
@@ -234,5 +236,5 @@ def main(action):
         command('/usr/bin/podman','rm',CONTAINER)
     # Pending changes launch the candidate listeners behind a closed firewall.
     # The explicit transaction opens them only after verified restart.
-    if not store.pending():runtime.firewall(store.peers(state))
+    if not store.pending() and not certificates.pending(store):runtime.firewall(store.peers(state))
     return subprocess.run(container_command(identity)).returncode

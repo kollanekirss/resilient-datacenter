@@ -45,7 +45,7 @@ def listener(name,address,port,vhosts,policies,*,tls=False):
     if tls:
         chain['transport_socket']={'name':'envoy.transport_sockets.tls','typed_config':{'@type':'type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext',
             'common_tls_context':{'tls_params':{'tls_minimum_protocol_version':'TLSv1_2'},
-            'tls_certificates':[{'certificate_chain':{'filename':'/etc/rdc-gateway/tls.crt'},'private_key':{'filename':'/etc/rdc-gateway/tls.key'}}]}}}
+            'tls_certificates':[{'certificate_chain':{'filename':'/etc/rdc-gateway/tls/active/tls.crt'},'private_key':{'filename':'/etc/rdc-gateway/tls/active/tls.key'}}]}}}
     return {'name':name,'address':socket(address,port),'filter_chains':[chain]}
 
 
@@ -78,7 +78,8 @@ def envoy(profile,identity,peers,*,services=SUPPORTED):
     fallback={'name':'denied','domains':['*'],'routes':[{'match':{'prefix':'/'},'direct_response':{'status':403}}]}
     ingress.append(fallback);outbound.append(fallback)
     return {'static_resources':{'listeners':[listener('regional',owned['gateway_ipv4'],443,ingress,incoming_policies,tls=True),
-        listener('private_lan',profile['lan_address'],3128,outbound,outgoing_policies)],'clusters':clusters}}
+        listener('private_lan',profile['lan_address'],3128,outbound,outgoing_policies),
+        listener('certificate_check','127.0.0.1',9443,[fallback],{},tls=True)],'clusters':clusters}}
 
 
 def firewall(profile,peers,*,lan_interface,now,replace,services=SUPPORTED):

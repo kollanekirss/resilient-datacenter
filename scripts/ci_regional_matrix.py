@@ -153,6 +153,8 @@ def setup_application(institution,index,identity,document):
 def setup_gateway(institution,index,identity,document,tls):
     node=institution+'-gateway';folder=ROOT/(institution+'-proxy');folder.mkdir(mode=0o700)
     for name in ('tls.crt','tls.key'):(folder/name).write_bytes((tls/name).read_bytes());(folder/name).chmod(0o600)
+    (folder/'tls/active').mkdir(parents=True,mode=0o700)
+    for name in ('tls.crt','tls.key'):(folder/'tls/active'/name).write_bytes((tls/name).read_bytes())
     profile={'kind':'regional-gateway','schema_version':1,'institution_id':institution,'node_name':node,
              'regional_controller':network.CONTROLLERS['regional']['hostname'],'lan_address':'10.203.'+str(index)+'.1','lan_subnet':'10.203.'+str(index)+'.0/24',
              'identity_file':'/root/public-identity.json','tls_certificate':str(folder/'tls.crt'),'tls_private_key':str(folder/'tls.key'),'upstreams':{'matrix':'10.203.'+str(index)+'.10'}}

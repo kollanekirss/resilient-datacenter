@@ -16,7 +16,7 @@ def test_gateway_has_fixed_tls_upstreams_no_admin_or_dynamic_forwarding():
     config=m.envoy(p,own,peers)
     assert 'admin' not in config
     listeners=config['static_resources']['listeners']
-    assert [(x['address']['socket_address']['address'],x['address']['socket_address']['port_value']) for x in listeners]==[('100.64.0.10',443),('10.203.1.1',3128)]
+    assert [(x['address']['socket_address']['address'],x['address']['socket_address']['port_value']) for x in listeners]==[('100.64.0.10',443),('10.203.1.1',3128),('127.0.0.1',9443)]
     clusters=config['static_resources']['clusters']
     assert all(x['type']=='STATIC' for x in clusters)
     matrix=next(x for x in clusters if x['name']=='local_matrix')
@@ -57,7 +57,7 @@ def test_regional_endpoints_cannot_fall_back_to_an_unrelated_interface():
 def test_synapse_http10_connect_is_accepted_only_on_private_listener():
     m=importlib.import_module('gateway_rendering');p,own,peers=inputs()
     listeners=m.envoy(p,own,peers)['static_resources']['listeners']
-    public,private=[item['filter_chains'][0]['filters'][0]['typed_config'] for item in listeners]
+    public,private=[item['filter_chains'][0]['filters'][0]['typed_config'] for item in listeners[:2]]
     assert private['http_protocol_options']=={'accept_http_10':True}
     assert 'http_protocol_options' not in public
     # A missing or unapproved target still has no default host or route.
@@ -75,3 +75,18 @@ def test_candidate_file_routes_are_method_scoped_and_do_not_expose_general_dav()
     assert 'local_nextcloud' in text and 'public' in text
     assert '/remote.php/dav' not in text and '/settings' not in text and '/login' not in text
     with pytest.raises(ValueError):m.envoy(p,own,peers,services=('arbitrary',))
+
+
+def test_gateway_tls_check_is_loopback_only_and_has_no_application_routes():
+    m=importlib.import_module('gateway_rendering');p,own,peers=inputs()
+    listeners=m.envoy(p,own,peers)['static_resources']['listeners']
+    check=next(item for item in listeners if item['name']=='certificate_check')
+    assert check['address']['socket_address']=={'address':'127.0.0.1','port_value':9443}
+    chain=check['filter_chains'][0]
+    tls=chain['transport_socket']['typed_config']['common_tls_context']['tls_certificates']
+    public=listeners[0]['filter_chains'][0]['transport_socket']['typed_config']['common_tls_context']['tls_certificates']
+    assert tls==public and tls[0]['certificate_chain']['filename']=='/etc/rdc-gateway/tls/active/tls.crt'
+    hcm=chain['filters'][0]['typed_config']
+    assert hcm['http_filters'][0]['typed_config']['rules']['policies']=={}
+    for host in hcm['route_config']['virtual_hosts']:
+        for route in host['routes']:assert route['direct_response']['status']==403 and 'route' not in route
