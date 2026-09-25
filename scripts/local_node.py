@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from profile_config import load_profile
 from setup_contracts import validate_local_manifest
 from local_checks import check_local, inspect_local_checks
+from operation_environment import ansible_environment
 from operation_results import ActionResult, Exit, OperationError, result_for_state
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -32,8 +33,7 @@ def apply_manifest(manifest, path, *, runner=subprocess.run, checker=check_local
     # Apply a private snapshot of the reviewed data, never an arbitrary inventory.
     with tempfile.TemporaryDirectory(prefix='sc-local-') as folder:
         snapshot=Path(folder)/'manifest.json'; snapshot.write_text(json.dumps(manifest)); snapshot.chmod(0o600)
-        env={k:v for k,v in os.environ.items() if not k.startswith('ANSIBLE_')}
-        env.update(ANSIBLE_CONFIG=str(ROOT/'ansible.cfg'),ANSIBLE_HOME=str(ROOT/'.cache/ansible'),ANSIBLE_LOCAL_TEMP=str(ROOT/'.work/ansible-tmp'))
+        env=ansible_environment(ROOT)
         runner(install_command(snapshot,as_root=os.geteuid()==0),cwd=ROOT,env=env,check=True)
     return {'status':'installed','enrollment':'not-verified'}
 
