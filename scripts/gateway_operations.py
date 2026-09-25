@@ -150,6 +150,9 @@ def action(args):
     from regional_operations import interactive
     import sys
     command=args.gateway_action
+    if command=='issuer':
+        from service_issuer import action as issuer_action
+        return issuer_action(args)
     if command=='certificate':
         require_platform();runtime.verify_runtime()
         if args.certificate_action=='status':return certificates.status(Store(runtime.BASE))

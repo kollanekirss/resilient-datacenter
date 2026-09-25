@@ -64,3 +64,16 @@ Files: `scripts/rdc.py`, `scripts/gateway_operations.py`, `scripts/ci_regional_g
 - [ ] Extend actual gateway acceptance to issue a second disposable trusted certificate, replace it and compare the real served fingerprint. Inject a failure after switching, verify rollback serves the old fingerprint, and verify policy/state bytes did not change.
 - [ ] Test LAN and regional attempts to reach port9443 fail, local HTTP returns403, and restarting with an abandoned certificate marker leaves federation closed until the exact change resumes.
 - [ ] Run hosted acceptance, inspect failures before fixes, update validation evidence and author-review the resulting diff. Continue with the fixed DNS renewal runner; do not claim gateway lifecycle complete from manual replacement alone.
+
+### Task 4: Fixed DNS issuer for the gateway
+
+Files: `scripts/service_issuer_contracts.py`, `scripts/service_issuer.py`, `scripts/service_issuer_setup.py`, `scripts/rdc.py`, `scripts/ci_service_issuer.py`, `scripts/ci_regional_gateway.py`, `tests/test_gateway_issuer.py`.
+
+Interfaces: keep the existing issuer API and fixed local paths on each dedicated node. Add `kind=gateway-certificates`, `gateway_fingerprint`, and exactly the present `matrix_hostname`/`nextcloud_hostname` fields. `matching_application(profile)` returns a verified gateway Store for this kind; `activate_application` calls `activate_certificate` while holding the gateway lock. Initial issuance prepares files and does not start a gateway.
+
+- [ ] Add failing tests for one/two-domain contracts, forbidden Element/extra fields, fingerprint mismatch, exact pinned service names, isolated frozen dependency imports and wizard names derived from a signed identity.
+- [ ] Extend name validation and fixed issuance command, preserving provider/CA/path restrictions. Derive wizard identity fields from the imported signed public identity, display its fingerprint, and retain explicit issuer-terms consent.
+- [ ] Add issuer lock routing: backup, a fixed issuer setup lock, then the existing gateway lock when the gateway is installed. No gateway directory is created by pre-install issuance. Verify installed gateway ownership before enabling activation; renewal cannot change a signed hostname or identity.
+- [ ] Include the entire gateway runtime dependency catalogue in the frozen issuer; preserve recognition of prior application-only catalogues without silently upgrading them. Read-only status checks actual served TLS through the gateway verifier.
+- [ ] Reuse the disposable provider-boundary fixture with gateway ownership. Run the actual installed renewal service to activate a new trusted leaf; inject provider failure and prove it retains the active certificate. Record public DNS/ACME acceptance as not run.
+- [ ] Run the full suite and native gateway/application jobs, update docs/evidence, and review the final certificate diff before marking this plan complete. Gateway encrypted recovery remains the next separate plan.

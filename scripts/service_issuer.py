@@ -22,7 +22,9 @@ TIMER=Path('/etc/systemd/system/rdc-service-certificate.timer')
 LEGACY_FILES=('service_issuer_runner.py','service_issuer.py','service_issuer_contracts.py','service_certificates.py',
        'service_runtime.py','service_contracts.py','certificate_lifecycle.py','profile_config.py','setup_contracts.py',
        'validate_inventory.py','validate_tls.py')
-FILES=LEGACY_FILES+('nextcloud_runtime.py','nextcloud_certificates.py','nextcloud_regional.py','service_regional.py','regional_http.py')
+SERVICE_FILES=LEGACY_FILES+('nextcloud_runtime.py','nextcloud_certificates.py','nextcloud_regional.py','service_regional.py','regional_http.py')
+from gateway_runtime import RUNTIME_FILES as GATEWAY_FILES
+FILES=SERVICE_FILES+tuple(name for name in GATEWAY_FILES if name not in SERVICE_FILES)
 
 
 def directory(path,*,create=True):
@@ -79,11 +81,16 @@ def operation_lock(profile=None):
     if profile is None and (BASE/'configuration.json').exists():profile=configuration()['profile']
     file_service=profile is not None and profile.get('kind')=='nextcloud-certificates'
     with ExitStack() as stack:
-        paths=[Path('/run/rdc-nextcloud-operation.lock' if file_service else '/run/rdc-services-operation.lock')]
+        gateway=profile is not None and profile.get('kind')=='gateway-certificates'
+        paths=[Path('/run/rdc-gateway-certificate-setup.lock' if gateway else ('/run/rdc-nextcloud-operation.lock' if file_service else '/run/rdc-services-operation.lock'))]
         if Path('/etc/rdc-backup').exists():paths.insert(0,Path('/etc/rdc-backup/operation.lock'))
         for path in paths:
             fd=os.open(path,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
             stream=stack.enter_context(os.fdopen(fd,'a'));fcntl.flock(stream,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        if gateway:
+            import gateway_runtime
+            from gateway_store import Store
+            if gateway_runtime.BASE.exists() or gateway_runtime.BASE.is_symlink():stack.enter_context(Store(gateway_runtime.BASE).lock(wait_seconds=10))
         if Path('/etc/rdc-restore-pending.json').exists():raise ValueError('A pending restore blocks certificate issuance and activation')
         yield
 
@@ -135,10 +142,16 @@ def application_runtime(profile):
 
 
 def active_directory(profile):
+    if profile['kind']=='gateway-certificates':
+        import gateway_runtime
+        return gateway_runtime.BASE/'tls'
     return Path('/etc/rdc-nextcloud-tls' if profile['kind']=='nextcloud-certificates' else '/etc/rdc-service-tls')
 
 
 def activate_application(profile,settings,cert,key):
+    if profile['kind']=='gateway-certificates':
+        from gateway_certificates import activate_certificate
+        return activate_certificate(settings,cert,key)
     if profile['kind']=='nextcloud-certificates':
         from nextcloud_certificates import activate_certificate
         return activate_certificate(settings,cert,key)
@@ -146,6 +159,15 @@ def activate_application(profile,settings,cert,key):
 
 
 def matching_application(profile):
+    if profile['kind']=='gateway-certificates':
+        import gateway_runtime
+        from gateway_store import Store
+        from regional_agreements import fingerprint
+        gateway_runtime.verify_runtime();store=Store(gateway_runtime.BASE);identity=store.identity();owned=identity['payload']
+        expected={name+'_hostname':domain for name,domain in owned['services'].items()}
+        if profile['institution_id']!=owned['institution_id'] or profile['node_name']!=owned['gateway_node'] or profile['gateway_fingerprint']!=fingerprint(identity) or {name:profile[name] for name in name_fields(profile)}!=expected:
+            raise ValueError('Certificate issuer differs from the pinned gateway identity or service names')
+        return store
     settings=application_runtime(profile).read_settings()
     if any(settings['ownership'][k]!=profile[k] for k in ('institution_id','node_name',*name_fields(profile))):
         raise ValueError('Certificate issuer and application identities differ')
@@ -160,6 +182,9 @@ def issue(profile,token):
     if any(profile[k]!=network[k] for k in ('institution_id','node_name')):raise ValueError('Certificate request differs from the local node')
     data={'schema_version':1,'profile':profile,'network':network}
     with operation_lock(profile):
+        if profile['kind']=='gateway-certificates':
+            import gateway_runtime
+            if gateway_runtime.BASE.exists():matching_application(profile)
         check_ambient()
         marker=BASE/'configuration.json'
         if BASE.exists() or BASE.is_symlink():
@@ -183,7 +208,7 @@ def issue(profile,token):
         except (OSError,ValueError,subprocess.SubprocessError):
             write(BASE/'status.json',json.dumps({'state':'issuance-failed','checked_at':datetime.now(timezone.utc).isoformat()}),replace=True)
             raise ValueError('Certificate issuance failed. Review DNS zone access, provider token, propagation and issuer availability; existing active TLS was retained.') from None
-    return dict(paths,state='issued-not-activated',next_step='Use these certificate paths in '+('files' if profile['kind']=='nextcloud-certificates' else 'services')+' setup, install applications, then enable certificate renewal.')
+    return dict(paths,state='issued-not-activated',next_step='Use these certificate paths in '+('gateway' if profile['kind']=='gateway-certificates' else ('files' if profile['kind']=='nextcloud-certificates' else 'services'))+' setup, install applications, then enable certificate renewal.')
 
 
 def unit_text():
@@ -196,7 +221,7 @@ def timer_text():
 
 def verify_runtime():
     directory(RUNTIME,create=False);manifest=json.loads(private_file(RUNTIME/'manifest.json'))
-    if set(manifest)!={'schema_version','files'} or manifest['schema_version']!=1 or set(manifest['files']) not in (set(FILES),set(LEGACY_FILES)):raise ValueError('Unknown issuer runtime')
+    if set(manifest)!={'schema_version','files'} or manifest['schema_version']!=1 or set(manifest['files']) not in (set(FILES),set(SERVICE_FILES),set(LEGACY_FILES)):raise ValueError('Unknown issuer runtime')
     if set(p.name for p in RUNTIME.iterdir())!=set(manifest['files'])|{'manifest.json'}:raise ValueError('Unexpected issuer runtime files')
     for name,digest in manifest['files'].items():
         if hashlib.sha256(private_file(RUNTIME/name)).hexdigest()!=digest:raise ValueError('Certificate renewal runtime changed')
@@ -260,7 +285,12 @@ def status():
     if active.exists():
         cert=x509.load_pem_x509_certificate(active.read_bytes());expiry=validity(cert,'after')
         result.update(expires_at=expiry.isoformat(),expires_within_14_days=expiry<=datetime.now(timezone.utc)+timedelta(days=14))
-        try:application_runtime(data['profile']).verify_https(matching_application(data['profile']));result['serving_verified']=True
+        try:
+            settings=matching_application(data['profile'])
+            if data['profile']['kind']=='gateway-certificates':
+                from gateway_certificates import status as gateway_status
+                result['serving_verified']=gateway_status(settings)['serving_certificate_verified']
+            else:application_runtime(data['profile']).verify_https(settings);result['serving_verified']=True
         except (OSError,ValueError,subprocess.SubprocessError):result['serving_verified']=False
     if RUNTIME.exists():
         verify_runtime()
@@ -273,16 +303,22 @@ def status():
 def action(args):
     if args.issuer_action=='setup':
         from service_issuer_setup import wizard
-        return wizard(args.output_file,package=getattr(args,'certificate_package','matrix'))
+        package=getattr(args,'certificate_package','matrix')
+        if package=='gateway':
+            from regional_operations import imported
+            return wizard(args.output_file,package=package,identity=imported(args.identity))
+        return wizard(args.output_file,package=package)
     from backup_operations import require_platform
     require_platform()
+    expected_kind={'matrix':'service-certificates','nextcloud':'nextcloud-certificates','gateway':'gateway-certificates'}[getattr(args,'certificate_package','matrix')]
+    if args.issuer_action in ('enable','status') and configuration()['profile']['kind']!=expected_kind:raise ValueError('Use the issuer command for the installed certificate owner')
     if args.issuer_action=='enable':return enable()
     if args.issuer_action=='status':return status()
     if args.issuer_action=='issue':
         import getpass,sys
         from profile_config import load_profile
         profile=load_profile(str(args.profile))
-        if validate(profile):raise ValueError('Invalid certificate request profile')
+        if validate(profile) or profile['kind']!=expected_kind:raise ValueError('Use a certificate request for this selected package')
         token=None
         if args.token_file is not None:
             if not args.token_file.is_absolute():raise ValueError('Use an absolute private credential-file path')

@@ -250,6 +250,12 @@ def certificate_acceptance(store):
     assert resumed['state']=='active' and remote_fingerprint()==result['fingerprint']
     assert (store.base/'state.json').read_bytes()==before
     print('Actual gateway TLS: new served certificate, loopback-only deny-all verifier, verified rollback after injected failure, closed interrupted restart and exact resume without approval changes PASS.',flush=True)
+    from ci_service_issuer import exercise as issuer_exercise
+    def renewal_certificate():
+        folder=issued('automatically-renewed-certificate')
+        return folder/'tls.crt',folder/'tls.key'
+    issuer_exercise(renewal_certificate,package='gateway')
+    assert (store.base/'state.json').read_bytes()==before
 
 if __name__=='__main__':
     try:main()

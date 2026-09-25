@@ -153,5 +153,5 @@ def status(store):
     intent=pending(store)
     return {'state':'gateway-certificate-pending' if intent else 'gateway-certificate-configured',
             'expires_at':expiry.isoformat(),'expires_within_14_days':expiry<=datetime.now(timezone.utc)+timedelta(days=14),
-            'serving_certificate_verified':verified,'fingerprint':fingerprint,'automatic_renewal':'not-configured',
-            'next_step':'Resume the exact pending certificate replacement.' if intent else 'Configure a reviewed renewal issuer before production use.'}
+            'serving_certificate_verified':verified,'fingerprint':fingerprint,'renewal_status_command':'rdc gateway issuer status',
+            'next_step':'Resume the exact pending certificate replacement.' if intent else 'Inspect gateway issuer status to verify automatic renewal.'}

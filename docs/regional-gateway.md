@@ -26,7 +26,7 @@ The gateway has one regional VPN identity. Service VMs keep their internal ident
 2. Use the existing local node installation/enrollment flow to join the regional controller. Record its assigned regional IPv4. Do not join this same client to the institution's internal controller.
 3. Assign distinct RFC1918 addresses to the gateway and service VMs on one dedicated /24 through /30 subnet. The installer verifies the gateway interface; it does not create the switch, VLAN or service interfaces for you. Service VMs need their own normal connectivity as well.
 4. Follow [bilateral approvals](regional-approvals.md) to create the institution identity and independently confirm partner fingerprints. Keep the encrypted signing key on the administrator's machine. Copy only its public identity and completed signed agreements to the gateway.
-5. Supply a system-trusted PEM certificate and private key naming the declared service domains. Keep the key root-readable only. Certificates must have at least seven days remaining. Gateway automated renewal is not yet implemented; this is a development prerequisite, not a production lifecycle promise.
+5. Supply a system-trusted PEM certificate and private key naming the declared service domains. Keep the key root-readable only. Certificates must have at least seven days remaining. The optional gateway issuer below can supply these files and renew them; live provider acceptance is still required.
 6. Prepare the profile interactively, review it, then check the dedicated gateway. Paths below are examples; replace them with the files you prepared.
 
 ```sh
@@ -114,7 +114,7 @@ The current source passed disposable file exchange and destination-denial checks
 
 ## Replace the gateway certificate
 
-The development source now includes manual managed replacement; its native acceptance is recorded separately in `validation-status.md`. Automatic gateway issuance/renewal is still being built.
+The development source now includes manual managed replacement; its native acceptance is recorded separately in `validation-status.md`. The optional issuer below uses the same activation transaction.
 
 ```sh
 sudo ./rdc gateway certificate status
@@ -122,3 +122,23 @@ sudo ./rdc gateway certificate replace --certificate /root/renewed.crt --private
 ```
 
 The certificate must name every service in the signed gateway identity and chain to a system-trusted authority. Replacement briefly closes partner transport, checks the new certificate actually served by the proxy, and recovers the previous certificate if activation fails. A dedicated check listener binds only to localhost and denies all HTTP requests. If the operation is interrupted, partner transport stays closed; repeat the replacement with the same certificate/key files to complete it. Resolve a pending partner-policy change before starting a separate certificate change. The development format is not an automatic upgrade of previously installed experimental gateway revisions.
+
+## Prepare automatic gateway renewal
+
+The optional issuer uses a restricted Cloudflare DNS token and the fixed Let's Encrypt production endpoint. Its provider boundary is simulated in automated tests; verify actual domain issuance on your infrastructure before relying on it.
+
+On the dedicated, enrolled gateway, use your own signed public institution identity:
+
+```sh
+./rdc gateway issuer setup --identity /root/own-identity.json --output-file /root/gateway-issuer.json
+sudo ./rdc gateway issuer issue /root/gateway-issuer.json
+```
+
+The wizard derives the service domains from that identity and asks for the certificate account email and explicit issuer-terms consent. Issuance prompts privately for the restricted DNS token. Use the printed certificate/key paths when preparing the gateway installation. After installing the gateway:
+
+```sh
+sudo ./rdc gateway issuer enable
+sudo ./rdc gateway issuer status
+```
+
+Enabling checks the installed gateway fingerprint and exact service domains. The twice-daily scheduler checks for renewal, validates the issued material and activates it through the same closed, verified transaction. Provider failure retains the currently active certificate and records failure. Keep emergency DNS-provider and recovery access separately. The existing `rdc-service-certificate` scheduler names are shared implementation names; each dedicated node owns only its own issuer configuration.
