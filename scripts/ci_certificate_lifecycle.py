@@ -32,7 +32,7 @@ def download(url,path,digest):
     path.write_bytes(content)
 
 
-def main():
+def main(*,controller_exercise=None):
     if (os.geteuid()!=0 or os.environ.get('GITHUB_ACTIONS')!='true' or os.environ.get('RUNNER_ENVIRONMENT')!='github-hosted'
         or platform.system()!='Linux' or platform.machine()!='x86_64' or 'VERSION_ID="24.04"' not in Path('/etc/os-release').read_text()):
         raise SystemExit('This integration test is restricted to disposable GitHub-hosted Ubuntu 24.04 amd64 runners.')
@@ -122,6 +122,7 @@ def main():
             access_exercise()
             from ci_scheduled_backup import exercise as scheduled_exercise
             scheduled_exercise()
+            if controller_exercise is not None:controller_exercise()
         run(['systemctl','stop',service])
     print(role+': actual service initial TLS, certificate replacement, failed restart and verified rollback PASS. Public ACME issuance NOT RUN.')
 

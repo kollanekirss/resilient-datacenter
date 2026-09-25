@@ -23,6 +23,12 @@ def questions(answers):
             fields += [('acme_email','Email for your Let\'s Encrypt account','email'),('acme_terms','Review https://letsencrypt.org/repository/ and accept the current subscriber agreement; type accept to authorize issuance','terms')]
         else:
             fields += [(name,label,'path') for name,label in [('control_cert','Absolute path to controller certificate chain'),('control_key','Absolute path to controller private key'),('relay_cert','Absolute path to relay certificate chain'),('relay_key','Absolute path to relay private key')]]
+        fields += [('relay_count','How many relay locations? Enter 1–4; use separate power and connectivity where possible','relay-count')]
+        for index in range(2,int(answers.get('relay_count','1'))+1):
+            prefix=f'relay{index}'
+            fields += [(prefix+'_hostname',f'Relay location {index} DNS name','hostname'),(prefix+'_ip',f'Relay location {index} public IPv4','ip'),(prefix+'_user',f'Relay location {index} SSH username','user')]
+            if answers.get('tls_mode')!='managed-acme':
+                fields += [(prefix+'_cert',f'Relay location {index} absolute certificate path','path'),(prefix+'_key',f'Relay location {index} absolute private key path','path')]
         fields += [('derper_artifact','Absolute path to the verified or locally built Linux relay executable','path')]
         fields += [('derper_sha256','Relay executable SHA256 from its build metadata','sha'),('node_count','How many local nodes? Enter 1–32','count')]
         for index in range(int(answers.get('node_count','0'))):
@@ -45,6 +51,7 @@ def acceptable(kind,value):
     if kind=='path': return Path(value).is_absolute()
     if kind=='user': return bool(re.fullmatch(r'[a-z_][a-z0-9_-]{0,31}',value))
     if kind=='sha': return bool(re.fullmatch('[a-f0-9]{64}',value))
+    if kind=='relay-count': return value.isdigit() and 1<=int(value)<=4
     if kind=='count': return value.isdigit() and 1<=int(value)<=32
     if kind=='ip':
         try:
@@ -63,6 +70,10 @@ def configuration(answers):
     groups={}
     for group,prefix in [('controller','control'),('relay','relay')]:
         groups[group]={'hosts':{prefix+'-offsite':{'ansible_host':a[prefix+'_ip'],'ansible_user':a[prefix+'_user'],**({} if managed else {'tls_certificate':a[prefix+'_cert'],'tls_private_key':a[prefix+'_key']})}}}
+    for index in range(2,int(a.get('relay_count','1'))+1):
+        prefix=f'relay{index}';name=f'relay-offsite-{index}'
+        variables.setdefault('additional_relays',[]).append({'host':name,'hostname':a[prefix+'_hostname'],'region_id':900+index})
+        groups['relay']['hosts'][name]={'ansible_host':a[prefix+'_ip'],'ansible_user':a[prefix+'_user'],**({} if managed else {'tls_certificate':a[prefix+'_cert'],'tls_private_key':a[prefix+'_key']})}
     return {'all':{'vars':variables,'children':groups}}
 
 
@@ -75,6 +86,7 @@ def run_wizard(directory: Path, *, resume=None, input_fn=input, output_fn=print)
         answers=draft['answers']
         if any(not isinstance(v,str) for v in answers.values()): raise ValueError('Invalid saved answers')
         if 'node_count' in answers and not acceptable('count',answers['node_count']): raise ValueError('Invalid saved node count')
+        if 'relay_count' in answers and not acceptable('relay-count',answers['relay_count']): raise ValueError('Invalid saved relay count')
         allowed={k:kind for k,_,kind in questions(answers)}
         if set(answers)-set(allowed) or any(not acceptable(allowed[k],v) for k,v in answers.items()): raise ValueError('Invalid or unsupported saved answer')
     output_fn('Prepare networking only. No application or backup is installed. Use :back, :save or :cancel at setup questions and final review. Preparation changes no servers.')
@@ -106,7 +118,7 @@ def run_wizard(directory: Path, *, resume=None, input_fn=input, output_fn=print)
                 outputs=prepare_outputs(answers['purpose'],data)
                 return 'prepared' if save(outputs) else 'cancelled'
             key,label,kind=fields[index]
-            default=answers.get(key,'')
+            default=answers.get(key,'1' if key=='relay_count' else '')
             value=input_fn(label+(f' [{default}]' if default else '')+': ').strip()
             if value==':cancel': return 'cancelled'
             if value==':save': return draft_save()
@@ -118,7 +130,7 @@ def run_wizard(directory: Path, *, resume=None, input_fn=input, output_fn=print)
             if key in ('purpose','tls_mode'):
                 permitted={k for k,_,_ in questions(answers)}
                 answers={k:v for k,v in answers.items() if k in permitted}
-            if key=='node_count':
+            if key in ('node_count','relay_count'):
                 permitted={k for k,_,_ in questions(answers)}
                 answers={k:v for k,v in answers.items() if k in permitted}
             index+=1

@@ -8,6 +8,7 @@
   vars_files: [../versions.yml]
   vars:
     profile_policy: '{{ hostvars["localhost"].profile.policy }}'
+    profile_relays: '{{ hostvars["localhost"].profile.relays }}'
     profile_relay_host: '{{ hostvars["localhost"].profile.relay_host }}'
   pre_tasks:
     - name: Claim validated controller
