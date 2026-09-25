@@ -30,6 +30,11 @@ def local_request(method,path,data=None):
 
 
 def create(username,password,*,admin=False):
+    from service_certificates import operation_lock
+    with operation_lock():return _create(username,password,admin=admin)
+
+
+def _create(username,password,*,admin=False):
     settings=runtime.read_settings();runtime.ready('synapse',settings)
     private=runtime.root_json(runtime.BASE/'secrets.json')
     nonce=local_request('GET','/_synapse/admin/v1/register').get('nonce')
