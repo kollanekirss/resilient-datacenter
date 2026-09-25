@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives import hashes,serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID,ExtendedKeyUsageOID
 from setup_contracts import local_ownership
-from service_operations import install_fresh
+from service_operations import install_or_resume
 from service_accounts import create
 
 ADDRESS='100.64.0.22'
@@ -60,7 +60,7 @@ def main():
     cert,key=certificates()
     profile={'kind':'matrix-services','schema_version':1,'institution_id':'ci','node_name':'services','matrix_hostname':MATRIX,'element_hostname':ELEMENT,
              'tls_mode':'supplied','tls_certificate':str(cert),'tls_private_key':str(key)}
-    result=install_fresh(profile,network,ADDRESS)
+    result=install_or_resume(profile,network,ADDRESS)
     assert result['state']=='service-listeners-verified'
     alice_password=secrets.token_urlsafe(24);bob_password=secrets.token_urlsafe(24)
     assert create('cialice',alice_password,admin=True)['state']=='account-created'

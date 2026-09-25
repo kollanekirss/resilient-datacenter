@@ -48,7 +48,7 @@ def installed_address(network):
 def reserved_paths():
     return [runtime.BASE,runtime.STATE,runtime.INSTALLED,TLSBASE,TARGET,
             *[Path('/etc/systemd/system')/(name+'.service') for name in runtime.UNITS.values()],
-            *[Path('/etc/systemd/system')/(name+'.service.d') for name in runtime.UNITS.values()]]
+            *[Path('/etc/systemd/system')/(name+'.service.d') for name in runtime.UNITS.values()],Path(str(TARGET)+'.d')]
 
 
 def preflight(profile):
@@ -62,10 +62,12 @@ def preflight(profile):
     existing=runtime.BASE/'ownership.json'
     if existing.exists() or existing.is_symlink():
         if not same_installation(profile,network,root_json(existing)):raise ValueError('Application identity/version differs; migration requires a reviewed path')
-        current=runtime.read_settings()
-        if current['bind_address']!=address:raise ValueError('Service endpoint changed; address migration requires review')
+        if any(Path('/etc/systemd/system',name+'.service.d').exists() for name in runtime.UNITS.values()) or Path(str(TARGET)+'.d').exists(): raise ValueError('Unreviewed application unit overrides require administration review')
+        if (runtime.BASE/'runtime.json').exists():
+            current=root_json(runtime.BASE/'runtime.json')
+            if current['bind_address']!=address:raise ValueError('Service endpoint changed; address migration requires review')
         for name,content in zip(('tls.crt','tls.key'),tls_inputs(profile)):
-            if (runtime.TLS/name).read_bytes()!=content:raise ValueError('Use a reviewed certificate replacement operation; apply does not overwrite TLS identities')
+            if (runtime.TLS/name).exists() and (runtime.TLS/name).read_bytes()!=content:raise ValueError('Use a reviewed certificate replacement operation; apply does not overwrite TLS identities')
         return {'ownership':owner,'address':address,'existing':True}
     if any(p.exists() or p.is_symlink() for p in reserved_paths()):raise ValueError('Unowned application resources exist; this installer does not adopt them')
     if shutil.disk_usage('/var/lib').free<12*1024**3:raise ValueError('Provide at least 12 GiB free local space before installing this initial Matrix package')
@@ -85,43 +87,68 @@ def pull_images():
     with tempfile.TemporaryDirectory(prefix='rdc-image-auth-') as directory:
         auth=Path(directory)/'auth.json';auth.write_text('{"auths":{}}');auth.chmod(0o600)
         for item in pins.values():
+            cached=subprocess.run(['/usr/bin/podman','image','exists',item['image']],capture_output=True,timeout=15)
+            if cached.returncode==0: continue
+            if cached.returncode!=1: raise ValueError('Cannot inspect local service image cache')
             subprocess.run(['/usr/bin/podman','pull','--authfile',str(auth),'--arch','amd64','--os','linux',item['image']],
                            check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=600)
     return pins
 
 
+def directory(path,*,mode=0o700,uid=0,gid=0):
+    if path.exists() or path.is_symlink():
+        info=path.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid!=uid or info.st_gid!=gid or stat.S_IMODE(info.st_mode)!=mode:
+            raise ValueError('Existing service directory differs from its owned permissions')
+        return
+    path.mkdir(mode=mode);os.chown(path,uid,gid);path.chmod(mode)
+
+
 def write(path,content,*,mode=0o600,uid=0,gid=0):
+    data=content.encode() if isinstance(content,str) else content
+    if path.exists() or path.is_symlink():
+        info=path.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_uid!=uid or info.st_gid!=gid or stat.S_IMODE(info.st_mode)!=mode or path.read_bytes()!=data:
+            raise ValueError('Existing service configuration differs; resume will not overwrite it')
+        return
     fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,mode)
-    with os.fdopen(fd,'wb') as stream:stream.write(content.encode() if isinstance(content,str) else content)
+    with os.fdopen(fd,'wb') as stream:stream.write(data);stream.flush();os.fsync(stream.fileno())
     os.chown(path,uid,gid);path.chmod(mode)
 
 
-def install_fresh(profile,network,address):
+def install_or_resume(profile,network,address):
     # The public apply path runs preflight first. Disposable CI may call this
     # lower-level helper with its synthetic owned node and local test network.
     require_platform();owner=ownership(profile,network);cert,key=tls_inputs(profile)
-    if any(p.exists() or p.is_symlink() for p in reserved_paths()):raise ValueError('Application target must be fresh')
+    marker=runtime.BASE/'ownership.json'
+    if marker.exists() or marker.is_symlink():
+        if not same_installation(profile,network,root_json(marker)):raise ValueError('Cannot resume another application identity')
+    elif any(p.exists() or p.is_symlink() for p in reserved_paths()):raise ValueError('Application target must be fresh or owned by this exact installation')
     if not Path('/usr/bin/podman').exists():
         subprocess.run(['/usr/bin/apt-get','update','-qq'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=300)
         subprocess.run(['/usr/bin/apt-get','install','-y','podman'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=600)
     pins=pull_images()
     settings={'schema_version':1,'ownership':owner,'bind_address':address,'components':pins}
     for name in pins:runtime.verify_image(name,settings)
-    for path in (runtime.BASE,runtime.STATE,runtime.INSTALLED,TLSBASE):path.mkdir(mode=0o700)
+    directory(runtime.BASE)
     write(runtime.BASE/'ownership.json',json.dumps(owner,indent=2)+'\n')
+    for path in (runtime.STATE,runtime.INSTALLED,TLSBASE):directory(path)
     write(runtime.BASE/'runtime.json',json.dumps(settings,indent=2)+'\n')
-    generated={name:secrets.token_hex(32) for name in ('database_password','registration_secret','macaroon_secret','form_secret')}
-    write(runtime.BASE/'secrets.json',json.dumps(generated))
+    if (runtime.BASE/'secrets.json').exists():generated=root_json(runtime.BASE/'secrets.json')
+    else:
+        if any((runtime.STATE/name).exists() and any((runtime.STATE/name).iterdir()) for name in ('postgres','synapse')): raise ValueError('Persistent application data exists without its saved secrets; recovery requires review')
+        generated={name:secrets.token_hex(32) for name in ('database_password','registration_secret','macaroon_secret','form_secret')}
+        write(runtime.BASE/'secrets.json',json.dumps(generated))
     for name,uid in (('postgres',999),('synapse',991)):
-        path=runtime.STATE/name;path.mkdir(mode=0o700);os.chown(path,uid,uid)
-    configuration=runtime.BASE/'synapse';configuration.mkdir(mode=0o750);os.chown(configuration,0,991)
+        directory(runtime.STATE/name,uid=uid,gid=uid)
+    configuration=runtime.BASE/'synapse';directory(configuration,mode=0o750,gid=991)
     write(configuration/'homeserver.yaml',synapse(profile,generated),mode=0o640,gid=991)
     write(configuration/'log.config',logging_config(),mode=0o640,gid=991)
     write(runtime.BASE/'database-password',generated['database_password']+'\n',mode=0o400,uid=999,gid=999)
     write(runtime.BASE/'element.json',element(profile),mode=0o644)
     write(runtime.BASE/'element-nginx.conf',element_nginx(),mode=0o644)
     write(runtime.BASE/'Caddyfile',proxy(profile,address),mode=0o644)
-    runtime.TLS.mkdir(mode=0o700)
+    directory(runtime.TLS)
     write(runtime.TLS/'tls.crt',cert,mode=0o644);write(runtime.TLS/'tls.key',key)
     hashes={}
     for name in ('service_runtime.py','service_images.json'):
@@ -139,7 +166,7 @@ def install_fresh(profile,network,address):
 def status():
     settings=runtime.read_settings()
     for name in runtime.UNITS:
-        runtime.verify_image(name,settings);runtime.ready(name,settings)
+        runtime.verify_image(name,settings);runtime.ready(name,settings,attempts=1)
     return {'state':'service-listeners-verified','matrix_url':'https://'+settings['ownership']['matrix_hostname'],
             'element_url':'https://'+settings['ownership']['element_hostname'],'application_login_test':'not-run',
             'application_backup':'not-configured','federation':'disabled'}
@@ -147,7 +174,31 @@ def status():
 
 def apply(profile):
     review=preflight(profile)
-    if review['existing']:
-        subprocess.run(['/bin/systemctl','start','rdc-service-proxy.service'],check=True,timeout=180)
-        return status()
-    return install_fresh(profile,review['ownership']['network'],review['address'])
+    return install_or_resume(profile,review['ownership']['network'],review['address'])
+
+
+def action(args):
+    import fcntl
+    import sys
+    from profile_config import load_profile
+    if args.action=='setup':
+        from service_setup import wizard
+        return wizard(args.output_file)
+    require_platform()
+    if args.action=='status':return status()
+    if args.action=='check':return dict(preflight(load_profile(str(args.profile))),state='checks-passed')
+    if args.action=='account':
+        from service_accounts import interactive
+        return interactive(admin=args.admin)
+    if args.action!='apply':raise ValueError('Unsupported application action')
+    profile=load_profile(str(args.profile));review=preflight(profile)
+    print('Install Matrix, PostgreSQL, Element and a private HTTPS proxy on THIS node: '+profile['node_name']+'. No public registration or federation will be enabled.')
+    print('The application uses pinned containers. User login and application recovery remain unverified until exercised.')
+    phrase='INSTALL MATRIX ON '+profile['node_name']
+    if not sys.stdin.isatty() or input('Type '+phrase+' to proceed: ').strip()!=phrase:return {'state':'cancelled'}
+    fd=os.open('/run/rdc-services-operation.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+    with os.fdopen(fd,'a') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        try:return apply(profile)
+        except KeyboardInterrupt:
+            raise ValueError('Installation interrupted. Existing application state was retained; rerun the same reviewed profile to resume and verify it.') from None

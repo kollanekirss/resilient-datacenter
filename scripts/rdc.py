@@ -75,6 +75,12 @@ def parser():
     targets=target.add_subparsers(dest='target_action',required=True)
     targets.add_parser('prepare').add_argument('manifest',type=Path)
     targets.add_parser('authorize').add_argument('public_key',type=Path)
+    services=commands.add_parser('services',help='Prepare and operate the experimental local Matrix package')
+    service_commands=services.add_subparsers(dest='action',required=True)
+    service_commands.add_parser('setup').add_argument('--output-file',type=Path,required=True)
+    for action in ('check','apply'): service_commands.add_parser(action).add_argument('profile',type=Path)
+    service_commands.add_parser('status')
+    service_commands.add_parser('account').add_argument('--admin',action='store_true')
     release=commands.add_parser('release',help='Download and verify an experimental release; never install')
     fetch=release.add_subparsers(dest='action',required=True).add_parser('fetch')
     fetch.add_argument('version')
@@ -126,6 +132,11 @@ def doctor_exit(checks):
     return Exit.SUCCESS
 
 
+def service_action(args):
+    from service_operations import action
+    return action(args)
+
+
 def backup_action(args):
     from backup_operations import action
     return action(args)
@@ -135,6 +146,12 @@ def dispatch(args) -> ActionResult:
     if args.command=='setup':
         state=run_wizard(args.output_dir,resume=args.resume,input_fn=input)
         return result_for_state(state)
+    if args.command=='services':
+        try: outcome=service_action(args)
+        except ValueError as error:
+            print('Application action blocked: '+str(error));return result_for_state('blocked')
+        print(json.dumps(outcome,indent=2))
+        return result_for_state({'prepared':'prepared','cancelled':'cancelled'}.get(outcome.get('state'),'checks-passed'))
     if args.command=='backup':
         try: outcome=backup_action(args)
         except ValueError as error:

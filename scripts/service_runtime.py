@@ -86,7 +86,7 @@ def container_command(name,settings):
             '--tmpfs','/tmp:rw,nosuid,nodev,size=64m,mode=1777']
     image=settings['components'][name]['image']
     if name=='postgres':
-        return common+['--user=999:999','--memory=512m','--tmpfs','/var/run/postgresql:rw,nosuid,nodev,size=16m,uid=999,gid=999,mode=775',
+        return common+['--user=999:999','--memory=512m','--tmpfs','/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777',
                        '--volume',str(STATE/'postgres')+':/var/lib/postgresql/data:rw',
                        '--volume',str(BASE/'database-password')+':/run/secrets/database-password:ro',
                        '--env','POSTGRES_USER=synapse','--env','POSTGRES_DB=synapse',
@@ -137,9 +137,9 @@ def verify_https(settings):
                 if hashlib.sha256(connection.getpeercert(binary_form=True)).digest()!=fingerprint: raise ValueError('Service is not serving its selected certificate')
 
 
-def ready(name,settings):
+def ready(name,settings,*,attempts=90):
     last=None
-    for attempt in range(90):
+    for attempt in range(attempts):
         try:
             record=inspect_container(name,settings)
             if record is None or not record.get('State',{}).get('Running'): raise ValueError('Container is not running')
@@ -154,7 +154,7 @@ def ready(name,settings):
             return
         except (OSError,ValueError,subprocess.SubprocessError) as error:
             last=error
-            if attempt<89:time.sleep(1)
+            if attempt<attempts-1:time.sleep(1)
     raise ValueError('Service did not reach verified readiness') from last
 
 

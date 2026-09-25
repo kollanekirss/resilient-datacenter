@@ -1,6 +1,7 @@
 name: Disposable Matrix services
 on:
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read
@@ -28,3 +29,6 @@ jobs:
         run: |
           sudo systemctl status rdc-postgres rdc-synapse rdc-element rdc-service-proxy --no-pager || true
           sudo journalctl -u rdc-postgres -u rdc-synapse -u rdc-element -u rdc-service-proxy --no-pager --lines=120
+          sudo journalctl -k --no-pager --lines=250
+          sudo aa-status || true
+          sudo podman info --format '{{json .Host.Security}}'
