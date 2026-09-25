@@ -21,7 +21,11 @@ def exercise(settings):
     document=agreements.accept(peerkey,offered,now=now,expected_peer=agreements.fingerprint(own))
     bundle={'kind':'regional-service-link','schema_version':1,'package':'matrix','gateway_identity':own,'gateway_lan_address':'10.204.1.1','service_lan_address':'10.204.1.10','lan_subnet':'10.204.1.0/24','agreements':[document]}
     from service_link import configure
-    assert configure(bundle,expected_fingerprint=agreements.fingerprint(own))['state']=='matrix-connector-configured'
+    try:result=configure(bundle,expected_fingerprint=agreements.fingerprint(own))
+    except subprocess.CalledProcessError as error:
+        print('Disposable connector native validation failure: '+str(error.stderr)[-4000:],flush=True)
+        raise
+    assert result['state']=='matrix-connector-configured'
     def request(path,source='10.204.1.1'):
         return json.loads(run('ip','netns','exec','rdc-connector-peer','curl','--silent','--show-error','--noproxy','*','--interface',source,
                              '--resolve',hostname+':8443:10.204.1.10','--write-out','\\n%{http_code}',
