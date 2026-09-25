@@ -78,7 +78,7 @@ def main():
             configuration=Path('/etc/headscale'); configuration.mkdir(mode=0o750); os.chown(configuration,0,gid)
             for name,content in {'config.yaml':environment.get_template('controller/templates/config.yaml.j2').render(headscale_hostname=HOST,tls_mode='managed-acme'),
                                  'policy.json':json.dumps({'tagOwners':{},'grants':[]}),
-                                 'derp-map.yml':'regions: {}\n'}.items():
+                                 'derp-map.yml':environment.get_template('controller/templates/derp-map.yml.j2').render(derp_hostname='relay.ci.test',hostvars={'relay-01':{'ansible_host':'192.0.2.2'}})}.items():
                 p=configuration/name;p.write_text(content);p.chmod(0o640);os.chown(p,0,gid)
             unit=environment.get_template('controller/templates/headscale.service.j2').render().replace('/usr/bin/headscale',str(binary))
         else:
