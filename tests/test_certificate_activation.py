@@ -125,3 +125,19 @@ def test_failed_status_never_writes_status_or_restarts(monkeypatch,tmp_path):
     monkeypatch.setattr(m.Runtime,'restart',forbidden)
     assert m.main(['status'])==1
     assert list(tmp_path.iterdir())==[]
+
+
+def test_offline_coverage_checks_chain_at_end_of_window(certs,monkeypatch):
+    import subprocess
+    from datetime import datetime,timedelta,timezone
+    import portable_application_install as installer
+    cp,kp=certs;calls=[]
+    def verify(argv,**kwargs):
+        calls.append(argv)
+        if '-attime' in argv:raise subprocess.CalledProcessError(2,argv)
+    monkeypatch.setattr(api().subprocess,'run',verify)
+    before=int((datetime.now(timezone.utc)+timedelta(days=8)).timestamp())
+    with pytest.raises(subprocess.CalledProcessError):
+        installer.coverage(cp.read_bytes(),kp.read_bytes(),'a.pilot.test',8)
+    assert len(calls)==2
+    assert int(calls[1][calls[1].index('-attime')+1])>=before

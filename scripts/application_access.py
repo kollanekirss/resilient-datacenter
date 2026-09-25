@@ -96,8 +96,8 @@ def portable_proxy(profile,address,package):
     access=validate_access(profile['access'])
     if address!=access['backend_address']:raise ValueError('Portable proxy address differs from profile')
     common='    bind '+address+'\n    tls /tls/tls.crt /tls/tls.key\n    header X-Content-Type-Options nosniff\n'
-    headers=('            header_up X-Forwarded-For {http.request.client_ip}\n'
-             '            header_up X-Real-IP {http.request.client_ip}\n'
+    headers=('            header_up X-Forwarded-For {http.vars.client_ip}\n'
+             '            header_up X-Real-IP {http.vars.client_ip}\n'
              '            header_up X-Forwarded-Proto https\n'
              '            header_up -Forwarded\n')
     def upstream(port):

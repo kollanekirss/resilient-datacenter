@@ -31,8 +31,9 @@ def material(path,*,private=False):
 
 
 def coverage(cert,key,hostname,days):
-    result=validate_material(cert,key,hostname)
-    if datetime.fromisoformat(result['expires_at'])<datetime.now(timezone.utc)+timedelta(days=days):
+    horizon=datetime.now(timezone.utc)+timedelta(days=days)
+    result=validate_material(cert,key,hostname,verify_at=horizon)
+    if datetime.fromisoformat(result['expires_at'])<horizon:
         raise ValueError('Certificate does not cover the planned offline duration plus margin')
     return result
 

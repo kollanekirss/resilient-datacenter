@@ -223,7 +223,8 @@ class Runtime(Services):
             if owner['role']=='peer':verify_peer(manifest)
             else:
                 from application_access import verify_local_address
-                verify_local_address(owner)
+                from backup_scope import network_owner
+                verify_local_address(network_owner(owner))
             if 'applications' in owner:
                 from backup_scope import application_runtime
                 runtime=application_runtime(owner['applications']);settings=runtime.read_settings()

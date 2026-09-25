@@ -138,7 +138,8 @@ def main(role):
         finally:builtins.input=saved_input;getpass.getpass=saved_getpass
         import nextcloud_runtime as runtime
         # Test Nextcloud's real request-address interpretation, not an echo proxy.
-        (runtime.APP/'rdc-ci-ip.php').write_text('<?php require_once __DIR__."/lib/base.php"; header("Content-Type: application/json"); echo json_encode(["client"=>\\OC::$server->getRequest()->getRemoteAddress()]);')
+        status_path=runtime.APP/'status.php';original_status=status_path.read_bytes()
+        status_path.write_bytes(b'<?php if (isset($_GET["rdc_ci_ip"])) { require_once __DIR__."/lib/base.php"; header("Content-Type: application/json"); echo json_encode(["client"=>\\OC::$server->getRequest()->getRemoteAddress()]); exit; } ?>'+original_status)
     run(['ip','netns','exec','rdc-front',sys.executable,__file__,'frontend'],timeout=360)
     assert not Path('/etc/systemd/system/tailscaled.service').exists()
     assert subprocess.run(['ip','link','show','tailscale0'],capture_output=True).returncode!=0
@@ -151,7 +152,7 @@ def main(role):
             if values.strip():break
             time.sleep(2)
         assert set(values.split())=={'10.76.20.100'},values
-    else:(runtime.APP/'rdc-ci-ip.php').unlink()
+    else:status_path.write_bytes(original_status)
     # Replace only the fixture's backend CA, keeping frontend trust unchanged.
     trust=Path('/etc/rdc-frontend/tls/active/backend-ca.crt');saved=trust.read_bytes()
     try:

@@ -76,3 +76,19 @@ def test_portable_upgrade_journal_preserves_access_and_rejects_migration(tmp_pat
     with pytest.raises(transaction.UpgradeError) as error:transaction.apply(plan,backend,root=tmp_path)
     assert error.value.recovered and not error.value.committed
     assert transaction.last_result(tmp_path)['state']=='previous-version-restored'
+
+
+@pytest.mark.parametrize('role',['chat','files'])
+def test_native_restore_verification_checks_network_identity_and_application(role,monkeypatch):
+    import application_access
+    import backup_scope
+    import restore_runtime
+    from types import SimpleNamespace
+    network,owner=owners(role);checked=[]
+    monkeypatch.setattr(application_access,'verify_assigned',lambda address:checked.append(address))
+    fake=SimpleNamespace(UNITS={'proxy':'proxy'},read_settings=lambda:{},ready=lambda name,settings:checked.append(name))
+    monkeypatch.setattr(backup_scope,'application_runtime',lambda _:fake)
+    runtime=restore_runtime.Runtime(owner)
+    monkeypatch.setattr(runtime,'is_active',lambda _:True)
+    runtime.verify(owner)
+    assert checked==[network['access']['backend_address'],'proxy']

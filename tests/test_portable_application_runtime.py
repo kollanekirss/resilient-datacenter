@@ -21,8 +21,8 @@ def test_portable_tls_backend_preserves_only_trusted_frontend_headers(role,modul
     assert 'bind '+address in text
     assert 'trusted_proxies static '+p['access']['frontend_address'] in text
     assert 'trusted_proxies_strict' in text
-    assert 'header_up X-Forwarded-For {http.request.client_ip}' in text
-    assert 'header_up X-Real-IP {http.request.client_ip}' in text
+    assert 'header_up X-Forwarded-For {http.vars.client_ip}' in text
+    assert 'header_up X-Real-IP {http.vars.client_ip}' in text
     with pytest.raises(ValueError):importlib.import_module(module).proxy(p,'10.76.40.99')
 
 
