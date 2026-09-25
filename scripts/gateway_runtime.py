@@ -163,7 +163,7 @@ def verify_runtime():
         if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_mode&0o022 or hashlib.sha256(path.read_bytes()).hexdigest()!=digest:raise ValueError('Gateway runtime changed; review a controlled upgrade')
 
 
-RUNTIME_FILES=('gateway_entry.py','gateway_runtime.py','gateway_store.py','gateway_contracts.py','gateway_images.json','gateway_rendering.py',
+RUNTIME_FILES=('gateway_entry.py','gateway_runtime.py','gateway_store.py','gateway_contracts.py','gateway_images.json','gateway_rendering.py','regional_http.py',
                'gateway_transition.py','regional_workspace.py','regional_agreements.py','profile_config.py','validate_inventory.py','validate_tls.py')
 
 

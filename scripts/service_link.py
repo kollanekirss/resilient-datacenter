@@ -13,26 +13,31 @@ FIELDS={'kind','schema_version','package','gateway_identity','gateway_lan_addres
 
 
 def prepare(bundle,settings,*,expected_fingerprint,now):
-    if not isinstance(bundle,dict) or set(bundle)!=FIELDS or bundle['kind']!='regional-service-link' or type(bundle['schema_version']) is not int or bundle['schema_version']!=1 or bundle['package']!='matrix':raise ValueError('Use a supported public Matrix connector document')
+    if not isinstance(bundle,dict) or set(bundle)!=FIELDS or bundle['kind']!='regional-service-link' or type(bundle['schema_version']) is not int or bundle['schema_version']!=1 or bundle['package'] not in ('matrix','nextcloud'):raise ValueError('Use a supported public application connector document')
     agreements.canonical(bundle);identity=bundle['gateway_identity'];own=agreements.verify_identity(identity)
     if agreements.fingerprint(identity)!=expected_fingerprint:raise ValueError('Confirm the full institution approval fingerprint independently')
+    package=bundle['package'];domain_key=package+'_hostname'
+    selected=connector
+    if package=='nextcloud':
+        import nextcloud_regional as selected
     owner=settings['ownership']
-    if owner.get('packages')!=['matrix'] or owner.get('institution_id')!=own['institution_id'] or owner.get('matrix_hostname')!=own['services'].get('matrix') or owner.get('network',{}).get('controller_hostname')==own['regional_controller']:
-        raise ValueError('Connector must match this institution and Matrix domain while preserving a separate internal network')
+    if owner.get('packages')!=[package] or owner.get('institution_id')!=own['institution_id'] or owner.get(domain_key)!=own['services'].get(package) or owner.get('network',{}).get('controller_hostname')==own['regional_controller']:
+        raise ValueError('Connector must match this institution and application domain while preserving a separate internal network')
     peers=gateway_contracts.peer_rules(identity,bundle['agreements'],[],now=now)
-    config={'schema_version':1,'package':'matrix','application_owner':owner,'gateway_fingerprint':expected_fingerprint,
+    config={'schema_version':1,'package':package,'application_owner':owner,'gateway_fingerprint':expected_fingerprint,
             **{k:bundle[k] for k in ('gateway_lan_address','service_lan_address','lan_subnet')},
-            'peers':sorted([{'hostname':peer['domains']['matrix'],'expires_at':peer['expires_at']} for peer in peers if 'matrix' in peer['services']],key=lambda p:p['hostname'])}
-    connector.validate(config,settings);return config
+            'peers':sorted([{'hostname':peer['domains'][package],'expires_at':peer['expires_at']} for peer in peers if package in peer['services']],key=lambda p:p['hostname'])}
+    selected.validate(config,settings);return config
 
 
-def export_gateway(store):
+def export_gateway(store,package='matrix'):
+    if package not in ('matrix','nextcloud'):raise ValueError('Unsupported connector package')
     if store.pending():raise ValueError('Complete the pending gateway policy change before preparing its service connector')
     state=store.state();profile=store.profile();identity=store.identity()
-    if 'matrix' not in identity['payload']['services']:raise ValueError('This gateway has no Matrix service')
-    approved={peer['agreement_id'] for peer in store.peers() if 'matrix' in peer['services']}
-    return {'kind':'regional-service-link','schema_version':1,'package':'matrix','gateway_identity':identity,
-            'gateway_lan_address':profile['lan_address'],'service_lan_address':profile['upstreams']['matrix'],'lan_subnet':profile['lan_subnet'],
+    if package not in identity['payload']['services']:raise ValueError('This gateway has no selected application')
+    approved={peer['agreement_id'] for peer in store.peers() if package in peer['services']}
+    return {'kind':'regional-service-link','schema_version':1,'package':package,'gateway_identity':identity,
+            'gateway_lan_address':profile['lan_address'],'service_lan_address':profile['upstreams'][package],'lan_subnet':profile['lan_subnet'],
             'agreements':[document for document in state['agreements'] if document['offer']['payload']['agreement_id'] in approved]}
 
 

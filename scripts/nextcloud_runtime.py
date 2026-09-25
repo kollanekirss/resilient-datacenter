@@ -88,7 +88,8 @@ def regional_controls_command(settings,config):
           'foreach($d as $k=>$v){$a->setValueString("files_sharing",$k,$v);}'
           '$a->setValueString("core","shareapi_allow_links","no");'
           '$a->setValueBool("core",\\OC\\OCM\\OCMSignatoryManager::APPCONFIG_SIGN_ENFORCED,true);'
-          '$a->setValueBool("core",\\OC\\OCM\\OCMSignatoryManager::APPCONFIG_SIGN_DISABLED,false);')
+          '$a->setValueBool("core",\\OC\\OCM\\OCMSignatoryManager::APPCONFIG_SIGN_DISABLED,false);'
+          'echo "rdc-regional-controls-applied\\n";')
     return common(settings)+['--rm','--interactive','--user=33:33','--memory=512m','--entrypoint=php',
         '--volume',str(APP)+':/var/www/html:ro','--volume',str(regional.BASE/'runtime-config')+':/var/www/html/config:ro',
         '--volume',str(STATE/'files')+':/var/www/data:rw',settings['components']['nextcloud']['image'],'-r',code]
@@ -97,8 +98,9 @@ def regional_controls_command(settings,config):
 def synchronize_regional(settings):
     regional.materialize(settings,(BASE/'Caddyfile').read_text(),(BASE/'config/config.php').read_bytes())
     config=regional.active(settings)
-    subprocess.run(regional_controls_command(settings,config),input=json.dumps(regional.controls(config)),
+    result=subprocess.run(regional_controls_command(settings,config),input=json.dumps(regional.controls(config)),
                    text=True,check=True,capture_output=True,timeout=120)
+    if result.stdout.strip()!='rdc-regional-controls-applied':raise ValueError('File sharing controls were not applied; keep service stopped and inspect its private configuration permissions')
 
 
 def maintenance_command(settings,action):

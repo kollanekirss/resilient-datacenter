@@ -68,3 +68,16 @@ def test_file_runtime_always_mounts_generated_proxy_policy_and_synchronizes_shar
     assert '--network=host' in command and '--user=33:33' in command
     assert '--entrypoint=php' in command and '--interactive' in command
     assert 'php://stdin' in command[-1]
+
+
+def test_private_runtime_umask_does_not_hide_configuration_from_application_group(tmp_path,monkeypatch):
+    import os
+    import stat
+    m=importlib.import_module('nextcloud_regional')
+    monkeypatch.setattr(m,'BASE',tmp_path/'connector');monkeypatch.setattr(m,'RESTORE',tmp_path/'absent')
+    monkeypatch.setattr(m.os,'chown',lambda *args:None)
+    previous=os.umask(0o077)
+    try:m.materialize(settings(),'original',b'private identity')
+    finally:os.umask(previous)
+    assert stat.S_IMODE(m.BASE.stat().st_mode)==0o750
+    assert stat.S_IMODE((m.BASE/'runtime-config').stat().st_mode)==0o750

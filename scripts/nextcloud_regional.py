@@ -69,11 +69,13 @@ def active(settings):
 
 
 def materialize(settings,original,application_config=None):
-    if not directory_exists():BASE.mkdir(mode=0o750);os.chown(BASE,0,33)
+    if not directory_exists():
+        BASE.mkdir(mode=0o750);BASE.chmod(0o750)
+        if os.geteuid()==0:os.chown(BASE,0,33)
     if RESTORE.exists() or RESTORE.is_symlink():write(BASE/'disabled.json',json.dumps({'reason':'application-restore-requires-current-partner-review'}),mode=0o600)
     config=active(settings)
     directory=BASE/'runtime-config'
-    if not directory.exists():directory.mkdir(mode=0o750)
+    if not directory.exists():directory.mkdir(mode=0o750);directory.chmod(0o750)
     info=directory.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode&0o022:raise ValueError('Unsafe generated file configuration')
     if any(item.name not in ('config.php','zz-regional.config.php') for item in directory.iterdir()):raise ValueError('Unreviewed generated file configuration')

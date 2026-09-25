@@ -24,3 +24,15 @@ def test_service_link_requires_exact_application_and_confirmed_institution_key()
     with pytest.raises(ValueError):m.prepare(changed,settings(),expected_fingerprint=fingerprint(b['gateway_identity']),now=NOW+2)
     other=settings();other['ownership']['network']['controller_hostname']='regional.example.test'
     with pytest.raises(ValueError):m.prepare(b,other,expected_fingerprint=fingerprint(b['gateway_identity']),now=NOW+2)
+
+
+def test_file_service_link_uses_only_its_own_signed_scope():
+    m=importlib.import_module('service_link');b=bundle();b['package']='nextcloud'
+    from regional_agreements import fingerprint
+    owned=b['gateway_identity']['payload']
+    current={'ownership':{'packages':['nextcloud'],'institution_id':owned['institution_id'],
+                         'nextcloud_hostname':owned['services']['nextcloud'],'network':{'controller_hostname':'internal.north.test'}}}
+    result=m.prepare(b,current,expected_fingerprint=fingerprint(b['gateway_identity']),now=NOW+2)
+    assert result['package']=='nextcloud'
+    assert result['peers'][0]['hostname']==b['agreements'][0]['offer']['payload']['recipient']['payload']['services']['nextcloud']
+    with pytest.raises(ValueError):m.prepare(b,settings(),expected_fingerprint=fingerprint(b['gateway_identity']),now=NOW+2)

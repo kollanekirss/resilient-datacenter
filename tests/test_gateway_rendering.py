@@ -63,3 +63,15 @@ def test_synapse_http10_connect_is_accepted_only_on_private_listener():
     # A missing or unapproved target still has no default host or route.
     assert 'default_host_for_http_10' not in json.dumps(private)
     assert private['http_filters'][0]['name']=='envoy.filters.http.rbac'
+
+
+def test_candidate_file_routes_are_method_scoped_and_do_not_expose_general_dav():
+    m=importlib.import_module('gateway_rendering');p,own,peers=inputs()
+    config=m.envoy(p,own,peers,services=('nextcloud',))
+    hcm=config['static_resources']['listeners'][0]['filter_chains'][0]['filters'][0]['typed_config']
+    routes=hcm['route_config']['virtual_hosts'][0]['routes']
+    assert all(route['match']['headers'][0]['name']==':method' for route in routes)
+    text=json.dumps(config)
+    assert 'local_nextcloud' in text and 'public' in text
+    assert '/remote.php/dav' not in text and '/settings' not in text and '/login' not in text
+    with pytest.raises(ValueError):m.envoy(p,own,peers,services=('arbitrary',))
