@@ -176,7 +176,9 @@ def apply(stage,owner,*,root=Path('/'),runtime=None,permissions=set_permissions)
     root=Path(root);stage=Path(stage);review=plan(stage,owner,root=root)
     services=resources(owner).services
     original={name:runtime.is_active(name) for name in services}
-    directory=root/TRANSACTIONS;directory.mkdir(mode=0o700,parents=True,exist_ok=True)
+    parent=(root/TRANSACTIONS).parent;parent.mkdir(mode=0o700,exist_ok=True)
+    if parent.is_symlink() or parent.stat().st_uid!=os.geteuid() or parent.stat().st_mode&0o077: raise ValueError('Unsafe restore journal parent')
+    directory=root/TRANSACTIONS;directory.mkdir(mode=0o700,exist_ok=True)
     if directory.is_symlink() or directory.stat().st_mode & 0o077: raise ValueError('Unsafe restore journal directory')
     runtime_state=runtime.prepare(owner) if hasattr(runtime,'prepare') else {}
     journal={'schema_version':1,'id':uuid.uuid4().hex,'ownership':owner,'paths':review['paths'],

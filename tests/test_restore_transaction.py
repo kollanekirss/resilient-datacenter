@@ -104,3 +104,11 @@ def test_recovery_rejects_symlink_journal(tmp_path):
     with pytest.raises(KeyboardInterrupt): api().apply(stage,owner,root=root,runtime=Interrupted(),permissions=lambda *a:None)
     pending=root/'etc/rdc-restore-pending.json';copy=root/'original.json';pending.rename(copy);pending.symlink_to(copy)
     with pytest.raises(ValueError,match='Unsafe'): api().recover(owner,root=root,runtime=Runtime())
+
+
+def test_recovery_state_parent_is_private_and_unowned_shared_parent_blocks(tmp_path):
+    owner,root,stage=fixture(tmp_path)
+    parent=root/'var/lib/rdc-backup';parent.mkdir(mode=0o755)
+    with pytest.raises(ValueError,match='journal'):
+        api().apply(stage,owner,root=root,runtime=Runtime(),permissions=lambda *a:None)
+    assert parent.stat().st_mode&0o077!=0  # Do not silently adopt/chmod existing state.

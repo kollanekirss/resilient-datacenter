@@ -127,3 +127,11 @@ def test_backup_routing_preserves_explicit_actions_without_install_passthrough(m
 def test_cancelled_backup_preparation_is_not_reported_as_success(monkeypatch,tmp_path):
     m=api();monkeypatch.setattr(m,'backup_action',lambda args:{'state':'cancelled'})
     assert m.main(['backup','setup','--output-file',str(tmp_path/'profile.json')])==4
+
+
+def test_backup_overdue_and_unreachable_status_require_attention(monkeypatch):
+    m=api()
+    for state in ('backup-overdue','backup-unreachable'):
+        monkeypatch.setattr(m,'backup_action',lambda args:{'state':state})
+        assert m.main(['backup','schedule','status'])==3
+    assert m.main(['backup','schedule','enable','--frequency','every-second'])==2
