@@ -89,6 +89,18 @@ def maintenance(settings,action,data):
     if result.returncode:raise ValueError('Private file-service '+action+' failed; inspect application state without publishing secrets')
 
 
+def code_entries(root):
+    root=Path(root);entries=[root,*root.rglob('*')]
+    for entry in entries:
+        if entry.is_symlink():
+            try:target=entry.resolve(strict=True)
+            except (OSError,RuntimeError):raise ValueError('Broken or cyclic link in pinned application code') from None
+            if not target.is_relative_to(root.resolve()) or not (target.is_file() or target.is_dir()):
+                raise ValueError('Pinned application code link escapes its read-only tree')
+        elif not (entry.is_file() or entry.is_dir()):raise ValueError('Special file in pinned application code')
+    return entries
+
+
 def bootstrap(settings,profile,admin_user,admin_password,database_password):
     completed=runtime.BASE/'identity.json'
     if completed.exists():
@@ -117,9 +129,9 @@ def bootstrap(settings,profile,admin_user,admin_password,database_password):
     write(runtime.BASE/'config/config.php',application_config(profile,identity),mode=0o400,uid=33,gid=33)
     # Code is recreated from the pinned image on a replacement, not a writable
     # application volume. Config and uploaded files have separate mounts.
-    for entry in [runtime.APP,*runtime.APP.rglob('*')]:
-        if entry.is_symlink() or not (entry.is_file() or entry.is_dir()):raise ValueError('Unexpected linked or special file in application code')
-        os.chown(entry,0,0);entry.chmod(0o755 if entry.is_dir() else 0o644)
+    for entry in code_entries(runtime.APP):
+        os.chown(entry,0,0,follow_symlinks=False)
+        if not entry.is_symlink():entry.chmod(0o755 if entry.is_dir() else 0o644)
     (runtime.APP/'config/config.php').unlink(missing_ok=True)
 
 
