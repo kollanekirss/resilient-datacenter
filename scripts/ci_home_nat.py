@@ -71,7 +71,7 @@ def main(package):
     path=ROOT/'backup-node.json';path.write_text(json.dumps(manifest));path.chmod(0o600)
     assert apply_manifest(manifest,path,confirm_fn=lambda _:'yes')['status']=='installed'
     auth=ROOT/'one-use-auth.key';auth.write_text(approved_key(control,'tag:backup'));auth.chmod(0o600)
-    try:run('/usr/local/bin/tailscale','up','--login-server=https://'+control['hostname'],'--hostname=backup','--advertise-tags=tag:backup',
+    try:run('/usr/local/bin/tailscale','up','--login-server=https://'+control['hostname'],'--hostname=backup',
         '--auth-key=file:'+str(auth),'--accept-dns=false','--accept-routes=false','--ssh=false','--timeout=60s')
     finally:auth.unlink(missing_ok=True)
     from backup_target import prepare,authorize

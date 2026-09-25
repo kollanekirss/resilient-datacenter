@@ -48,3 +48,7 @@ def test_local_playbook_installs_client_only():
     plays=yaml.safe_load(p.read_text())
     assert all(p['hosts']=='localhost' and p['connection']=='local' for p in plays)
     assert [p.get('roles') for p in plays if 'roles' in p]==[['client']]
+
+
+def test_unowned_client_daemon_path_is_reserved():
+    assert '/usr/local/sbin/tailscaled' in checks().RESERVED

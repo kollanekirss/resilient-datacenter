@@ -20,9 +20,11 @@ def main(phase,data):
         from local_node import apply_manifest
         path=Path('/root/node.json');private(path,json.dumps(manifest))
         assert apply_manifest(manifest,path,confirm_fn=lambda _:'yes')['status']=='installed'
+        # The administrator-approved preauth key supplies its tag. Headscale
+        # forbids combining a tagged key with client-requested advertise-tags.
         auth=Path('/root/one-use-auth.key');private(auth,data['auth_key'])
         try:subprocess.run(['/usr/local/bin/tailscale','up','--login-server=https://'+manifest['headscale_hostname'],
-            '--hostname='+manifest['node_name'],'--advertise-tags='+manifest['node_tag'],'--auth-key=file:'+str(auth),
+            '--hostname='+manifest['node_name'],'--auth-key=file:'+str(auth),
             '--accept-dns=false','--accept-routes=false','--ssh=false','--timeout=60s'],check=True,capture_output=True,timeout=75)
         finally:auth.unlink(missing_ok=True)
         from local_checks import check_local
