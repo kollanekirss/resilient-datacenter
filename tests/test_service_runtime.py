@@ -24,6 +24,8 @@ def test_container_commands_use_fixed_images_and_no_public_port_mapping():
         assert '--network=host' in command and '--pull=never' in command
         assert '--privileged' not in command and '--publish' not in command and '-p' not in command
         assert '--cap-drop=ALL' in command and '--security-opt=no-new-privileges' in command
+        assert '--runtime=/usr/bin/runc' in command
+        assert not any('unconfined' in a for a in command)
         assert settings()['components'][name]['image'] in command
         assert not any('PASSWORD=' in a for a in command)
     command=m.container_command('element',settings())

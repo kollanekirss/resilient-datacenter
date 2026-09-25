@@ -62,6 +62,13 @@ def main():
              'tls_mode':'supplied','tls_certificate':str(cert),'tls_private_key':str(key)}
     result=install_or_resume(profile,network,ADDRESS)
     assert result['state']=='service-listeners-verified'
+    from service_runtime import read_settings,inspect_container,UNITS
+    settings=read_settings()
+    for component in UNITS:
+        record=inspect_container(component,settings)
+        confinement=Path('/proc')/str(record['State']['Pid'])/'attr/current'
+        assert 'containers-default-' in confinement.read_text() and '(enforce)' in confinement.read_text()
+    print('All four containers retain enforced AppArmor confinement.',flush=True)
     alice_password=secrets.token_urlsafe(24);bob_password=secrets.token_urlsafe(24)
     assert create('cialice',alice_password,admin=True)['state']=='account-created'
     assert create('cibob',bob_password)['state']=='account-created'

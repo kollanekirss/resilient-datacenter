@@ -124,9 +124,9 @@ def install_or_resume(profile,network,address):
     if marker.exists() or marker.is_symlink():
         if not same_installation(profile,network,root_json(marker)):raise ValueError('Cannot resume another application identity')
     elif any(p.exists() or p.is_symlink() for p in reserved_paths()):raise ValueError('Application target must be fresh or owned by this exact installation')
-    if not Path('/usr/bin/podman').exists():
+    if not Path('/usr/bin/podman').exists() or not Path('/usr/bin/runc').exists():
         subprocess.run(['/usr/bin/apt-get','update','-qq'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=300)
-        subprocess.run(['/usr/bin/apt-get','install','-y','podman'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=600)
+        subprocess.run(['/usr/bin/apt-get','install','-y','podman','runc'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=600)
     pins=pull_images()
     settings={'schema_version':1,'ownership':owner,'bind_address':address,'components':pins}
     for name in pins:runtime.verify_image(name,settings)

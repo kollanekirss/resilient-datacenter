@@ -80,7 +80,7 @@ def verify_image(name,settings):
 
 def container_command(name,settings):
     if name not in UNITS: raise ValueError('Unsupported service component')
-    common=['/usr/bin/podman','run','--rm','--name',UNITS[name],'--network=host','--pull=never','--read-only',
+    common=['/usr/bin/podman','--runtime=/usr/bin/runc','run','--rm','--name',UNITS[name],'--network=host','--pull=never','--read-only',
             '--cap-drop=ALL','--security-opt=no-new-privileges','--pids-limit=512',
             '--label','org.rdc.owner='+owner_digest(settings),'--label','org.rdc.component='+name,
             '--tmpfs','/tmp:rw,nosuid,nodev,size=64m,mode=1777']
