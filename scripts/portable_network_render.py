@@ -23,7 +23,7 @@ def unbound(plan):
 
 def chrony(plan, settings, role='dns'):
     lines = ['# Local time is not independent evidence of correct UTC.',
-             'driftfile /var/lib/chrony/rdc-portable/drift', 'rtcsync', 'makestep 1.0 3', 'cmdport 0']
+             'driftfile /var/lib/chrony/rdc-portable.drift', 'rtcsync', 'makestep 1.0 3', 'cmdport 0']
     dns = plan['vms']['dns']['address']
     if role == 'dns':
         lines.append('bindaddress ' + dns)

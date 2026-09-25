@@ -81,7 +81,8 @@ def main():
         (target / 'rdc.yaml').chmod(0o600)
         run('netplan', 'generate', '--root-dir', str(netroot))
     run('unbound-checkconf', str(kit / 'dns/unbound.conf'))
-    run('chronyd', '-p', '-f', str(kit / 'dns/chrony.conf'))
+    time_config = Path('/etc/chrony/rdc-portable.conf'); time_config.write_bytes((kit/'dns/chrony.conf').read_bytes())
+    run('chronyd', '-p', '-f', str(time_config))
     run('systemd-analyze', 'verify', *(str(SOURCE / 'portable' / (n + '.service')) for n in
                                       ('rdc-portable-dns', 'rdc-portable-time', 'rdc-portable-firewall')))
     run('ip', 'link', 'add', 'rdc-local-ci', 'type', 'bridge'); run('ip', 'link', 'set', 'rdc-local-ci', 'up')
@@ -92,10 +93,7 @@ def main():
     # These stock services exist only on the throwaway runner. Avoid pid/socket
     # collisions; -x prevents the fixture chronyd from adjusting its host clock.
     run('systemctl', 'stop', 'chrony', 'unbound')
-    drift = Path('/var/lib/chrony/rdc-portable'); drift.mkdir(mode=0o750)
-    account = pwd.getpwnam('_chrony'); os.chown(drift, account.pw_uid, account.pw_gid)
     dns_config = Path('/etc/unbound/rdc-portable.conf'); dns_config.write_bytes((kit/'dns/unbound.conf').read_bytes())
-    time_config = Path('/etc/chrony/rdc-portable.conf'); time_config.write_bytes((kit/'dns/chrony.conf').read_bytes())
     def start_dns():
         return spawn('dns', 'ip','netns','exec','rdc-dns','unbound','-d','-c',str(dns_config))
     def start_time(configuration):

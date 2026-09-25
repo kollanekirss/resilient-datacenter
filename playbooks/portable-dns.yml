@@ -123,14 +123,24 @@
         mode: '0644'
         validate: /usr/sbin/unbound-checkconf %s
       notify: Restart portable DNS
-    - name: Install syntax-checked local time configuration
+    - name: Stage time configuration under the distribution AppArmor-allowed path
       ansible.builtin.copy:
         src: '{{ rdc_network_kit }}/dns/chrony.conf'
+        dest: /etc/chrony/rdc-portable.pending.conf
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Check staged chrony syntax before activation
+      ansible.builtin.command: /usr/sbin/chronyd -p -f /etc/chrony/rdc-portable.pending.conf
+      changed_when: false
+    - name: Activate checked local time configuration
+      ansible.builtin.copy:
+        src: /etc/chrony/rdc-portable.pending.conf
+        remote_src: true
         dest: /etc/chrony/rdc-portable.conf
         owner: root
         group: root
         mode: '0644'
-        validate: /usr/sbin/chronyd -p -f %s
       notify: Restart portable time
     - name: Install atomic dedicated firewall configuration
       ansible.builtin.copy:
@@ -141,13 +151,6 @@
         mode: '0644'
         validate: /usr/sbin/nft --check --file %s
       notify: Restart portable firewall
-    - name: Prepare private clock drift storage
-      ansible.builtin.file:
-        path: /var/lib/chrony/rdc-portable
-        state: directory
-        owner: _chrony
-        group: _chrony
-        mode: '0750'
     - name: Install separate role units
       ansible.builtin.copy:
         src: '{{ playbook_dir }}/../portable/{{ item }}.service'
