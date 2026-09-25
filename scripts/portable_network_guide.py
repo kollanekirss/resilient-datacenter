@@ -12,6 +12,10 @@ def render(plan, settings, policy):
         f'Use a console or directly attached administrator on {admin} with the management subnet mask. '
         f'Reach Proxmox at https://{pve}:8006 by its verified certificate identity (prepare a hosts entry for its existing hostname if needed). '
         'Do not disable certificate checks. The administrator needs no default route to reach Proxmox on this same link.',
+        f'For SSH to service VMs, add explicit routes on the administrator computer for {plan["networks"]["frontend"]["cidr"]}, '
+        f'{plan["networks"]["applications"]["cidr"]} and {plan["networks"]["partner"]["cidr"]} via {edge} '
+        'on the management interface. These routes need the edge while direct Proxmox access does not. '
+        'Do not route those destinations via the unused reserved management.gateway.',
         'Test this path with OPNsense powered off. Back up the Proxmox configuration and OPNsense configuration to encrypted offsite storage. '
         'Keep physical console credentials separately accessible. Never move host management onto the WAN bridge.', '',
         '## 2. Assign OPNsense interfaces through its console', '',
@@ -83,7 +87,8 @@ def render(plan, settings, policy):
                   'Record the comparison and repeat after power loss; do not change time backwards on running application databases.']
     else:
         lines += [f'The only source is the independent local NTP device at {settings["clock"]["source"]}. '
-                  'Verify that device and its power supply. When absent, this configuration has no local fallback; '
+                  f'Verify that device and its power supply, and give it a return route to {plan["networks"]["frontend"]["cidr"]} via {edge}. '
+                  'When absent, this configuration has no local fallback; '
                   'check chrony tracking and treat unsynchronised replies as a failed prerequisite.']
     lines += ['Prepared staff devices must use this DNS/time server explicitly; DHCP NTP support varies by client. '
               'The `time/ROLE.conf` files are client configurations for the later service phase, not automatically installed here. '
