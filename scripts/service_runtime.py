@@ -159,21 +159,27 @@ def ready(name,settings,*,attempts=90):
 
 
 def main():
+    phase='arguments'
     try:
         if len(sys.argv)!=3 or sys.argv[1] not in ('run','ready','stop') or sys.argv[2] not in UNITS: raise ValueError('Unsupported runtime action')
-        action,name=sys.argv[1:];settings=read_settings()
-        if action=='ready':ready(name,settings);return 0
-        existing=inspect_container(name,settings)
+        action,name=sys.argv[1:];phase='read-settings';settings=read_settings()
+        if action=='ready':
+            phase='readiness';ready(name,settings);return 0
+        phase='inspect-container';existing=inspect_container(name,settings)
         if action=='stop':
-            if existing is not None:podman('stop','--time','45',UNITS[name],timeout=60)
+            if existing is not None:
+                phase='stop-container';podman('stop','--time','45',UNITS[name],timeout=60)
             return 0
-        verify_image(name,settings)
+        phase='verify-image';verify_image(name,settings)
         if existing is not None:
             if existing.get('State',{}).get('Running'):
                 return subprocess.run(['/usr/bin/podman','attach',UNITS[name]]).returncode
-            podman('rm',UNITS[name])  # Exact owned stopped container; persistent bind data stays.
+            phase='remove-stopped-container';podman('rm',UNITS[name])  # Exact owned stopped container; persistent bind data stays.
+        phase='launch-container'
         return subprocess.run(container_command(name,settings)).returncode
-    except Exception:
+    except Exception as error:
+        detail=' exit='+str(error.returncode) if isinstance(error,subprocess.CalledProcessError) else ''
+        print('RDC runtime phase='+phase+' error='+type(error).__name__+detail,file=sys.stderr)
         print('RDC application service action failed. Inspect its local journal, ownership, image identity and configuration; no unowned container was replaced.',file=sys.stderr)
         return 1
 

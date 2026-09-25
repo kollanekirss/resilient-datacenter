@@ -51,3 +51,17 @@ def test_unit_readiness_precedes_dependent_proxy_and_database_is_not_public():
     assert 'ready proxy' in unit and 'stop proxy' in unit
     postgres=m.container_command('postgres',settings())
     assert 'listen_addresses=127.0.0.1' in postgres and 'port=5433' in postgres
+
+
+def test_runtime_failure_identifies_phase_without_external_secrets(monkeypatch,capsys):
+    import subprocess
+    m=api()
+    monkeypatch.setattr(m.sys,'argv',['service_runtime.py','run','proxy'])
+    monkeypatch.setattr(m,'read_settings',settings)
+    def fail(*args):
+        raise subprocess.CalledProcessError(125,['podman'],stderr='DO-NOT-LOG-SECRET')
+    monkeypatch.setattr(m,'inspect_container',fail)
+    assert m.main()==1
+    output=capsys.readouterr().err
+    assert 'phase=inspect-container' in output and 'CalledProcessError' in output
+    assert 'exit=125' in output and 'DO-NOT-LOG-SECRET' not in output
