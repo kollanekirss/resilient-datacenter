@@ -116,17 +116,20 @@ def main(selected):
     pull_images(for_owner(plan['target_owner']['applications']))
     from restore_runtime import install_guards
     install_guards(plan['source_owner'],upgrade_compat=True)
+    candidate_verified=[]
     class FailedCandidate(upgrade.Backend):
         def verify(self,journal,*,original=False):
             super().verify(journal,original=original)
             assert not remote_probe(),'Non-loopback user ingress opened before commit'
             if not original:
+                candidate_verified.append(True)
                 write_proof('candidate-only-change')
                 raise ValueError('Injected failure after actual target version verification and candidate write')
     with upgrade.locks(selected):
         try:transaction.apply(plan,FailedCandidate(plan['source_owner']))
         except transaction.UpgradeError as error:assert error.recovered and not error.committed
         else:raise AssertionError('Candidate verification failure was ignored')
+    assert candidate_verified==[True],'Failure did not reach actual target verification'
     assert read_proof()=='before-upgrade' and stable()==identity and remote_probe()
     assert upgrade.check()['state']=='upgrade-ready'
     print(selected+': actual predecessor backup, target migration, closed non-loopback ingress and complete original code/data rollback PASS.',flush=True)
@@ -168,4 +171,11 @@ def main(selected):
 
 if __name__=='__main__':
     if len(sys.argv)!=2:raise SystemExit('Choose matrix or nextcloud')
-    main(sys.argv[1])
+    try:main(sys.argv[1])
+    except BaseException as failure:
+        import traceback
+        cause=failure
+        while cause is not None:
+            traceback.print_exception(type(cause),cause,cause.__traceback__,chain=False)
+            cause=cause.__context__
+        raise

@@ -5,6 +5,7 @@ import fcntl
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import stat
@@ -51,6 +52,37 @@ def verify_helpers(runtime,owner):
         if name in ('service_images.json','nextcloud_images.json'):
             if json.loads(raw)!={'schema_version':1,'components':for_owner(owner['applications'])}:raise ValueError('Installed catalogue differs from the reviewed predecessor')
         elif raw!=(SOURCE/name).read_bytes():raise ValueError('This predecessor helper revision has no reviewed upgrade path')
+
+
+def retire_containers(runtime,journal):
+    """Remove only exact reviewed stopped containers before switching ownership.
+
+    Bind-mounted data is retained. Inspect every component first, and use its
+    immutable container ID without force so a concurrent writer is never killed.
+    Both journal owners are permitted to handle interrupted partial promotion.
+    """
+    identifiers=[]
+    for name,unit in runtime.UNITS.items():
+        try:records=json.loads(runtime.podman('container','inspect',unit))
+        except subprocess.CalledProcessError:
+            try:runtime.podman('container','exists',unit)
+            except subprocess.CalledProcessError as absent:
+                if absent.returncode==1:continue
+                raise
+            raise
+        if not isinstance(records,list) or len(records)!=1:raise ValueError('Cannot identify upgrade container')
+        record=records[0]
+        for field in ('source_owner','target_owner'):
+            owner=journal[field]['applications']
+            try:runtime.validate_container(record,name,{'ownership':owner,'components':for_owner(owner)})
+            except ValueError:continue
+            break
+        else:raise ValueError('Upgrade refuses an unowned container')
+        identifier=record.get('Id')
+        if record.get('State',{}).get('Running') is not False or not isinstance(identifier,str) or not re.fullmatch('[a-f0-9]{64}',identifier):
+            raise ValueError('Upgrade requires an identified stopped container')
+        identifiers.append(identifier)
+    for identifier in identifiers:runtime.podman('rm',identifier)
 
 
 def check():
@@ -193,6 +225,7 @@ class Backend:
         return settings
 
     def migrate(self,journal):
+        retire_containers(self.runtime,journal)
         settings=self.install_runtime(journal)
         self.isolation.allow_validation()
         self.isolation.start(self.runtime.UNITS['postgres'])
@@ -219,6 +252,7 @@ class Backend:
 
     def restore_original(self,journal):
         self.quiesce(journal);self.isolate(journal)
+        retire_containers(self.runtime,journal)
         upgrade_files.restore(ROOT,self.owner,journal['id'])
         if component_hashes(ROOT,self.owner)!=journal['source_hashes']:raise ValueError('Retained original helpers changed')
         self.isolation.allow_validation()
