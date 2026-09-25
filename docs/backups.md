@@ -131,11 +131,11 @@ Archived issuer data is never installed automatically. If needed, export its pro
 sudo ./rdc gateway recovery export-token --output-file /root/private-recovery/dns-token
 ```
 
-Review or rotate the token, then use the explicit gateway issuer setup/issue/enable workflow. The export never prints the secret. It does not reopen the gateway or replace an active issuer account. Full disposable encrypted gateway acceptance is being run on the development branch; consult the current validation ledger before relying on it.
+Review or rotate the token, then use the explicit gateway issuer setup/issue/enable workflow. The export never prints the secret. It does not reopen the gateway or replace an active issuer account. Disposable encrypted gateway and clean owned-installation recovery have passing evidence; consult the validation ledger for the synthetic VPN boundary and separate actual client-relocation evidence.
 
 ### A fresh application or gateway replacement
 
-A newly enrolled replacement initially has a different VPN identity. Recover the original identity **before** installing chat, files or the gateway; otherwise its listeners or signed gateway address may not match after restoration. This development path is undergoing disposable acceptance.
+A newly enrolled replacement initially has a different VPN identity. Recover the original identity **before** installing chat, files or the gateway; otherwise its listeners or signed gateway address may not match after restoration. This path has disposable gateway acceptance, including an injected restore failure. The gateway lifecycle fixture uses a synthetic VPN identity; actual enrolled-client continuity is a separate test, and real-site acceptance remains pending.
 
 1. Prepare a fresh supported Ubuntu peer with the original institution/node/controller labels, temporary enrollment and approved access to the backup destination. Use its provider console or independent administration connection. Import the saved repository password and SSH key with `backup configure`; do not initialize the repository.
 2. Download the exact full application snapshot and prepare its network-only recovery stage. Choose its actual package (`matrix`, `nextcloud` or `gateway`):
