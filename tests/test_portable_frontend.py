@@ -62,3 +62,34 @@ def test_application_kit_verifies_rendered_files_and_rejects_tampering(tmp_path)
     (target/'nginx.conf').write_text('proxy_ssl_verify off;')
     with pytest.raises(ValueError):bundle.verify(target,plan,settings)
     with pytest.raises(ValueError):bundle.prepare(plan,settings,target)
+
+
+def test_same_generation_renewal_restarts_to_finish_an_interrupted_activation(tmp_path,monkeypatch):
+    import portable_application_install as m
+    calls=[]
+    monkeypatch.setattr(m,'BASE',tmp_path)
+    monkeypatch.setattr(m,'directory',lambda path,**kwargs:path.mkdir(mode=0o700,exist_ok=True))
+    monkeypatch.setattr(m,'write',lambda path,raw,**kwargs:path.write_bytes(raw))
+    monkeypatch.setattr(m.subprocess,'run',lambda argv,**kwargs:calls.append(argv))
+    values={'chat.crt':b'fixture-cert','chat.key':b'fixture-key'}
+    m.activate_frontend_tls({},values)
+    assert calls==[]
+    m.activate_frontend_tls({},values,replace=True)
+    assert calls==[['/bin/systemctl','restart','rdc-frontend.service']]
+
+
+def test_firewall_check_accepts_kernel_chain_grouping_but_rejects_rule_reordering(monkeypatch):
+    import portable_frontend_runtime as runtime
+    config=api().configuration(*fixture());entries=api().firewall(config)
+    reported=[entries[0]]
+    for name in ('input','output','forward'):
+        reported.extend(item for item in entries if item.get('chain',{}).get('name')==name)
+        reported.extend(item for item in entries if item.get('rule',{}).get('chain')==name)
+    def nft(*args,**kwargs):
+        if args==('-j','list','tables'):return {'nftables':[entries[0]]}
+        return {'nftables':reported}
+    monkeypatch.setattr(runtime,'nft',nft)
+    runtime.ingress(config)
+    indices=[i for i,item in enumerate(reported) if item.get('rule',{}).get('chain')=='input']
+    reported[indices[0]],reported[indices[-1]]=reported[indices[-1]],reported[indices[0]]
+    with pytest.raises(ValueError):runtime.ingress(config)

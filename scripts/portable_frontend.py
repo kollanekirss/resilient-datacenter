@@ -114,4 +114,10 @@ def firewall(config):
         rule('output',match(payload('ip','daddr'),address),match(payload('tcp','dport'),443))
     for protocol,ports in (('udp',[53,123]),('tcp',[53])):
         rule('output',match(payload('ip','daddr'),c['dns_address']),match(payload(protocol,'dport'),(ports[0] if len(ports)==1 else {'set':ports})))
-    return entries
+    # nft lists each chain followed by its rules. Preserve order within a
+    # chain while emitting that same deterministic representation.
+    result=[entries[0]]
+    for chain in ('input','output','forward'):
+        result.extend(item for item in entries if item.get('chain',{}).get('name')==chain)
+        result.extend(item for item in entries if item.get('rule',{}).get('chain')==chain)
+    return result

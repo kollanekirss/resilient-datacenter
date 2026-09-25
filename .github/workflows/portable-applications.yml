@@ -38,4 +38,4 @@ jobs:
           sudo systemctl status rdc-frontend rdc-postgres rdc-synapse rdc-element rdc-service-proxy rdc-nextcloud-postgres rdc-nextcloud rdc-nextcloud-proxy --no-pager || true
           sudo journalctl -u rdc-frontend -u rdc-postgres -u rdc-synapse -u rdc-service-proxy -u rdc-nextcloud-postgres -u rdc-nextcloud -u rdc-nextcloud-proxy --no-pager --lines=100
           sudo nft list ruleset
-          sudo ip netns exec rdc-front nft list ruleset || true
+          sudo ip netns exec rdc-front nft -j list ruleset || true

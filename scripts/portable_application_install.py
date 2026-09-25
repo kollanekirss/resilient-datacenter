@@ -82,12 +82,17 @@ def activate_frontend_tls(c,values,*,replace=False):
     digest=hashlib.sha256(b''.join(name.encode()+values[name] for name in sorted(values))).hexdigest()
     generation=base/digest;directory(generation)
     for name,raw in values.items():write(generation/name,raw)
+    fd=os.open(generation,os.O_RDONLY)
+    try:os.fsync(fd)
+    finally:os.close(fd)
     active=base/'active'
     old=None
     if active.is_symlink():
         old=os.readlink(active)
         if not __import__('re').fullmatch('[a-f0-9]{64}',old):raise ValueError('Unexpected frontend TLS generation')
-        if old==digest:return
+        if old==digest:
+            if replace:subprocess.run(['/bin/systemctl','restart','rdc-frontend.service'],check=True,timeout=120)
+            return
         if not replace:raise ValueError('Use frontend-renew for certificate changes')
     elif active.exists():raise ValueError('Unsafe frontend TLS active path')
     temporary=base/('switch-'+secrets.token_hex(8))
@@ -101,6 +106,9 @@ def activate_frontend_tls(c,values,*,replace=False):
         except BaseException:
             if old is not None:
                 temporary=base/('rollback-'+secrets.token_hex(8));os.symlink(old,temporary);os.replace(temporary,active)
+                fd=os.open(base,os.O_RDONLY)
+                try:os.fsync(fd)
+                finally:os.close(fd)
                 subprocess.run(['/bin/systemctl','restart','rdc-frontend.service'],check=False,timeout=120)
             raise
 

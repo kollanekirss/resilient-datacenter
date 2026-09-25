@@ -4,6 +4,7 @@ import hashlib
 import http.client
 import json
 import os
+import re
 from pathlib import Path
 import socket
 import ssl
@@ -83,9 +84,14 @@ def verify_tls(c):
     # A failed backend must not prevent access to healthy applications.
     # Startup verifies this listener; status separately verifies applications.
     context=ssl.create_default_context()
-    for item in c['services'].values():
+    for role,item in c['services'].items():
+        pem=read(BASE/'tls'/'active'/(role+'.crt'))
+        leaf=re.search(b'-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----',pem,re.S)
+        if leaf is None:raise ValueError('Missing frontend certificate')
+        expected=hashlib.sha256(ssl.PEM_cert_to_DER_cert(leaf.group().decode())).digest()
         with socket.create_connection((c['address'],443),timeout=5) as raw:
-            with context.wrap_socket(raw,server_hostname=item['hostname']):pass
+            with context.wrap_socket(raw,server_hostname=item['hostname']) as secure:
+                if hashlib.sha256(secure.getpeercert(binary_form=True)).digest()!=expected:raise ValueError('Frontend is not serving the selected certificate generation')
 
 
 def main(action):
