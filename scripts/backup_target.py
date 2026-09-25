@@ -95,6 +95,10 @@ def provision_storage(owner,address):
     (BASE/'authorized_keys').chmod(0o644)
     private_write(BASE/'sshd_config',config)
     private_write(BASE/'ownership.json',json.dumps({'schema_version':1,'ownership':owner,'address':address}))
+    privilege_separation=Path('/run/sshd')
+    privilege_separation.mkdir(mode=0o755,exist_ok=True)
+    if privilege_separation.is_symlink() or privilege_separation.stat().st_uid!=0 or privilege_separation.stat().st_mode & 0o022:
+        raise ValueError('Unsafe SSH privilege-separation directory')
     subprocess.run(['/usr/sbin/sshd','-t','-f',str(BASE/'sshd_config')],check=True,timeout=15)
     unit='''[Unit]
 Description=Dedicated encrypted-backup SFTP storage over the private overlay
@@ -104,7 +108,9 @@ PartOf=tailscaled.service
 StartLimitIntervalSec=0
 [Service]
 ExecStart=/usr/sbin/sshd -D -f /etc/rdc-backup-target/sshd_config
-RuntimeDirectory=rdc-backup-sshd
+RuntimeDirectory=rdc-backup-sshd sshd
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
 Restart=on-failure
 RestartSec=5
 UMask=0077
