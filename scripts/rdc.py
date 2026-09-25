@@ -40,6 +40,10 @@ class Parser(argparse.ArgumentParser):
 def parser():
     result=Parser(prog='rdc',description=__doc__)
     commands=result.add_subparsers(dest='command',required=True)
+    portable=commands.add_parser('portable',help='Preview a portable Proxmox site; changes no servers')
+    portable.add_argument('portable_action',choices=('preview',))
+    portable.add_argument('plan',type=Path)
+    portable.add_argument('--json',action='store_true')
     commands.add_parser('status',help='Read separate local operational evidence').add_argument('--json',action='store_true')
     upgrade=commands.add_parser('upgrade',help='Check, apply or recover a reviewed local application upgrade')
     upgrade.add_argument('upgrade_action',choices=('check','apply','recover'))
@@ -237,6 +241,14 @@ def backup_action(args):
 
 
 def dispatch(args) -> ActionResult:
+    if args.command=='portable':
+        from portable_plan import load, preview, render
+        try:
+            outcome=preview(load(args.plan))
+        except ValueError as error:
+            print('Site plan rejected: '+str(error));return result_for_state('blocked')
+        print(json.dumps(outcome,indent=2) if args.json else render(outcome))
+        return result_for_state('checks-passed')
     if args.command=='upgrade':
         from upgrade_runtime import action
         try:outcome=action(args,input_fn=input)
@@ -353,7 +365,7 @@ def main(argv=None) -> int:
             if argv is None: return int(Exit.PENDING)
         args=command.parse_args(argv)
         result=dispatch(args)
-        if args.command=='status' and args.json:return int(result.exit_code)
+        if args.command in ('status','portable') and args.json:return int(result.exit_code)
         show_checks(result.checks)
         text={
             'prepared':'Configuration prepared. No servers were changed.',

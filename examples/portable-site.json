@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "site": "tallinn-kit",
+  "recovery_site": "tartu-recovery",
+  "proxmox": {
+    "endpoint": "https://pve.example.org:8006",
+    "node": "pve",
+    "storage": "local-lvm",
+    "wan_bridge": "vmbr0"
+  },
+  "networks": {
+    "management": {
+      "cidr": "10.76.10.0/24",
+      "gateway": "10.76.10.1",
+      "bridge": "vmbr1"
+    },
+    "staff": {
+      "cidr": "10.76.20.0/24",
+      "gateway": "10.76.20.1",
+      "bridge": "vmbr2"
+    },
+    "frontend": {
+      "cidr": "10.76.30.0/24",
+      "gateway": "10.76.30.1",
+      "bridge": "vmbr3"
+    },
+    "applications": {
+      "cidr": "10.76.40.0/24",
+      "gateway": "10.76.40.1",
+      "bridge": "vmbr4"
+    },
+    "partner": {
+      "cidr": "10.76.50.0/24",
+      "gateway": "10.76.50.1",
+      "bridge": "vmbr5"
+    }
+  },
+  "vms": {
+    "edge": {
+      "id": 201,
+      "cpu": 2,
+      "memory_mib": 3072,
+      "disk_gib": 40,
+      "address": "10.76.10.2"
+    },
+    "dns": {
+      "id": 202,
+      "cpu": 2,
+      "memory_mib": 1024,
+      "disk_gib": 40,
+      "address": "10.76.30.10"
+    },
+    "nginx": {
+      "id": 203,
+      "cpu": 2,
+      "memory_mib": 1024,
+      "disk_gib": 40,
+      "address": "10.76.30.11"
+    },
+    "chat": {
+      "id": 204,
+      "cpu": 2,
+      "memory_mib": 4096,
+      "disk_gib": 40,
+      "address": "10.76.40.10"
+    },
+    "files": {
+      "id": 205,
+      "cpu": 2,
+      "memory_mib": 4096,
+      "disk_gib": 40,
+      "address": "10.76.40.11"
+    },
+    "partner": {
+      "id": 206,
+      "cpu": 2,
+      "memory_mib": 2048,
+      "disk_gib": 40,
+      "address": "10.76.50.10"
+    }
+  },
+  "domains": {
+    "chat": "chat.example.org",
+    "element": "element.example.org",
+    "files": "files.example.org"
+  },
+  "offline_days": 14,
+  "certificate_margin_days": 14
+}

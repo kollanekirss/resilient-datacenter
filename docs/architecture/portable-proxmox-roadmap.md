@@ -4,6 +4,8 @@ Status: planned engineering work, not an installer or completion record. Impleme
 
 ## 1. Site plan and preview
 
+Initial schema validation and a separate CLI preview are implemented: see [usage and limitations](../portable-site-plan.md). Interactive collection and integration into the existing journey remain follow-up work.
+
 Deliver a new optional platform profile without changing the existing Ubuntu journey. Build a pure plan validator and renderer before adding infrastructure mutations.
 
 - Collect site identity, Proxmox endpoint, existing bridge/storage selections, reserved VM IDs, module resources, local subnets/addresses, permanent service domains, backup location, expected offline duration and certificate margin.
