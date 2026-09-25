@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "components": {
+    "gateway": {
+      "version": "1.39.1",
+      "image": "docker.io/envoyproxy/envoy@sha256:be87c8b52663c1164a5bdf3c5419017a269cb3d8c74be1ec93638a71f1ffbd4b",
+      "config_digest": "sha256:ef41fe510c94b2a96c03e5f19a0bdce3ec92819c430401229e94faf768af792f",
+      "platform": "linux/amd64"
+    }
+  }
+}

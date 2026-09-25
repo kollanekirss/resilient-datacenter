@@ -38,7 +38,7 @@ def inputs(profile):
 
 
 def reserved_paths():
-    return [runtime.BASE,runtime.STATE,runtime.APP,runtime.INSTALLED,TLSBASE,TARGET,CRON,TIMER,
+    return [runtime.BASE,runtime.STATE,runtime.APP,runtime.INSTALLED,runtime.regional.BASE,TLSBASE,TARGET,CRON,TIMER,
             *[Path('/etc/systemd/system',name+'.service') for name in runtime.UNITS.values()]]
 
 
@@ -153,7 +153,7 @@ def freeze_code(root):
 
 
 def cron_unit():
-    return '[Unit]\nDescription=RDC Nextcloud background jobs\nAfter=rdc-nextcloud.service\nPartOf=rdc-nextcloud.service\nRequisite=rdc-nextcloud.service\n[Service]\nType=oneshot\nExecStart=/usr/bin/python3 -I -B /usr/local/lib/rdc-nextcloud/nextcloud_cron.py\nTimeoutStartSec=300\nUMask=0077\n'
+    return '[Unit]\nDescription=RDC Nextcloud background jobs\nAfter=rdc-nextcloud.service\nPartOf=rdc-nextcloud.service\n[Service]\nType=oneshot\nExecStart=/usr/bin/python3 -I -B /usr/local/lib/rdc-nextcloud/nextcloud_cron.py\nTimeoutStartSec=300\nUMask=0077\n'
 
 
 def cron_timer():return '[Unit]\nDescription=RDC Nextcloud background-job schedule\n[Timer]\nOnBootSec=5m\nOnUnitActiveSec=5m\n[Install]\nWantedBy=timers.target\n'
@@ -186,7 +186,7 @@ def install_or_resume(profile,network,address,admin_user,admin_password):
     write(runtime.BASE/'ports.conf',apache_ports(),mode=0o644);write(runtime.BASE/'site.conf',apache_site(),mode=0o644)
     write(runtime.BASE/'Caddyfile',proxy(profile,address),mode=0o644)
     hashes={}
-    for name in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py'):
+    for name in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py','nextcloud_regional.py','service_regional.py','regional_http.py'):
         content=(SOURCE/name).read_bytes();write(runtime.INSTALLED/name,content,mode=0o644);hashes[name]=hashlib.sha256(content).hexdigest()
     write(runtime.INSTALLED/'manifest.json',json.dumps({'schema_version':1,'files':hashes}))
     for name,unitname in runtime.UNITS.items():write(Path('/etc/systemd/system',unitname+'.service'),runtime.unit(name),mode=0o644)
@@ -198,14 +198,13 @@ def install_or_resume(profile,network,address,admin_user,admin_password):
     runtime.podman('exec','--user','999:999',runtime.UNITS['postgres'],'psql','-p','5434','-U','nextcloud','-d','nextcloud','-c','ALTER ROLE oc_admin NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION',timeout=30)
     if runtime.TLS.exists() and ((runtime.TLS/'tls.crt').read_bytes()!=cert or (runtime.TLS/'tls.key').read_bytes()!=key):raise ValueError('Use the explicit certificate replacement command')
     activate_certificate(settings,cert,key,initial=True)
+    runtime.synchronize_regional(settings)
     subprocess.run(['/bin/systemctl','start','rdc-nextcloud.service'],check=True,timeout=180)
-    # Disable external federation before exposing the application to users.
-    for app in ('federation','updatenotification','sharebymail'):
+    # Preserve only the currently reviewed connector's narrowly selected shares.
+    for app in ('updatenotification','sharebymail'):
         runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','app:disable',app,timeout=60)
-    for control in FEDERATION_CONTROLS:
-        runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:set','files_sharing',control,'--value=no',timeout=60)
-    runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:set','core','shareapi_allow_links','--value=no',timeout=60)
-    if federation_status()!='disabled' or public_links_status()!='disabled':raise ValueError('External sharing controls did not take effect')
+    expected='approved-gateway-configured' if runtime.regional.active(settings) else 'disabled'
+    if federation_status()!=expected or public_links_status()!='disabled':raise ValueError('External sharing controls did not take effect')
     runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','background:cron',timeout=60)
     subprocess.run(['/bin/systemctl','enable','--now','rdc-nextcloud.target','rdc-nextcloud-cron.timer'],check=True,timeout=180)
     subprocess.run(['/bin/systemctl','start','rdc-nextcloud-proxy.service'],check=True,timeout=180)
@@ -218,8 +217,10 @@ FEDERATION_CONTROLS=('outgoing_server2server_share_enabled','incoming_server2ser
 
 
 def federation_status():
-    values=[runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:get','files_sharing',name,timeout=30).strip() for name in FEDERATION_CONTROLS]
-    return 'disabled' if all(value=='no' for value in values) else 'configuration-changed'
+    config=runtime.regional.active(runtime.read_settings());expected=runtime.regional.controls(config)
+    values={name:runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:get','files_sharing',name,timeout=30).strip() for name in FEDERATION_CONTROLS}
+    if values!=expected:return 'configuration-changed'
+    return 'approved-gateway-configured' if config else 'disabled'
 
 
 def public_links_status():
@@ -238,6 +239,9 @@ def action(args):
     import getpass
     import sys
     from profile_config import load_profile
+    if args.action=='regional':
+        from nextcloud_link import action as regional_action
+        return regional_action(args)
     if args.action=='issuer':
         from service_issuer import action as issuer_action
         return issuer_action(args)

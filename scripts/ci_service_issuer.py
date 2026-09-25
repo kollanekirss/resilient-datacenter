@@ -16,6 +16,14 @@ def exercise(certificate_factory,*,package='matrix'):
     if package=='nextcloud':
         profile={k:v for k,v in profile.items() if k not in ('matrix_hostname','element_hostname')}
         profile.update(kind='nextcloud-certificates',node_name='files',nextcloud_hostname='files.ci.test')
+    if package=='gateway':
+        from gateway_store import Store
+        import gateway_runtime
+        from regional_agreements import fingerprint
+        identity=Store(gateway_runtime.BASE).identity();owned=identity['payload']
+        profile={k:v for k,v in profile.items() if k not in ('matrix_hostname','element_hostname')}
+        profile.update(kind='gateway-certificates',institution_id=owned['institution_id'],node_name=owned['gateway_node'],gateway_fingerprint=fingerprint(identity))
+        profile.update({name+'_hostname':domain for name,domain in owned['services'].items()})
     active=issuer.active_directory(profile)/'active'
     issuer.directory(issuer.BASE)
     network=json.loads(Path('/etc/server-connectivity-profile.json').read_text())

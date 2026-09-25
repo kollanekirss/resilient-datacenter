@@ -10,14 +10,17 @@ FIELDS={'kind','schema_version','provider','institution_id','node_name','acme_em
 def name_fields(profile):
     if profile.get('kind')=='service-certificates':return ('matrix_hostname','element_hostname')
     if profile.get('kind')=='nextcloud-certificates':return ('nextcloud_hostname',)
+    if profile.get('kind')=='gateway-certificates':return tuple(name for name in ('matrix_hostname','nextcloud_hostname') if name in profile)
     return ()
 
 
 def validate(data):
-    if not isinstance(data,dict) or set(data)!=FIELDS|set(name_fields(data)) or not _safe_values(data):return ['Use only the documented certificate request fields; credentials and commands are forbidden.']
+    extra={'gateway_fingerprint'} if isinstance(data,dict) and data.get('kind')=='gateway-certificates' else set()
+    if not isinstance(data,dict) or set(data)!=FIELDS|set(name_fields(data))|extra or not _safe_values(data):return ['Use only the documented certificate request fields; credentials and commands are forbidden.']
     errors=[]
-    if data['kind'] not in ('service-certificates','nextcloud-certificates') or type(data['schema_version']) is not int or data['schema_version']!=1 or data['provider']!='cloudflare':errors.append('Unsupported certificate provider contract.')
+    if data['kind'] not in ('service-certificates','nextcloud-certificates','gateway-certificates') or type(data['schema_version']) is not int or data['schema_version']!=1 or data['provider']!='cloudflare':errors.append('Unsupported certificate provider contract.')
     if not all(_identifier(data[k]) for k in ('institution_id','node_name')):errors.append('Invalid node identity.')
+    if data['kind']=='gateway-certificates' and (not isinstance(data['gateway_fingerprint'],str) or not re.fullmatch('[a-f0-9]{64}',data['gateway_fingerprint'])):errors.append('Use the full pinned institution approval fingerprint.')
     names=name_fields(data)
     if not names or not all(hostname(data[k]) for k in names) or len({data[k] for k in names})!=len(names):errors.append('Provide distinct permanent application DNS names.')
     if not isinstance(data['acme_email'],str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+%-]{0,126}@[A-Za-z0-9][A-Za-z0-9.-]{0,251}\.[A-Za-z]{2,63}',data['acme_email']):errors.append('Provide a valid certificate account email.')

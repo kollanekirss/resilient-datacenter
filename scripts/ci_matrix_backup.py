@@ -23,13 +23,13 @@ def prepare_network():
     subprocess.run(['systemctl','daemon-reload'],check=True);subprocess.run(['systemctl','start','tailscaled'],check=True)
 
 
-def prepare_backup(network):
+def prepare_backup(network,*,address='100.64.0.12'):
     guard()
     from backup_target import provision_storage,authorize
     from backup_operations import configure,configured,backup_now
     from backup_schedule import enable,disable
-    subprocess.run(['ip','address','add','100.64.0.12/32','dev','lo'],check=True)
-    endpoint=provision_storage(network,'100.64.0.12')
+    subprocess.run(['ip','address','add',address+'/32','dev','lo'],check=True)
+    endpoint=provision_storage(network,address)
     profile={'kind':'backup-profile','schema_version':1,'institution_id':network['institution_id'],'node_name':network['node_name'],'role':'peer',
              **{k:endpoint[k] for k in ('backup_host','backup_port','backup_host_key')}}
     configure(profile);authorize(Path('/etc/rdc-backup/ssh_key.pub'))
@@ -56,17 +56,22 @@ def snapshot(network_snapshot):
     assert status(0)['attempts']['last_attempt']['outcome']=='succeeded'
     snapshots=transport.snapshots();assert len(snapshots)==1 and snapshots[0]['id']!=network_snapshot
     assert 'rdc-'+package(application)+'-v1' in snapshots[0]['tags']
+    from backup_operations import status_summary
+    evidence=status_summary(snapshots)
+    assert evidence['state']=='snapshot-present' and evidence['backup_age_seconds']>=0
+    print('Captured '+package(application)+' snapshot age at acceptance check seconds: '+str(round(evidence['backup_age_seconds'],2)),flush=True)
     return snapshots[0]['id']
 
 
-def restore(identifier):
+def restore(identifier,*,staged=False):
     guard()
     from backup_operations import configured,stage_restore,WORK
     from restore_runtime import Runtime
     from restore_transaction import apply
     from backup_scope import application_runtime
     from backup_contracts import resources
-    data,_=configured();stage_restore(identifier)
+    data,_=configured()
+    if not staged:stage_restore(identifier)
     class ApplicationRuntime(Runtime):
         def verify(self,owner):
             # Actual applications are verified; dummy transport cannot prove VPN.

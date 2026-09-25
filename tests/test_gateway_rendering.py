@@ -1,0 +1,92 @@
+import importlib
+import json
+import pytest
+from test_gateway_contracts import profile
+from test_regional_agreements import agreement,NOW
+
+
+def inputs():
+    from gateway_contracts import peer_rules
+    document,own,_=agreement()
+    return profile(),own,peer_rules(own,[document],[],now=NOW+2)
+
+
+def test_gateway_has_fixed_tls_upstreams_no_admin_or_dynamic_forwarding():
+    m=importlib.import_module('gateway_rendering');p,own,peers=inputs()
+    config=m.envoy(p,own,peers)
+    assert 'admin' not in config
+    listeners=config['static_resources']['listeners']
+    assert [(x['address']['socket_address']['address'],x['address']['socket_address']['port_value']) for x in listeners]==[('100.64.0.10',443),('10.203.1.1',3128),('127.0.0.1',9443)]
+    clusters=config['static_resources']['clusters']
+    assert all(x['type']=='STATIC' for x in clusters)
+    matrix=next(x for x in clusters if x['name']=='local_matrix')
+    tls=matrix['transport_socket']['typed_config']
+    assert tls['sni']==own['payload']['services']['matrix']
+    assert tls['common_tls_context']['validation_context']['trusted_ca']['filename']=='/etc/ssl/certs/ca-certificates.crt'
+    text=json.dumps(config)
+    assert 'direct_remote_ip' in text and 'connect_matcher' in text
+    assert 'ORIGINAL_DST' not in text and 'dynamic_forward_proxy' not in text
+    # Both accepted catalogues retain exact method/path and peer boundaries.
+    assert 'local_nextcloud' in text
+    assert '/_matrix/client' not in text and '/_synapse/admin' not in text
+
+
+def test_empty_approval_still_denies_and_firewall_expires_existing_connections():
+    m=importlib.import_module('gateway_rendering');p,own,peers=inputs()
+    config=m.envoy(p,own,[])
+    assert 'direct_response' in json.dumps(config)
+    rules=m.firewall(p,peers,lan_interface='rdc-lan',now=NOW+2,replace=False)
+    assert 'flush ruleset' not in rules and 'timeout 3598s' in rules
+    assert 'tcp sport 443' in rules and 'tcp dport 443' in rules
+    assert 'ct state established' not in rules
+    assert 'iifname "rdc-lan"' in rules and 'iifname "tailscale0"' in rules
+    assert 'add chain inet rdc_gateway forward' in rules
+    assert 'delete table inet rdc_gateway' not in rules
+    assert m.firewall(p,peers,lan_interface='rdc-lan',now=NOW+3600,replace=True).startswith('delete table inet rdc_gateway\n')
+    for name in ('eth0; flush ruleset','tailscale0','lo','x"'):
+        with pytest.raises(ValueError):m.firewall(p,peers,lan_interface=name,now=NOW+2,replace=False)
+
+
+def test_regional_endpoints_cannot_fall_back_to_an_unrelated_interface():
+    m=importlib.import_module('gateway_rendering');p,own,peers=inputs()
+    text=m.firewall(p,peers,lan_interface='rdc-lan',now=NOW+2,replace=False)
+    for selector in ('tcp dport 443','tcp sport 443'):
+        assert 'output oifname != "tailscale0" ip daddr 100.64.0.0/10 '+selector+' drop' in text
+
+
+def test_synapse_http10_connect_is_accepted_only_on_private_listener():
+    m=importlib.import_module('gateway_rendering');p,own,peers=inputs()
+    listeners=m.envoy(p,own,peers)['static_resources']['listeners']
+    public,private=[item['filter_chains'][0]['filters'][0]['typed_config'] for item in listeners[:2]]
+    assert private['http_protocol_options']=={'accept_http_10':True}
+    assert 'http_protocol_options' not in public
+    # A missing or unapproved target still has no default host or route.
+    assert 'default_host_for_http_10' not in json.dumps(private)
+    assert private['http_filters'][0]['name']=='envoy.filters.http.rbac'
+
+
+def test_candidate_file_routes_are_method_scoped_and_do_not_expose_general_dav():
+    m=importlib.import_module('gateway_rendering');p,own,peers=inputs()
+    config=m.envoy(p,own,peers,services=('nextcloud',))
+    hcm=config['static_resources']['listeners'][0]['filter_chains'][0]['filters'][0]['typed_config']
+    routes=hcm['route_config']['virtual_hosts'][0]['routes']
+    assert all(route['match']['headers'][0]['name']==':method' for route in routes)
+    text=json.dumps(config)
+    assert 'local_nextcloud' in text and 'public' in text
+    assert '/remote.php/dav' not in text and '/settings' not in text and '/login' not in text
+    with pytest.raises(ValueError):m.envoy(p,own,peers,services=('arbitrary',))
+
+
+def test_gateway_tls_check_is_loopback_only_and_has_no_application_routes():
+    m=importlib.import_module('gateway_rendering');p,own,peers=inputs()
+    listeners=m.envoy(p,own,peers)['static_resources']['listeners']
+    check=next(item for item in listeners if item['name']=='certificate_check')
+    assert check['address']['socket_address']=={'address':'127.0.0.1','port_value':9443}
+    chain=check['filter_chains'][0]
+    tls=chain['transport_socket']['typed_config']['common_tls_context']['tls_certificates']
+    public=listeners[0]['filter_chains'][0]['transport_socket']['typed_config']['common_tls_context']['tls_certificates']
+    assert tls==public and tls[0]['certificate_chain']['filename']=='/etc/rdc-gateway/tls/active/tls.crt'
+    hcm=chain['filters'][0]['typed_config']
+    assert hcm['http_filters'][0]['typed_config']['rules']['policies']=={}
+    for host in hcm['route_config']['virtual_hosts']:
+        for route in host['routes']:assert route['direct_response']['status']==403 and 'route' not in route

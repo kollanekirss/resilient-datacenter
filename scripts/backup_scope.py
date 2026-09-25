@@ -10,11 +10,12 @@ def network_owner(owner):
 
 
 def package(application):
-    if not isinstance(application,dict) or application.get('packages') not in (['matrix'],['nextcloud']):raise ValueError('Unknown application backup package')
+    if not isinstance(application,dict) or application.get('packages') not in (['matrix'],['nextcloud'],['gateway']):raise ValueError('Unknown application backup package')
     return application['packages'][0]
 
 
 def application_profile(application):
+    if package(application)=='gateway':return application['profile']
     if package(application)=='nextcloud':
         from nextcloud_contracts import from_owner
         return from_owner(application)
@@ -24,6 +25,11 @@ def application_profile(application):
 
 
 def include(network,application):
+    if package(application)=='gateway':
+        from gateway_backup import validate_owner
+        validate_owner(application)
+        if application['network']!=network:raise ValueError('Gateway backup network ownership differs')
+        return dict(network,applications=application)
     if package(application)=='nextcloud':
         from nextcloud_contracts import ownership as expected_owner
     else:expected_owner=ownership
@@ -43,7 +49,7 @@ def verify_installed(root,owner):
     if json.loads((root/'etc/server-connectivity-profile.json').read_text())!=network_owner(owner):
         raise ValueError('Backup network identity changed')
     if 'applications' in owner:
-        base='etc/rdc-nextcloud' if package(owner['applications'])=='nextcloud' else 'etc/rdc-services'
+        base={'matrix':'etc/rdc-services','nextcloud':'etc/rdc-nextcloud','gateway':'etc/rdc-gateway'}[package(owner['applications'])]
         if json.loads((root/base/'ownership.json').read_text())!=owner['applications']:
             raise ValueError('Backup application identity changed')
 
@@ -54,6 +60,9 @@ def tag(owner):
 
 
 def application_runtime(application):
+    if package(application)=='gateway':
+        import gateway_backup_runtime
+        return gateway_backup_runtime
     if package(application)=='nextcloud':
         import nextcloud_runtime
         return nextcloud_runtime
@@ -62,6 +71,9 @@ def application_runtime(application):
 
 
 def application_backup(application):
+    if package(application)=='gateway':
+        import gateway_backup
+        return gateway_backup
     if package(application)=='nextcloud':
         import nextcloud_backup
         return nextcloud_backup
@@ -70,10 +82,16 @@ def application_backup(application):
 
 
 def installed_application(root=Path('/')):
-    markers=[Path(root)/base/'ownership.json' for base in ('etc/rdc-services','etc/rdc-nextcloud')]
+    markers=[Path(root)/base/'ownership.json' for base in ('etc/rdc-services','etc/rdc-nextcloud','etc/rdc-gateway')]
     present=[p for p in markers if p.exists() or p.is_symlink()]
     if len(present)>1:raise ValueError('Multiple application packages on one node require an unsupported scope migration')
+    if (Path(root)/'etc/rdc-gateway').exists() and not (Path(root)/'etc/rdc-gateway/ownership.json').exists():raise ValueError('Gateway installation is incomplete; do not claim network-only protection')
     if not present:return None
     from service_runtime import root_json
-    result=root_json(present[0]);package(result)
+    if present[0].parent.name=='rdc-gateway':
+        from regional_workspace import private_read
+        from gateway_store import decode
+        result=decode(private_read(present[0]))
+    else:result=root_json(present[0])
+    package(result)
     return result

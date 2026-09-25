@@ -81,6 +81,11 @@ def rules_digest(data,identifier):
 
 
 class Runtime(Services):
+    def close_gateway(self):
+        import gateway_runtime
+        from gateway_store import Store
+        gateway_runtime.Runtime(Store(gateway_runtime.BASE)).close()
+
     def __init__(self,owner):
         self.owner=owner;self.lock=None;self.timer_active=False;self.prepared=False;self.identifier=None
     def nft(self,*args,input=None):

@@ -173,7 +173,7 @@ def install_or_resume(profile,network,address):
             raise ValueError('Use services certificate to replace an existing TLS identity')
     activate_pair(TLSBASE,settings,cert,key,initial=True)
     hashes={}
-    for name in ('service_runtime.py','service_images.json'):
+    for name in ('service_runtime.py','service_images.json','service_regional.py'):
         content=(SOURCE/name).read_bytes();write(runtime.INSTALLED/name,content,mode=0o644);hashes[name]=hashlib.sha256(content).hexdigest()
     write(runtime.INSTALLED/'manifest.json',json.dumps({'schema_version':1,'files':hashes}))
     for name,unit_name in runtime.UNITS.items():write(Path('/etc/systemd/system')/(unit_name+'.service'),runtime.unit(name),mode=0o644)
@@ -199,7 +199,14 @@ def status():
             except (OSError,ValueError,subprocess.SubprocessError):backup={'state':'backup-unreachable','restore_test':'not-run'}
     return {'state':'service-listeners-verified','matrix_url':'https://'+settings['ownership']['matrix_hostname'],
             'element_url':'https://'+settings['ownership']['element_hostname'],'application_login_test':'not-run',
-            'application_backup':backup,'federation':'disabled'}
+            'application_backup':backup,'federation':regional_status(settings)}
+
+
+def regional_status(settings):
+    import service_regional
+    configured=service_regional.configured(settings)
+    if configured is None:return 'disabled'
+    return 'connector-configured-exchange-unverified' if service_regional.active(settings) else 'suspended-pending-review'
 
 
 def apply(profile):
@@ -211,6 +218,9 @@ def action(args):
     import fcntl
     import sys
     from profile_config import load_profile
+    if args.action=='regional':
+        from service_link import action as regional_action
+        return regional_action(args)
     if args.action=='issuer':
         from service_issuer import action as issuer_action
         return issuer_action(args)

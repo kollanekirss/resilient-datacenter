@@ -82,11 +82,17 @@ def main():
     from nextcloud_operations import federation_status
     assert federation_status()=='disabled'
     print('Actual Nextcloud: trusted HTTPS, pinned confined containers, two accounts, exact file round trip, unauthorized access denial, approved share and revocation, background jobs and repeated installation PASS.',flush=True)
+    from ci_service_connector import exercise as connector_exercise,verify_suspended_after_restore
+    connector_exercise(settings,package='nextcloud')
+    assert install_or_resume(profile,network,ADDRESS,'unused','unused')['federation']=='approved-gateway-configured'
+    assert request('GET',path)[1]==content
     identity_before=json.loads((runtime.BASE/'identity.json').read_text())
     selected=snapshot(network_snapshot)
     request('PUT',path,b'Later changes that must not replace the selected backup')
     request('PUT','/remote.php/dav/files/cialice/later.txt',b'Created after snapshot')
     restore(selected)
+    verify_suspended_after_restore(settings,package='nextcloud')
+    assert federation_status()=='disabled'
     assert request('GET',path)[1]==content
     denied('/remote.php/dav/files/cialice/later.txt')
     identity_after=json.loads((runtime.BASE/'identity.json').read_text())
@@ -126,4 +132,8 @@ def main():
     issuer_exercise(certificate_fixture.certificates,package='nextcloud')
     print('Actual Nextcloud browser login and uploaded file visibility PASS. Real VPN/home NAT and physical offsite placement NOT RUN.',flush=True)
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    try:main()
+    finally:
+        from ci_nextcloud_diagnostics import report
+        report(runtime.STATE/'files/nextcloud.log')

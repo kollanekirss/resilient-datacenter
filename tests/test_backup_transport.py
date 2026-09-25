@@ -72,3 +72,16 @@ def test_backup_time_is_data_capture_time_not_later_upload_time(monkeypatch,tmp_
     monkeypatch.setattr(m,'execute',execute)
     m.backup(tmp_path)
     assert calls[0][calls[0].index('--time')+1]=='2026-09-25 08:00:00'
+
+
+@pytest.mark.parametrize('scope',['matrix','nextcloud','gateway'])
+def test_application_scope_tags_survive_capture_and_listing(tmp_path,monkeypatch,scope):
+    m=api().Restic(profile(),base=tmp_path,scope=scope);calls=[]
+    (tmp_path/'snapshot.json').write_text(json.dumps({'captured_at':'2026-09-25T10:00:00+00:00'}))
+    def execute(args,**kwargs):
+        calls.append(args)
+        return json.dumps({'message_type':'summary','snapshot_id':'a'*64}) if 'backup' in args else '[]'
+    monkeypatch.setattr(m,'execute',execute)
+    assert m.backup(tmp_path)=='a'*64
+    assert 'rdc-'+scope+'-v1' in calls[0]
+    assert m.snapshots()==[] and calls[1][calls[1].index('--tag')+1]=='rdc-v1,rdc-'+scope+'-v1'

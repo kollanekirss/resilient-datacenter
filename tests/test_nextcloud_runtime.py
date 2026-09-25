@@ -17,7 +17,7 @@ def test_steady_application_cannot_rewrite_code_or_expose_database():
     assert '--rm' not in command
     assert '--entrypoint=apache2-foreground' in command
     assert '/opt/rdc-nextcloud-app:/var/www/html:ro' in command
-    assert '/etc/rdc-nextcloud/config:/var/www/html/config:ro' in command
+    assert '/etc/rdc-nextcloud-regional/runtime-config:/var/www/html/config:ro' in command
     assert '/var/lib/rdc-nextcloud/files:/var/www/data:rw' in command
     assert '--privileged' not in command and '--cap-drop=ALL' in command
     assert 'listen_addresses=127.0.0.1' in m.container_command('postgres',data)

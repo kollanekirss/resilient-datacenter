@@ -19,7 +19,7 @@ SNAPSHOT=re.compile('[a-f0-9]{64}')
 class Restic:
     def __init__(self,profile,*,base=Path('/etc/rdc-backup'),binary=Path('/usr/local/bin/rdc-restic'),scope='network'):
         if validate(profile): raise ValueError('Invalid backup profile')
-        if scope not in ('network','matrix','nextcloud'): raise ValueError('Unknown backup scope')
+        if scope not in ('network','matrix','nextcloud','gateway'): raise ValueError('Unknown backup scope')
         self.scope=scope
         self.profile=profile; self.base=Path(base); self.binary=Path(binary)
 

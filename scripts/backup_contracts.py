@@ -61,7 +61,10 @@ def resources(owner):
     paths+=('etc/server-connectivity-profile.json',)
     if 'applications' in owner:
         from backup_scope import package
-        if package(owner['applications'])=='nextcloud':
+        if package(owner['applications'])=='gateway':
+            paths+=('etc/rdc-gateway','var/lib/rdc-gateway-recovery')
+            services=('rdc-regional-guard.timer','rdc-regional-gateway')+services
+        elif package(owner['applications'])=='nextcloud':
             paths+=('etc/rdc-nextcloud','var/lib/rdc-nextcloud')
             services=('rdc-nextcloud-cron.timer','rdc-nextcloud-proxy','rdc-nextcloud','rdc-nextcloud-postgres')+services
         else:
@@ -79,8 +82,13 @@ def binary_paths(owner):
     paths=catalogue[owner['role']]
     if 'applications' in owner:
         from backup_scope import package
-        if package(owner['applications'])=='nextcloud':
-            paths+=tuple('usr/local/lib/rdc-nextcloud/'+n for n in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py'))
+        if package(owner['applications'])=='gateway':
+            from gateway_runtime import RUNTIME_FILES
+            paths+=tuple('usr/local/lib/rdc-gateway/'+name for name in (*RUNTIME_FILES,'manifest.json'))
+            paths+=tuple('etc/systemd/system/'+name for name in ('rdc-regional-gateway.service','rdc-regional-guard.service','rdc-regional-guard.timer'))
+            paths+=('etc/sysctl.d/80-rdc-regional-gateway.conf',)
+        elif package(owner['applications'])=='nextcloud':
+            paths+=tuple('usr/local/lib/rdc-nextcloud/'+n for n in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py','nextcloud_regional.py','service_regional.py','regional_http.py'))
             paths+=tuple('etc/systemd/system/'+n for n in ('rdc-nextcloud.service','rdc-nextcloud-postgres.service','rdc-nextcloud-proxy.service','rdc-nextcloud-cron.service','rdc-nextcloud-cron.timer'))
-        else:paths+=('usr/local/lib/rdc-services/service_runtime.py','usr/local/lib/rdc-services/service_images.json')
+        else:paths+=('usr/local/lib/rdc-services/service_runtime.py','usr/local/lib/rdc-services/service_images.json','usr/local/lib/rdc-services/service_regional.py')
     return paths
