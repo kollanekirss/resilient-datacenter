@@ -120,6 +120,10 @@ def main(package):
         path=ROOT/destination;path.write_bytes(first.get('/etc/rdc-backup/'+source));path.chmod(0o600)
     snapshot=guest_phase(first,'snapshot',data);identifier=snapshot['snapshot_id']
     assert snapshot['network']==identity and snapshot['application_identity']==original['application_identity']
+    captured=datetime.fromisoformat(snapshot['captured_at'])
+    age=(datetime.now(timezone.utc)-captured).total_seconds()
+    assert age>=0
+    print('Selected recoverable backup age at fencing: '+str(round(age,2))+' seconds.',flush=True)
     first.stop();assert first.process.poll() is not None
     started=time.monotonic()
     replacement=prepare_guest('replacement-home',22223,control,archive,cert_copy,key_copy)

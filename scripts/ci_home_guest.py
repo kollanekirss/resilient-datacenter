@@ -53,6 +53,10 @@ def main(phase,data):
         application_backup(installed_application()).include_services()
         _,transport=configured();transport.initialize()
         result=backup_now()
+        from backup_operations import status_summary
+        evidence=status_summary(transport.snapshots())
+        assert evidence['snapshot_id']==result['snapshot_id']
+        result['captured_at']=evidence['captured_at']
         return dict(result,network=network_identity(),application_identity=application_identity(data['package']))
     if phase=='bootstrap':
         from backup_operations import configure,configured
@@ -90,5 +94,12 @@ def application_identity(package):
 
 if __name__=='__main__':
     if len(sys.argv)!=2:raise SystemExit('One fixed guest phase required')
-    result=main(sys.argv[1],json.load(sys.stdin))
+    try:result=main(sys.argv[1],json.load(sys.stdin))
+    except BaseException as failure:
+        import traceback
+        cause=failure
+        while cause is not None:
+            traceback.print_exception(type(cause),cause,cause.__traceback__,chain=False)
+            cause=cause.__context__
+        raise
     print('RDC_RESULT:'+json.dumps(result),flush=True)
