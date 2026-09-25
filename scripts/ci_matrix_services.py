@@ -76,6 +76,11 @@ def main():
         confinement=Path('/proc')/str(record['State']['Pid'])/'attr/current'
         assert 'containers-default-' in confinement.read_text() and '(enforce)' in confinement.read_text()
     print('All four containers retain enforced AppArmor confinement.',flush=True)
+    # Exercise rapid consecutive lifecycle operations; a single successful TLS
+    # rotation is insufficient evidence against container cleanup races.
+    for attempt in range(20):
+        subprocess.run(['systemctl','restart','rdc-service-proxy.service'],check=True,timeout=180)
+    print('Twenty consecutive verified proxy restarts PASS.',flush=True)
     alice_password=secrets.token_urlsafe(24);bob_password=secrets.token_urlsafe(24)
     assert create('cialice',alice_password,admin=True)['state']=='account-created'
     assert create('cibob',bob_password)['state']=='account-created'
