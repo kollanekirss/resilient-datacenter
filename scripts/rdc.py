@@ -20,6 +20,7 @@ try:
     from infrastructure_operations import run_infrastructure
     from doctor import diagnose
     from source_identity import source_identity
+    from release_download import fetch as fetch_release
     from support_report import make_report, write_report
 except ImportError:
     print('Project dependencies are missing. From the project directory run:\n'
@@ -55,6 +56,11 @@ def parser():
     doctor=commands.add_parser('doctor',help='Read-only local and controller diagnostics; no sudo prompts')
     doctor.add_argument('manifest',type=Path)
     doctor.add_argument('--report',type=Path)
+    release=commands.add_parser('release',help='Download and verify an experimental release; never install')
+    fetch=release.add_subparsers(dest='action',required=True).add_parser('fetch')
+    fetch.add_argument('version')
+    fetch.add_argument('--commit',required=True)
+    fetch.add_argument('--output-dir',type=Path,required=True)
     commands.add_parser('version',help='Show source identity and pinned component versions')
     return result
 
@@ -105,6 +111,13 @@ def dispatch(args) -> ActionResult:
     if args.command=='setup':
         state=run_wizard(args.output_dir,resume=args.resume,input_fn=input)
         return result_for_state(state)
+    if args.command=='release':
+        try: fetch_release(args.version,args.commit,args.output_dir)
+        except ValueError as error:
+            print('Release blocked: '+str(error))
+            return result_for_state('blocked')
+        print('Release verified. No servers were changed and no downloaded program was executed.')
+        return result_for_state('checks-passed')
     if args.command=='version':
         print(json.dumps(source_identity(ROOT),indent=2))
         return result_for_state('checks-passed')

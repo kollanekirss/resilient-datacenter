@@ -131,3 +131,7 @@ Original Python-script commands remain available with their original output and 
 ```
 
 GitHub's Local checks workflow runs this command on a disposable Ubuntu runner with read-only repository permissions. It uses synthetic fixtures and loopback TLS tests; it does not deploy services or enroll real nodes. A green workflow is evidence of local consistency, not a successful live deployment.
+
+## Verified downloads
+
+`./rdc release fetch VERSION --commit FULL_COMMIT --output-dir NEW_DIRECTORY` verifies the fixed project publisher, workflow, source revision and artifact hashes before making release files available. It never installs them. See [release instructions](releases.md) for prerequisites and trust limits.
