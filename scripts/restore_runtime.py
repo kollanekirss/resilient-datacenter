@@ -68,10 +68,10 @@ def install_guards(owner,*,upgrade_compat=False):
 
 
 def isolation_rules(role,identifier):
-    if role not in ('controller','relay','peer') or not re.fullmatch('[a-f0-9]{32}',identifier): raise ValueError('Invalid restore isolation identity')
+    if role not in ('controller','relay','peer','portable') or not re.fullmatch('[a-f0-9]{32}',identifier): raise ValueError('Invalid restore isolation identity')
     rules=['iifname "lo" accept']
-    if role=='peer':
-        rules.append('iifname "tailscale0" drop')
+    if role in ('peer','portable'):
+        if role=='peer':rules.append('iifname "tailscale0" drop')
         rules.append('tcp dport { 443, 8443, 3128 } drop')
     else:
         rules.append('tcp dport 443 drop')
@@ -191,7 +191,7 @@ class Runtime(Services):
             digest=rules_digest(current,identifier)
         chains=[e['chain']['name'] for e in current['nftables'] if 'chain' in e]
         rules=[e['rule'] for e in current['nftables'] if 'rule' in e]
-        if sorted(chains)!=['forward','input'] or len(rules)!={'controller':2,'relay':3,'peer':4}[owner['role']]:
+        if sorted(chains)!=['forward','input'] or len(rules)!={'controller':2,'relay':3,'peer':4,'portable':2}[owner['role']]:
             raise ValueError('Recovery ingress rules were not installed completely')
         record['digest']=digest;atomic_json(ISOLATION,record)
     def allow_validation(self):
@@ -217,10 +217,14 @@ class Runtime(Services):
         self.prepared=False
     def verify(self,owner):
         if not all(self.is_active(n) for n in resources(owner).services): raise ValueError('Restored service did not stay active')
-        if owner['role']=='peer':
+        if owner['role'] in ('peer','portable'):
             manifest={'kind':'local-node','schema_version':1,'institution_id':owner['institution_id'],'node_name':owner['node_name'],
-                      'headscale_hostname':owner['controller_hostname'],'node_tag':owner['node_tag']}
-            verify_peer(manifest)
+                      'headscale_hostname':owner.get('controller_hostname'),'node_tag':owner.get('node_tag')}
+            if owner['role']=='peer':verify_peer(manifest)
+            else:
+                from application_access import verify_local_address
+                from backup_scope import network_owner
+                verify_local_address(network_owner(owner))
             if 'applications' in owner:
                 from backup_scope import application_runtime
                 runtime=application_runtime(owner['applications']);settings=runtime.read_settings()

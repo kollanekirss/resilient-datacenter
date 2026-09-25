@@ -3,8 +3,9 @@ import json
 from pathlib import Path
 import re
 from profile_config import _safe_values,_identifier
-from service_contracts import network_manifest
+from service_contracts import network_manifest,validate_network
 from validate_inventory import hostname
+from application_access import access_profile
 
 FIELDS={'kind','schema_version','institution_id','node_name','nextcloud_hostname','tls_mode','tls_certificate','tls_private_key'}
 NAMESPACES={'nextcloud':'docker.io/library/nextcloud','postgres':'docker.io/library/postgres','proxy':'docker.io/library/caddy'}
@@ -22,8 +23,12 @@ def image_pins():
 
 
 def validate(data):
-    if not isinstance(data,dict) or set(data)!=FIELDS or not _safe_values(data):return ['Use only the documented Nextcloud fields; secrets and execution overrides are forbidden.']
+    if not isinstance(data,dict) or set(data) not in (FIELDS,FIELDS|{'access'}) or not _safe_values(data):return ['Use only the documented Nextcloud fields; secrets and execution overrides are forbidden.']
     errors=[]
+    if 'access' in data:
+        from application_access import validate_access
+        try:validate_access(data['access'])
+        except ValueError:errors.append('Invalid portable access identity.')
     if data['kind']!='nextcloud-services' or type(data['schema_version']) is not int or data['schema_version']!=1:errors.append('Unsupported Nextcloud profile.')
     if not all(_identifier(data[k]) for k in ('institution_id','node_name')):errors.append('Invalid institution or node identity.')
     if not hostname(data['nextcloud_hostname']):errors.append('Provide the permanent Nextcloud DNS name.')
@@ -36,7 +41,7 @@ def validate(data):
 
 def ownership(profile,network):
     if validate(profile):raise ValueError('Invalid Nextcloud profile')
-    network_manifest(network)
+    validate_network(profile,network)
     if any(profile[k]!=network[k] for k in ('institution_id','node_name')):raise ValueError('File-service identity differs from this enrolled node')
     return {'schema_version':1,'role':'services','institution_id':profile['institution_id'],'node_name':profile['node_name'],
             'network':network,'packages':['nextcloud'],'nextcloud_hostname':profile['nextcloud_hostname'],'tls_mode':'supplied',
@@ -44,5 +49,5 @@ def ownership(profile,network):
 
 
 def from_owner(owner):
-    return {'kind':'nextcloud-services','schema_version':1,**{k:owner.get(k) for k in ('institution_id','node_name','nextcloud_hostname','tls_mode')},
+    return {**access_profile(owner), 'kind':'nextcloud-services','schema_version':1,**{k:owner.get(k) for k in ('institution_id','node_name','nextcloud_hostname','tls_mode')},
             'tls_certificate':'/etc/rdc-nextcloud-tls/active/tls.crt','tls_private_key':'/etc/rdc-nextcloud-tls/active/tls.key'}

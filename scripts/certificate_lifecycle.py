@@ -34,7 +34,7 @@ def validity(cert,which):
     return modern if modern is not None else getattr(cert,'not_valid_'+which).replace(tzinfo=timezone.utc)
 
 
-def validate_material(cert,key,hostname):
+def validate_material(cert,key,hostname,*,verify_at=None):
     chain=x509.load_pem_x509_certificates(cert)
     if not chain: raise ValueError('Empty certificate chain')
     leaf=chain[0]; private=serialization.load_pem_private_key(key,password=None)
@@ -55,6 +55,10 @@ def validate_material(cert,key,hostname):
         if len(chain)>1: argv+=['-untrusted',str(folder/'chain.pem')]
         argv.append(str(folder/'leaf.pem'))
         subprocess.run(argv,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
+        if verify_at is not None:
+            # Validate the entire selected trust path at the offline horizon.
+            subprocess.run(argv[:2]+['-attime',str(int(verify_at.timestamp()))]+argv[2:],
+                           check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
     return {'fingerprint':leaf.fingerprint(hashes.SHA256()).hex(),'expires_at':after.isoformat()}
 
 

@@ -33,7 +33,10 @@ def read_settings():
         raise ValueError('File-service network/package identity differs')
     pins=root_json(INSTALLED/'nextcloud_images.json')
     if pins.get('schema_version')!=1 or settings['components']!=pins.get('components') or set(settings['components'])!=set(UNITS):raise ValueError('File-service component catalogue differs')
-    if ipaddress.ip_address(settings['bind_address']) not in ipaddress.ip_network('100.64.0.0/10'):raise ValueError('Invalid file-service overlay address')
+    if owner['network'].get('role')=='portable':
+        from application_access import validate_binding
+        validate_binding(owner['network'],settings['bind_address'])
+    elif ipaddress.ip_address(settings['bind_address']) not in ipaddress.ip_network('100.64.0.0/10'):raise ValueError('Invalid file-service overlay address')
     return settings
 
 
@@ -122,8 +125,12 @@ def maintenance_command(settings,action):
                              settings['components']['nextcloud']['image'],'-r',code]
 
 
-def unit(name):
+def unit(name,*,network=None):
     dependencies={'postgres':[],'nextcloud':['rdc-nextcloud-postgres.service'],'proxy':['rdc-nextcloud.service','tailscaled.service']}[name]
+    if network is not None and network.get('role')=='portable':
+        from application_access import validate_portable_owner
+        validate_portable_owner(network)
+        dependencies=[v for v in dependencies if v!='tailscaled.service']
     text='[Unit]\nDescription=RDC file-service '+name+'\nPartOf=rdc-nextcloud.target\nAfter=network-online.target'
     if dependencies:text+=' '+' '.join(dependencies)+'\nRequires='+' '.join(dependencies)
     text+='\n[Service]\nType=simple\n'

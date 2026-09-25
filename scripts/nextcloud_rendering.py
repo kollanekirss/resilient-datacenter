@@ -41,6 +41,10 @@ def apache_site():
 
 
 def proxy(profile,address):
+    if validate(profile):raise ValueError('Invalid file-service profile')
+    if 'access' in profile:
+        from application_access import portable_proxy
+        return portable_proxy(profile,address,'nextcloud')
     if validate(profile) or ipaddress.ip_address(address) not in ipaddress.ip_network('100.64.0.0/10'):raise ValueError('Invalid private file-service endpoint')
     return ('{\n admin off\n auto_https off\n servers {\n  protocols h1 h2\n }\n}\nhttps://'+profile['nextcloud_hostname']+' {\n bind '+address+'\n tls /tls/tls.crt /tls/tls.key\n'
             ' header Strict-Transport-Security "max-age=15552000"\n'

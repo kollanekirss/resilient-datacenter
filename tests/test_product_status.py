@@ -128,3 +128,11 @@ def test_summary_worker_timeout_does_not_expose_exception_or_start_repair(monkey
     result=m.collect(probe=probe)
     assert all(item['state']=='unknown' for item in result['dimensions'].values())
     assert 'private command' not in json.dumps(result)
+
+
+def test_portable_local_network_status_is_not_reported_as_enrollment():
+    import product_status as m
+    result=m.sanitize('network',{'state':'local-address-verified','controller_required':False})
+    assert result['state']=='local-address-verified'
+    assert result['controller_required'] is False
+    assert 'local' in result['next_step'].lower()

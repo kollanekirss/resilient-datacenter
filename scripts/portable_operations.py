@@ -7,6 +7,9 @@ from proxmox_api import Client,credentials
 def action(args):
     plan=validate(load(args.plan));verb=args.portable_action
     if verb=='preview':return preview(plan)
+    if verb.startswith(('applications-','frontend-')):
+        from portable_application_commands import action as applications_action
+        return applications_action(args,plan)
     if verb.startswith('network-'):
         require(args.settings is not None, 'Supply --settings with the reviewed local network settings JSON.')
         from portable_network import derive

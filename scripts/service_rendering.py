@@ -68,6 +68,9 @@ http {
 
 def proxy(profile,address):
     checked(profile)
+    if 'access' in profile:
+        from application_access import portable_proxy
+        return portable_proxy(profile,address,'matrix')
     ip=ipaddress.ip_address(address)
     if ip.version!=4 or ip not in ipaddress.ip_network('100.64.0.0/10'): raise ValueError('Service HTTPS must bind to the verified overlay IPv4')
     common='    bind '+str(ip)+'\n    tls /tls/tls.crt /tls/tls.key\n    header X-Content-Type-Options nosniff\n    header Referrer-Policy no-referrer\n'

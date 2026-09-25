@@ -16,6 +16,8 @@ UPGRADE=Path('/etc/rdc-upgrade-pending.json')
 
 
 def validate(config,settings):
+    if settings.get('ownership',{}).get('network',{}).get('role')=='portable':
+        raise ValueError('Portable partner connectivity requires its separate relocation and federation acceptance phase')
     if not isinstance(config,dict) or set(config)!=FIELDS or type(config['schema_version']) is not int or config['schema_version']!=1 or config['package']!='nextcloud':raise ValueError('Unsupported regional file connector')
     owner=settings['ownership']
     if config['application_owner']!=owner or owner.get('packages')!=['nextcloud'] or not hostname(owner.get('nextcloud_hostname')):raise ValueError('Connector belongs to another file installation')

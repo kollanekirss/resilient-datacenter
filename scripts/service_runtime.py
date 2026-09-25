@@ -36,7 +36,10 @@ def read_settings():
     pins=root_json(INSTALLED/'service_images.json')
     if pins.get('schema_version')!=1 or data['components']!=pins.get('components') or set(data['components'])!=set(UNITS): raise ValueError('Service component catalogue changed')
     address=ipaddress.ip_address(data['bind_address'])
-    if address.version!=4 or address not in ipaddress.ip_network('100.64.0.0/10'): raise ValueError('Invalid service overlay address')
+    if owner['network'].get('role')=='portable':
+        from application_access import validate_binding
+        validate_binding(owner['network'],data['bind_address'])
+    elif address.version!=4 or address not in ipaddress.ip_network('100.64.0.0/10'): raise ValueError('Invalid service overlay address')
     for name in ('matrix_hostname','element_hostname'):
         if not isinstance(owner.get(name),str) or not re.fullmatch('[a-z0-9][a-z0-9.-]{1,251}[a-z0-9]',owner[name]): raise ValueError('Invalid service hostname')
     return data
@@ -118,29 +121,33 @@ def container_command(name,settings):
                    '--volume',str(TLS)+':/tls:ro',image]
 
 
-def ingress_entries(address):
+def ingress_entries(address,*,network=None):
     import ipaddress
     ip=ipaddress.ip_address(address)
-    if ip.version!=4 or ip not in ipaddress.ip_network('100.64.0.0/10'):raise ValueError('Invalid application ingress address')
+    portable=network is not None and network.get('role')=='portable'
+    if portable:
+        from application_access import validate_binding
+        validate_binding(network,address)
+    elif ip.version!=4 or ip not in ipaddress.ip_network('100.64.0.0/10'):raise ValueError('Invalid application ingress address')
     table='rdc_application'
     def match(left,right,op='=='):return {'match':{'op':op,'left':left,'right':right}}
     return [{'table':{'family':'inet','name':table,'comment':'rdc-application-ingress-v1'}},
             {'chain':{'family':'inet','table':table,'name':'input','type':'filter','hook':'input','prio':-150,'policy':'accept'}},
             {'rule':{'family':'inet','table':table,'chain':'input','expr':[
                 match({'meta':{'key':'iifname'}},'lo','!='),
-                match({'meta':{'key':'iifname'}},'tailscale0','!='),
+                (match({'payload':{'protocol':'ip','field':'saddr'}},network['access']['frontend_address'],'!=') if portable else match({'meta':{'key':'iifname'}},'tailscale0','!=')),
                 match({'payload':{'protocol':'ip','field':'daddr'}},str(ip)),
                 match({'payload':{'protocol':'tcp','field':'dport'}},443),{'drop':None}]}}]
 
 
-def validate_ingress(data,address):
+def validate_ingress(data,address,*,network=None):
     def normalize(value):
         if isinstance(value,dict):return {k:normalize(v) for k,v in value.items() if k!='handle'}
         if isinstance(value,list):return [normalize(v) for v in value]
         return value
     if not isinstance(data,dict) or set(data)!={'nftables'} or not isinstance(data['nftables'],list):raise ValueError('Cannot verify application ingress')
     entries=[normalize(e) for e in data['nftables'] if not isinstance(e,dict) or 'metainfo' not in e]
-    if entries!=ingress_entries(address):raise ValueError('Application ingress rules differ; administrator review required')
+    if entries!=ingress_entries(address,network=network):raise ValueError('Application ingress rules differ; administrator review required')
 
 
 def ingress_nft(*args,input=None):
@@ -149,7 +156,7 @@ def ingress_nft(*args,input=None):
 
 
 def application_ingress(settings,*,create=False):
-    address=settings['bind_address'];entries=ingress_entries(address)
+    address=settings['bind_address'];network=settings.get('ownership',{}).get('network');entries=ingress_entries(address,network=network)
     tables=ingress_nft('-j','list','tables')
     exists=any(e.get('table',{}).get('family')=='inet' and e['table'].get('name')=='rdc_application' for e in tables['nftables'])
     if not exists:
@@ -158,13 +165,17 @@ def application_ingress(settings,*,create=False):
         # existing table or override another firewall's drop decision.
         commands=[{'create':entries[0]},*({'add':entry} for entry in entries[1:])]
         ingress_nft('-j','-f','-',input=json.dumps({'nftables':commands}))
-    validate_ingress(ingress_nft('-j','list','table','inet','rdc_application'),address)
+    validate_ingress(ingress_nft('-j','list','table','inet','rdc_application'),address,network=network)
 
 
-def unit(name):
+def unit(name,*,network=None):
     if name not in UNITS: raise ValueError('Unsupported component')
     dependencies={'postgres':[],'synapse':['rdc-postgres.service'],'element':[],
                   'proxy':['rdc-synapse.service','rdc-element.service','tailscaled.service']}[name]
+    if network is not None and network.get('role')=='portable':
+        from application_access import validate_portable_owner
+        validate_portable_owner(network)
+        dependencies=[v for v in dependencies if v!='tailscaled.service']
     text='[Unit]\nDescription=RDC '+name+' service\nPartOf=rdc-services.target\nAfter=network-online.target'
     if dependencies:text+=' '+' '.join(dependencies)+'\nRequires='+' '.join(dependencies)
     text+='\n[Service]\nType=simple\n'

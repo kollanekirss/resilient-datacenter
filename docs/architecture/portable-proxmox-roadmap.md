@@ -1,6 +1,6 @@
 # Portable Proxmox profile: delivery roadmap
 
-Status: planned engineering work, not an installer or completion record. Implements the [reference architecture](portable-proxmox.md). Work proceeds in the listed order; each deliverable retains its own evidence and does not imply the later gates passed.
+Status: staged engineering roadmap with implementation and acceptance boundaries. Implements the [reference architecture](portable-proxmox.md). Work proceeds in the listed order; each deliverable retains its own evidence and does not imply the later gates passed.
 
 ## 1. Site plan and preview
 
@@ -46,6 +46,8 @@ Exit: prepared clients receive correct local addressing and DNS while prohibited
 
 ## 4. NGINX and application backend profile
 
+The [portable local application profile](../portable-local-applications.md) is implemented in development: separate NGINX, frontend-restricted TLS backends, local accounts, profile-bound recovery/upgrades and wizard preparation. Hosted component acceptance is recorded in the release notes. This does not establish combined Proxmox/OPNsense or physical-kit acceptance.
+
 Add a new access profile to the existing application modules rather than weakening their current default.
 
 - Provision NGINX service names and prepared certificate chains; reject unknown hosts and configure required application proxy headers and limits.
@@ -84,6 +86,6 @@ Exit: changed-uplink, lost-relay/controller and partner-partition exercises pass
 
 ## First implementation boundary
 
-Stages 1–3 have initial implementations with their evidence boundaries above. Stage 4 is the next implementation boundary. Later stages require their own detailed implementation plans because they modify different operational trust and recovery boundaries. Do not combine host provisioning, firewall changes and application migration into one opaque installer action.
+Stages 1–4 have initial implementations with their evidence boundaries above. Stage 5, the offline software/recovery bundle, is the next implementation boundary. Later stages require their own detailed implementation plans because they modify different operational trust and recovery boundaries. Do not combine host provisioning, firewall changes and application migration into one opaque installer action.
 
 No server software is to be executed on the preparation Mac. Linux deployment acceptance runs on disposable Ubuntu infrastructure; Proxmox/OPNsense acceptance needs a dedicated disposable virtualization environment. Unit tests and plan generation may run on the preparation computer.

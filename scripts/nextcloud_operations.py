@@ -59,8 +59,8 @@ def preflight(profile):
     if validate(profile):raise ValueError('Invalid file-service profile')
     network=root_json(Path('/etc/server-connectivity-profile.json'));owner=ownership(profile,network)
     address=installed_address(network);inputs(profile)
-    if {item[4][0] for item in socket.getaddrinfo(profile['nextcloud_hostname'],443,type=socket.SOCK_STREAM)}!={address}:
-        raise ValueError('The file-service DNS name must resolve only to this enrolled overlay IPv4')
+    if {item[4][0] for item in socket.getaddrinfo(profile['nextcloud_hostname'],443,type=socket.SOCK_STREAM)}!={network.get('access',{}).get('frontend_address',address)}:
+        raise ValueError('The file-service DNS name must resolve only to its declared access frontend')
     if Path('/etc/rdc-services').exists():raise ValueError('Use a separate enrolled VM for Nextcloud; this node already has the chat package')
     marker=runtime.BASE/'ownership.json'
     if marker.exists() or marker.is_symlink():
@@ -186,11 +186,11 @@ def install_or_resume(profile,network,address,admin_user,admin_password):
     write(runtime.BASE/'ports.conf',apache_ports(),mode=0o644);write(runtime.BASE/'site.conf',apache_site(),mode=0o644)
     write(runtime.BASE/'Caddyfile',proxy(profile,address),mode=0o644)
     hashes={}
-    for name in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py','nextcloud_regional.py','service_regional.py','regional_http.py'):
+    for name in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py','nextcloud_regional.py','service_regional.py','regional_http.py')+(('application_access.py',) if network['role']=='portable' else ()):
         content=(SOURCE/name).read_bytes();write(runtime.INSTALLED/name,content,mode=0o644);hashes[name]=hashlib.sha256(content).hexdigest()
     write(runtime.INSTALLED/'manifest.json',json.dumps({'schema_version':1,'files':hashes}))
-    for name,unitname in runtime.UNITS.items():write(Path('/etc/systemd/system',unitname+'.service'),runtime.unit(name),mode=0o644)
-    write(TARGET,'[Unit]\nDescription=RDC Nextcloud services\nAfter=tailscaled.service\nWants=rdc-nextcloud-proxy.service\n[Install]\nWantedBy=multi-user.target\n',mode=0o644)
+    for name,unitname in runtime.UNITS.items():write(Path('/etc/systemd/system',unitname+'.service'),runtime.unit(name,network=network),mode=0o644)
+    write(TARGET,'[Unit]\nDescription=RDC Nextcloud services\nAfter='+(('network.target' if network['role']=='portable' else 'tailscaled.service'))+'\nWants=rdc-nextcloud-proxy.service\n[Install]\nWantedBy=multi-user.target\n',mode=0o644)
     write(CRON,cron_unit(),mode=0o644);write(TIMER,cron_timer(),mode=0o644)
     runtime.application_ingress(settings,create=True)
     subprocess.run(['/bin/systemctl','daemon-reload'],check=True,timeout=30)

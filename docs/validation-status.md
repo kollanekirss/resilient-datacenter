@@ -1,4 +1,4 @@
-# Validation status — 2026-09-25
+# Validation status — 2026-09-26
 
 ## Current scope and evidence boundaries
 
@@ -240,3 +240,28 @@ Real namespace acceptance passed at `5729ada` in [run 36187367660](https://githu
 Acceptance found two defects before merge: Ubuntu's chrony AppArmor policy disallows arbitrary configuration/drift paths, and Unbound can return a header-only REFUSED packet for denied clients. Validation/runtime now use distribution-allowed paths; a regression test accepts a matching header-only refusal only for negative probes and still rejects it as a successful address answer.
 
 Review was inline by the author; there was no independent security review. Real Proxmox/OPNsense installation, DHCP/edge rule enforcement, the full guarded Ansible application on an actual guest, UTC accuracy, local application access, power-loss recovery and physical relocation remain **NOT RUN**. Linux namespaces test the guest module and client probes; they do not emulate OPNsense or establish institution-ready crisis operation.
+
+
+## Portable local applications (0.4.0-dev.3)
+
+Both packages passed on `bba8ba8` in [run 36195561861](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36195561861).
+The production installers run actual NGINX and pinned application containers on
+disposable Ubuntu, with separate frontend/staff namespaces and a same-bridge
+attacker. TLS identity, client-address spoofing, unknown/mismatched hostnames,
+backend trust failure, expired-certificate refusal, source restrictions,
+frontend replacement/repeated renewal, WAN-blocked service restart and native
+application snapshot restoration all pass. Saved messages/files survive restore;
+changes made after the snapshot do not. No Tailscale daemon or stub is present.
+
+The local suite passes 784 tests and all local Ansible syntax/read-only checks.
+The new fixture uses protocol clients and a native local snapshot; it does not
+claim browser acceptance of the whole kit or new portable SFTP-transfer evidence.
+Existing browser/encrypted transport/federation/upgrade/fresh-guest workflows are
+separate regression checks. Portable upgrade scope/rollback has unit coverage;
+live version migration remains tested in the existing overlay fixture.
+
+Review was inline by the author. Actual Proxmox/OPNsense deployment, combined
+physical-kit boot, full empty-host offline rebuild, relocation, portable partner
+integration, power/capacity measurements and unfamiliar-operator acceptance
+remain NOT RUN. See [operator instructions](portable-local-applications.md) and
+[release notes](release-notes/0.4.0-dev.3.md) for exact boundaries.

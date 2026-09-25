@@ -2,7 +2,7 @@
 
 This development iteration adds a resumable **Proxmox guest-installation wizard**. It prepares verified installation media, uploads it, starts each isolated installer and guides an operator through installing OPNsense and Ubuntu. It is a guided console workflow, not unattended installation.
 
-The phase ends with operator-confirmed OS installation and console login on disk-only VMs. The next [local network step](portable-local-network.md) prepares OPNsense configuration instructions and the separate Unbound/time module. NGINX, Synapse and Nextcloud configuration remain subsequent work. Keep guest links disconnected until following that reviewed network transition; this installation phase alone is not an operational crisis datacenter.
+The phase ends with operator-confirmed OS installation and console login on disk-only VMs. The next [local network step](portable-local-network.md) prepares OPNsense configuration instructions and the separate Unbound/time module. Step 9 prepares the [local application kit](portable-local-applications.md) for separate NGINX, Synapse/Element and Nextcloud deployment. Keep guest links disconnected until following that reviewed network transition; this installation phase alone is not an operational crisis datacenter.
 
 ## Before starting
 
@@ -39,6 +39,8 @@ No secrets are saved by answering these planning questions. Credential *file pat
 6. **Guest installation.** Select edge, dns, nginx, chat, files or partner. Follow the actions below, one guest at a time. The same Ubuntu ISO is reused for all five Linux guests.
 7. **Instructions.** Show the console procedure again. Quit at any point and resume later; progress is retained.
 8. **Local network.** Prepare or verify the [site-specific network kit](portable-local-network.md), or run client DNS/time checks after guided activation. Kit preparation needs no Proxmox credentials and changes no server.
+
+9. **Local applications.** Prepare or verify the [application kit](portable-local-applications.md) from the saved site/network settings. Follow its generated instructions on the separate chat, files and NGINX guests. This preparation does not install services remotely.
 
 ### Actions for each guest
 
@@ -109,4 +111,4 @@ API permissions extend shell allocation with `Datastore.AllocateTemplate` for up
 
 Automated coverage includes pinned-media integrity, decompression bounds, private state handling, multipart upload checksums, uncertain responses, phase restrictions, foreign/drifted configurations, disconnected NICs and wizard preparation/resume. Hosted media verification downloads real vendor files without executing them. These do not replace a live Proxmox installation exercise.
 
-Live Proxmox upload/configuration/start and both console installers still require a disposable host. No such host is connected to this development session. Physical hardware, local service operation and offline recovery remain separate acceptance gates. This iteration is ready for code review and lab use, not an operational crisis deployment.
+Live Proxmox upload/configuration/start and both console installers still require a disposable host. No such host is connected to this development session. Physical hardware, combined local service operation and full offline reconstruction remain separate acceptance gates. This iteration is ready for code review and lab use, not an operational crisis deployment.

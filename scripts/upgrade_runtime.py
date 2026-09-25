@@ -33,7 +33,8 @@ def command(argv,*,input=None,timeout=60):
     return result.stdout
 
 
-def source_files(selected):
+def source_files(selected,*,portable=False):
+    if portable:return source_files(selected)+('application_access.py',)
     if selected=='matrix':return ('service_runtime.py','service_images.json','service_regional.py')
     if selected=='nextcloud':return ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py','nextcloud_regional.py','service_regional.py','regional_http.py')
     raise ValueError('Unsupported package runtime')
@@ -41,7 +42,7 @@ def source_files(selected):
 
 def verify_helpers(runtime,owner):
     selected=package(owner['applications']);manifest=root_json(runtime.INSTALLED/'manifest.json')
-    expected=source_files(selected)
+    expected=source_files(selected,portable=owner['role']=='portable')
     if not isinstance(manifest,dict) or set(manifest)!={'schema_version','files'} or manifest['schema_version']!=1 or set(manifest['files'])!=set(expected):raise ValueError('Unknown installed runtime manifest')
     if {p.name for p in runtime.INSTALLED.iterdir()}!=set(expected)|{'manifest.json'}:raise ValueError('Unreviewed installed helper files')
     for name in expected:
@@ -219,7 +220,7 @@ class Backend:
         settings=root_json(runtime.BASE/'runtime.json');settings.update(ownership=target,components=for_owner(target))
         atomic_json(runtime.BASE/'ownership.json',target);atomic_json(runtime.BASE/'runtime.json',settings)
         hashes={}
-        for name in source_files(self.selected):
+        for name in source_files(self.selected,portable=self.owner['role']=='portable'):
             raw=(SOURCE/name).read_bytes();write(runtime.INSTALLED/name,raw,mode=0o644);hashes[name]=hashlib.sha256(raw).hexdigest()
         atomic_json(runtime.INSTALLED/'manifest.json',{'schema_version':1,'files':hashes})
         return settings

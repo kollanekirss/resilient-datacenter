@@ -117,7 +117,7 @@ def _capture(root,destination,owner,*,services=None):
         raise ValueError('Insufficient free space for a consistent local snapshot')
     components=component_hashes(root,owner)
     original={name:services.is_active(name) for name in catalogue.services}
-    daemon={'controller':'usr/bin/headscale','relay':'usr/local/bin/sc-derper','peer':'usr/local/sbin/tailscaled'}[owner['role']]
+    daemon={'controller':'usr/bin/headscale','relay':'usr/local/bin/sc-derper','peer':'usr/local/sbin/tailscaled','portable':None}[owner['role']]
     if hasattr(services,'verify_binary'):
         for name,active in original.items():
             if active:

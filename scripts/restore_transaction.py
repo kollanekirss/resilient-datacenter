@@ -145,7 +145,7 @@ def set_permissions(path,name,owner):
     if name in ('etc/rdc-services','var/lib/rdc-services','etc/rdc-nextcloud','var/lib/rdc-nextcloud','etc/rdc-gateway','var/lib/rdc-gateway-recovery'):
         from backup_scope import application_backup
         return application_backup(owner['applications']).restore_permissions(path,name)
-    group={'controller':'headscale','relay':'sc-derp','peer':'root'}[owner['role']]
+    group={'controller':'headscale','relay':'sc-derp','peer':'root','portable':'root'}[owner['role']]
     persistent=name.startswith('var/lib/')
     user=group if persistent else 'root'
     uid=pwd.getpwnam(user).pw_uid;gid=grp.getgrnam(group).gr_gid

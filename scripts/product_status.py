@@ -13,7 +13,7 @@ import tempfile
 DIMENSIONS=('network','applications','certificates','backup','recovery','partners')
 COMMON={'unknown','blocked','not-configured','not-applicable','change-pending','restore-pending','upgrade-pending'}
 STATES={
-    'network':COMMON|{'enrolled','enrolled-controller-unreachable','awaiting-enrollment','stopped','service-running'},
+    'network':COMMON|{'local-address-verified','enrolled','enrolled-controller-unreachable','awaiting-enrollment','stopped','service-running'},
     'applications':COMMON|{'service-listeners-verified','stopped'},
     'certificates':COMMON|{'certificate-valid','certificate-expiring','certificate-invalid','renewal-failed'},
     'backup':COMMON|{'backup-current','backup-overdue','backup-unreachable','backup-failed','backup-scope-missing','no-backup'},
@@ -29,13 +29,14 @@ NEXT={
     'partners':'Review gateway or connector status, current bilateral approvals and a real partner exchange. Do not bypass a recovery review.',
 }
 TIMES={'expires_at','captured_at','completed_at','last_success_at'}
-BOOLEANS={'controller_reachable','automatic_renewal','serving_verified'}
+BOOLEANS={'controller_required','controller_reachable','automatic_renewal','serving_verified'}
 COUNTS={'backup_age_seconds','approved_peers'}
 
 
 def sanitize(name,value):
     if not isinstance(value,dict) or value.get('state') not in STATES[name]:value={'state':'unknown'}
     result={'state':value['state'],'next_step':NEXT[name]}
+    if name=='network' and value['state']=='local-address-verified':result['next_step']='Verify local DNS, time and staff access; the assigned address alone does not prove application availability.'
     if value['state']=='upgrade-pending':result['next_step']='Run upgrade recover from the same reviewed project source on this node before other maintenance.'
     for key in BOOLEANS:
         if type(value.get(key)) is bool:result[key]=value[key]
@@ -85,7 +86,7 @@ def collect(*,probe=None):
 
 
 def needs_attention(result):
-    informational={'enrolled','service-running','service-listeners-verified','certificate-valid','backup-current','service-verified',
+    informational={'local-address-verified','enrolled','service-running','service-listeners-verified','certificate-valid','backup-current','service-verified',
                    'not-applicable','partners-disabled','transport-verified-exchange-untested'}
     return any(item['state'] not in informational for item in result['dimensions'].values())
 

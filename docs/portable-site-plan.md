@@ -1,6 +1,6 @@
 # Preview a portable Proxmox site
 
-This is the first implemented part of the [portable architecture](architecture/portable-proxmox.md). It validates an operator-supplied plan and prints a preview. It makes no network requests, changes no servers and writes no generated configuration. The separate [experimental Proxmox adapter](proxmox-provisioning.md) adds API checks and explicit blank VM shell allocation. OPNsense installation/configuration and the local application access profile are not implemented yet.
+This is the first implemented part of the [portable architecture](architecture/portable-proxmox.md). It validates an operator-supplied plan and prints a preview. It makes no network requests, changes no servers and writes no generated configuration. The separate [experimental Proxmox adapter](proxmox-provisioning.md) adds API checks and explicit blank VM shell allocation. The [guest wizard](portable-installation-wizard.md), [network kit](portable-local-network.md) and [local applications](portable-local-applications.md) provide subsequent guided stages; preview alone performs none of those deployments.
 
 After preparing the project's normal Python dependencies:
 
