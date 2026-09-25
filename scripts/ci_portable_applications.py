@@ -145,7 +145,7 @@ def main(role):
         status_path=runtime.APP/'status.php';original_status=status_path.read_bytes()
         needle=b'echo json_encode($values);'
         assert original_status.count(needle)==1
-        status_path.write_bytes(original_status.replace(needle,b"$values['rdc_ci_client']=\\OC::$server->getRequest()->getRemoteAddress(); "+needle))
+        status_path.write_bytes(original_status.replace(needle,b"$values['rdc_ci_client']=\\OCP\\Server::get(\\OCP\\IRequest::class)->getRemoteAddress(); "+needle))
         runtime.podman('exec',runtime.UNITS['nextcloud'],'php','-l','/var/www/html/status.php')
         # Clear PHP's cached status.php bytecode after the CI-only probe edit.
         run(['systemctl','restart','rdc-nextcloud.target'],timeout=240)
