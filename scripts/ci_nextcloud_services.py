@@ -70,7 +70,9 @@ def main():
     assert install_or_resume(profile,network,ADDRESS,'unused','unused')['state']=='file-service-listeners-verified'
     assert request('GET',path)[1]==content
     apps=json.loads(runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','app:list','--output=json'))
-    assert all(name not in apps['enabled'] for name in ('federatedfilesharing','federation','cloud_federation_api'))
+    assert 'federation' not in apps['enabled']
+    from nextcloud_operations import federation_status
+    assert federation_status()=='disabled'
     print('Actual Nextcloud: trusted HTTPS, pinned confined containers, two accounts, exact file round trip, unauthorized access denial, approved share and revocation, background jobs and repeated installation PASS.',flush=True)
     identity_before=json.loads((runtime.BASE/'identity.json').read_text())
     selected=snapshot(network_snapshot)
@@ -88,13 +90,15 @@ def main():
     from ci_element_browser import session
     from playwright.sync_api import expect
     with session() as page:
-        page.goto('https://'+HOST+'/login')
+        page.goto('https://'+HOST+'/index.php/login')
         page.locator('input[name="user"]').fill('cialice')
         page.locator('input[name="password"]').fill(alice_password)
         page.get_by_role('button',name='Log in',exact=True).click()
         page.wait_for_url('**/apps/**')
-        page.goto('https://'+HOST+'/apps/files/')
+        page.goto('https://'+HOST+'/index.php/apps/files/')
         expect(page.get_by_text('proof.txt',exact=True).first).to_be_visible()
+    from ci_service_issuer import exercise as issuer_exercise
+    issuer_exercise(certificate_fixture.certificates,package='nextcloud')
     print('Actual Nextcloud browser login and uploaded file visibility PASS. Real VPN/home NAT and physical offsite placement NOT RUN.',flush=True)
 
 if __name__=='__main__':main()

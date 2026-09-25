@@ -13,3 +13,12 @@ def test_pinned_code_links_must_stay_within_readonly_application_tree(tmp_path):
     with pytest.raises(ValueError):m.code_entries(root)
     (root/'escape').unlink();(root/'broken').symlink_to('absent')
     with pytest.raises(ValueError):m.code_entries(root)
+
+
+def test_external_sharing_requires_all_effective_controls(monkeypatch):
+    m=importlib.import_module('nextcloud_operations')
+    controls={name:'no' for name in m.FEDERATION_CONTROLS}
+    monkeypatch.setattr(m.runtime,'podman',lambda *args,**kwargs:controls[args[-1]])
+    assert m.federation_status()=='disabled'
+    controls['incoming_server2server_share_enabled']='yes'
+    assert m.federation_status()=='configuration-changed'

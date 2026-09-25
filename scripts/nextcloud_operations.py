@@ -74,14 +74,7 @@ def preflight(profile):
     return {'ownership':owner,'address':address,'existing':False}
 
 
-class TLSRuntime:
-    def __init__(self,settings):self.settings=settings
-    def restart(self,service):subprocess.run(['/bin/systemctl','restart','rdc-nextcloud-proxy.service'],check=True,capture_output=True,timeout=180)
-    def verify(self,hostname,fingerprint):runtime.verify_https(self.settings)
-
-
-def activate_certificate(settings,cert,key,*,initial=False):
-    return activate(TLSBASE,settings['ownership']['nextcloud_hostname'],'nextcloud',cert,key,gid=0,initial=initial,runtime=TLSRuntime(settings))
+from nextcloud_certificates import activate_certificate
 
 
 def maintenance(settings,action,data):
@@ -183,25 +176,41 @@ def install_or_resume(profile,network,address,admin_user,admin_password):
     activate_certificate(settings,cert,key,initial=True)
     subprocess.run(['/bin/systemctl','start','rdc-nextcloud.service'],check=True,timeout=180)
     # Disable external federation before exposing the application to users.
-    for app in ('federatedfilesharing','federation','cloud_federation_api','lookup_server_connector','updatenotification'):
+    for app in ('federation','updatenotification'):
         runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','app:disable',app,timeout=60)
+    for control in FEDERATION_CONTROLS:
+        runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:set','files_sharing',control,'--value=no',timeout=60)
+    if federation_status()!='disabled':raise ValueError('External sharing controls did not take effect')
     runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','background:cron',timeout=60)
     subprocess.run(['/bin/systemctl','enable','--now','rdc-nextcloud.target','rdc-nextcloud-cron.timer'],check=True,timeout=180)
     subprocess.run(['/bin/systemctl','start','rdc-nextcloud-proxy.service'],check=True,timeout=180)
     return status()
 
 
+FEDERATION_CONTROLS=('outgoing_server2server_share_enabled','incoming_server2server_share_enabled',
+                     'outgoing_server2server_group_share_enabled','incoming_server2server_group_share_enabled',
+                     'lookupServerEnabled','lookupServerUploadEnabled','federatedTrustedShareAutoAccept')
+
+
+def federation_status():
+    values=[runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:get','files_sharing',name,timeout=30).strip() for name in FEDERATION_CONTROLS]
+    return 'disabled' if all(value=='no' for value in values) else 'configuration-changed'
+
+
 def status():
     settings=runtime.read_settings()
     for name in runtime.UNITS:runtime.verify_image(name,settings);runtime.ready(name,settings,attempts=1)
     return {'state':'file-service-listeners-verified','nextcloud_url':'https://'+settings['ownership']['nextcloud_hostname'],
-            'application_login_test':'not-run','application_backup':backup_status(),'federation':'disabled'}
+            'application_login_test':'not-run','application_backup':backup_status(),'federation':federation_status()}
 
 
 def action(args):
     import getpass
     import sys
     from profile_config import load_profile
+    if args.action=='issuer':
+        from service_issuer import action as issuer_action
+        return issuer_action(args)
     if args.action=='setup':
         from nextcloud_setup import wizard
         return wizard(args.output_file)

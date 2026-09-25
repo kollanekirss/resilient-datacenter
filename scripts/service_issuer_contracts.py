@@ -4,15 +4,22 @@ from profile_config import _identifier,_safe_values
 from validate_inventory import hostname
 
 BASE='/etc/rdc-service-acme'
-FIELDS={'kind','schema_version','provider','institution_id','node_name','matrix_hostname','element_hostname','acme_email','acme_agree_terms'}
+FIELDS={'kind','schema_version','provider','institution_id','node_name','acme_email','acme_agree_terms'}
+
+
+def name_fields(profile):
+    if profile.get('kind')=='service-certificates':return ('matrix_hostname','element_hostname')
+    if profile.get('kind')=='nextcloud-certificates':return ('nextcloud_hostname',)
+    return ()
 
 
 def validate(data):
-    if not isinstance(data,dict) or set(data)!=FIELDS or not _safe_values(data):return ['Use only the documented certificate request fields; credentials and commands are forbidden.']
+    if not isinstance(data,dict) or set(data)!=FIELDS|set(name_fields(data)) or not _safe_values(data):return ['Use only the documented certificate request fields; credentials and commands are forbidden.']
     errors=[]
-    if data['kind']!='service-certificates' or type(data['schema_version']) is not int or data['schema_version']!=1 or data['provider']!='cloudflare':errors.append('Unsupported certificate provider contract.')
+    if data['kind'] not in ('service-certificates','nextcloud-certificates') or type(data['schema_version']) is not int or data['schema_version']!=1 or data['provider']!='cloudflare':errors.append('Unsupported certificate provider contract.')
     if not all(_identifier(data[k]) for k in ('institution_id','node_name')):errors.append('Invalid node identity.')
-    if not all(hostname(data[k]) for k in ('matrix_hostname','element_hostname')) or data['matrix_hostname']==data['element_hostname']:errors.append('Provide distinct Matrix and Element DNS names.')
+    names=name_fields(data)
+    if not names or not all(hostname(data[k]) for k in names) or len({data[k] for k in names})!=len(names):errors.append('Provide distinct permanent application DNS names.')
     if not isinstance(data['acme_email'],str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+%-]{0,126}@[A-Za-z0-9][A-Za-z0-9.-]{0,251}\.[A-Za-z]{2,63}',data['acme_email']):errors.append('Provide a valid certificate account email.')
     if data['acme_agree_terms'] is not True:errors.append('Explicit acceptance of the certificate issuer terms is required.')
     return errors
@@ -33,7 +40,7 @@ def issue_command(profile):
     if validate(profile):raise ValueError('Invalid service certificate request')
     return common_command()+['certonly','--dns-cloudflare','--dns-cloudflare-credentials',BASE+'/cloudflare.ini',
                              '--dns-cloudflare-propagation-seconds','60','--email',profile['acme_email'],'--agree-tos',
-                             '-d',profile['matrix_hostname'],'-d',profile['element_hostname']]
+                             ]+[value for key in name_fields(profile) for value in ('-d',profile[key])]
 
 
 def renew_command():return common_command()+['renew']

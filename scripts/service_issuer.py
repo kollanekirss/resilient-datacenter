@@ -9,7 +9,7 @@ from pathlib import Path
 import stat
 import subprocess
 import tempfile
-from service_issuer_contracts import validate,credential_text,issue_command,renew_command,validate_renewal
+from service_issuer_contracts import validate,credential_text,issue_command,renew_command,validate_renewal,name_fields
 from service_runtime import root_json,read_settings,verify_https
 from service_contracts import network_manifest
 from certificate_lifecycle import validate_material,validity
@@ -19,9 +19,10 @@ BASE=Path('/etc/rdc-service-acme')
 RUNTIME=Path('/opt/rdc-service-certificate-runtime')
 UNIT=Path('/etc/systemd/system/rdc-service-certificate.service')
 TIMER=Path('/etc/systemd/system/rdc-service-certificate.timer')
-FILES=('service_issuer_runner.py','service_issuer.py','service_issuer_contracts.py','service_certificates.py',
+LEGACY_FILES=('service_issuer_runner.py','service_issuer.py','service_issuer_contracts.py','service_certificates.py',
        'service_runtime.py','service_contracts.py','certificate_lifecycle.py','profile_config.py','setup_contracts.py',
        'validate_inventory.py','validate_tls.py')
+FILES=LEGACY_FILES+('nextcloud_runtime.py','nextcloud_certificates.py')
 
 
 def directory(path,*,create=True):
@@ -74,9 +75,11 @@ def check_ambient():
 
 
 @contextmanager
-def operation_lock():
+def operation_lock(profile=None):
+    if profile is None and (BASE/'configuration.json').exists():profile=configuration()['profile']
+    file_service=profile is not None and profile.get('kind')=='nextcloud-certificates'
     with ExitStack() as stack:
-        paths=[Path('/run/rdc-services-operation.lock')]
+        paths=[Path('/run/rdc-nextcloud-operation.lock' if file_service else '/run/rdc-services-operation.lock')]
         if Path('/etc/rdc-backup').exists():paths.insert(0,Path('/etc/rdc-backup/operation.lock'))
         for path in paths:
             fd=os.open(path,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
@@ -103,7 +106,7 @@ def material(profile):
         if info.st_uid!=0 or not stat.S_ISREG(info.st_mode) or info.st_mode&0o022 or info.st_size>262144:raise ValueError('Unsafe issued certificate material')
         if name=='privkey.pem' and info.st_mode&0o077:raise ValueError('Issued key is not private to root')
         contents.append(target.read_bytes())
-    for name in ('matrix_hostname','element_hostname'):validate_material(*contents,profile[name])
+    for name in name_fields(profile):validate_material(*contents,profile[name])
     return tuple(contents)
 
 
@@ -123,9 +126,28 @@ def publish(profile,cert,key):
     return {'certificate':str(BASE/'issued/tls.crt'),'private_key':str(BASE/'issued/tls.key')}
 
 
+def application_runtime(profile):
+    if profile['kind']=='nextcloud-certificates':
+        import nextcloud_runtime
+        return nextcloud_runtime
+    import service_runtime
+    return service_runtime
+
+
+def active_directory(profile):
+    return Path('/etc/rdc-nextcloud-tls' if profile['kind']=='nextcloud-certificates' else '/etc/rdc-service-tls')
+
+
+def activate_application(profile,settings,cert,key):
+    if profile['kind']=='nextcloud-certificates':
+        from nextcloud_certificates import activate_certificate
+        return activate_certificate(settings,cert,key)
+    return activate_pair(active_directory(profile),settings,cert,key)
+
+
 def matching_application(profile):
-    settings=read_settings()
-    if any(settings['ownership'][k]!=profile[k] for k in ('institution_id','node_name','matrix_hostname','element_hostname')):
+    settings=application_runtime(profile).read_settings()
+    if any(settings['ownership'][k]!=profile[k] for k in ('institution_id','node_name',*name_fields(profile))):
         raise ValueError('Certificate issuer and application identities differ')
     return settings
 
@@ -137,7 +159,7 @@ def issue(profile,token):
     network=root_json(Path('/etc/server-connectivity-profile.json'));network_manifest(network)
     if any(profile[k]!=network[k] for k in ('institution_id','node_name')):raise ValueError('Certificate request differs from the local node')
     data={'schema_version':1,'profile':profile,'network':network}
-    with operation_lock():
+    with operation_lock(profile):
         check_ambient()
         marker=BASE/'configuration.json'
         if BASE.exists() or BASE.is_symlink():
@@ -161,7 +183,7 @@ def issue(profile,token):
         except (OSError,ValueError,subprocess.SubprocessError):
             write(BASE/'status.json',json.dumps({'state':'issuance-failed','checked_at':datetime.now(timezone.utc).isoformat()}),replace=True)
             raise ValueError('Certificate issuance failed. Review DNS zone access, provider token, propagation and issuer availability; existing active TLS was retained.') from None
-    return dict(paths,state='issued-not-activated',next_step='Use these certificate paths in services setup, install applications, then enable certificate renewal.')
+    return dict(paths,state='issued-not-activated',next_step='Use these certificate paths in '+('files' if profile['kind']=='nextcloud-certificates' else 'services')+' setup, install applications, then enable certificate renewal.')
 
 
 def unit_text():
@@ -174,8 +196,8 @@ def timer_text():
 
 def verify_runtime():
     directory(RUNTIME,create=False);manifest=json.loads(private_file(RUNTIME/'manifest.json'))
-    if set(manifest)!={'schema_version','files'} or manifest['schema_version']!=1 or set(manifest['files'])!=set(FILES):raise ValueError('Unknown issuer runtime')
-    if set(p.name for p in RUNTIME.iterdir())!=set(FILES)|{'manifest.json'}:raise ValueError('Unexpected issuer runtime files')
+    if set(manifest)!={'schema_version','files'} or manifest['schema_version']!=1 or set(manifest['files']) not in (set(FILES),set(LEGACY_FILES)):raise ValueError('Unknown issuer runtime')
+    if set(p.name for p in RUNTIME.iterdir())!=set(manifest['files'])|{'manifest.json'}:raise ValueError('Unexpected issuer runtime files')
     for name,digest in manifest['files'].items():
         if hashlib.sha256(private_file(RUNTIME/name)).hexdigest()!=digest:raise ValueError('Certificate renewal runtime changed')
     for path,content in ((UNIT,unit_text()),(TIMER,timer_text())):
@@ -211,7 +233,7 @@ def enable():
         if probe.returncode:
             subprocess.run(['/usr/bin/apt-get','update','-qq'],check=True,capture_output=True,timeout=300)
             subprocess.run(['/usr/bin/apt-get','install','-y','python3-yaml','python3-cryptography'],check=True,capture_output=True,timeout=300)
-        activate_pair(Path('/etc/rdc-service-tls'),settings,cert,key)
+        activate_application(data['profile'],settings,cert,key)
         subprocess.run(['/bin/systemctl','daemon-reload'],check=True,capture_output=True,timeout=30)
         subprocess.run(['/bin/systemctl','enable','--now','rdc-service-certificate.timer'],check=True,capture_output=True,timeout=30)
         return {'state':'certificate-renewal-enabled','provider':'cloudflare','real_provider_acceptance':'operator-verification-required'}
@@ -223,7 +245,7 @@ def renew():
         data=configuration();settings=matching_application(data['profile'])
         try:
             check_renewal();execute(renew_command());cert,key=material(data['profile'])
-            result=activate_pair(Path('/etc/rdc-service-tls'),settings,cert,key);publish(data['profile'],cert,key)
+            result=activate_application(data['profile'],settings,cert,key);publish(data['profile'],cert,key)
             write(BASE/'status.json',json.dumps(dict(result,checked_at=datetime.now(timezone.utc).isoformat())),replace=True)
         except (OSError,ValueError,subprocess.SubprocessError):
             write(BASE/'status.json',json.dumps({'state':'renewal-failed','checked_at':datetime.now(timezone.utc).isoformat()}),replace=True)
@@ -234,11 +256,11 @@ def status():
     data=configuration();result={'state':'configured','provider':'cloudflare','automatic_renewal':False}
     if (BASE/'status.json').exists():result.update(json.loads(private_file(BASE/'status.json')))
     from cryptography import x509
-    active=Path('/etc/rdc-service-tls/active/tls.crt')
+    active=active_directory(data['profile'])/'active/tls.crt'
     if active.exists():
         cert=x509.load_pem_x509_certificate(active.read_bytes());expiry=validity(cert,'after')
         result.update(expires_at=expiry.isoformat(),expires_within_14_days=expiry<=datetime.now(timezone.utc)+timedelta(days=14))
-        try:verify_https(matching_application(data['profile']));result['serving_verified']=True
+        try:application_runtime(data['profile']).verify_https(matching_application(data['profile']));result['serving_verified']=True
         except (OSError,ValueError,subprocess.SubprocessError):result['serving_verified']=False
     if RUNTIME.exists():
         verify_runtime()
@@ -251,7 +273,7 @@ def status():
 def action(args):
     if args.issuer_action=='setup':
         from service_issuer_setup import wizard
-        return wizard(args.output_file)
+        return wizard(args.output_file,package=getattr(args,'certificate_package','matrix'))
     from backup_operations import require_platform
     require_platform()
     if args.issuer_action=='enable':return enable()
