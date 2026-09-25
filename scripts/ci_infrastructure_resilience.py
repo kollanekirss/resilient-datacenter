@@ -59,7 +59,7 @@ def exercise():
         with (Path('/etc/netns')/client['name']/'hosts').open('a') as stream:
             stream.write(''.join(entry['address']+' '+entry['hostname']+'\n' for entry in relays))
         # Permit STUN only. The peers cannot establish a direct UDP data path.
-        run('ip','netns','exec',client['name'],'nft','-f','-',input='table inet rdc_force_relay { chain output { type filter hook output priority -50; policy accept; udp dport != 3478 drop; } }\n')
+        run('ip','netns','exec',client['name'],'nft','-f','-',input='table inet rdc_force_relay {\n chain output {\n type filter hook output priority -50; policy accept;\n udp dport != 3478 drop;\n }\n}\n')
     service=clients[1];hostname='service.resilience.ci.test';folder=root/'https';folder.mkdir();network.issue(hostname,folder)
     script=folder/'serve.py'
     script.write_text('''import http.server,ssl,sys
@@ -122,6 +122,12 @@ def main():
     import ci_certificate_lifecycle
     sys.argv=[sys.argv[0],'controller']
     try:ci_certificate_lifecycle.main(controller_exercise=exercise)
+    except BaseException:
+        for path in network.ROOT.glob('*.log'):
+            print('Disposable component: '+path.name,flush=True)
+            for line in path.read_text(errors='replace').splitlines()[-20:]:
+                if not any(term in line.lower() for term in ('auth','token','key=','key:','register')):print(line[:500],flush=True)
+        raise
     finally:network.cleanup()
 
 

@@ -88,3 +88,22 @@ def test_multiple_relay_wizard_uses_separate_hosts_and_certificate_paths(tmp_pat
     infra=yaml.safe_load((tmp_path/'infrastructure.yml').read_text())
     assert infra['all']['vars']['additional_relays']==[{'host':'relay-offsite-2','hostname':'relay-two.pilot.test','region_id':902}]
     assert infra['all']['children']['relay']['hosts']['relay-offsite-2']['tls_private_key']=='/local/relay-two.key'
+
+
+def test_multiple_relay_draft_resumes_with_same_endpoint_identity(tmp_path):
+    m=wizard()
+    answers={'purpose':'independent','institution_id':'my-home','headscale_hostname':'control.pilot.test',
+        'control_ip':'1.1.1.1','control_user':'ubuntu','derp_hostname':'relay.pilot.test','relay_ip':'8.8.8.8','relay_user':'ubuntu',
+        'enrollment_admin':'lab-admin','tls_mode':'managed-acme','acme_email':'admin@institution.test','acme_terms':'accept',
+        'relay_count':'2','relay2_hostname':'relay-two.pilot.test','relay2_ip':'9.9.9.9','relay2_user':'ubuntu'}
+    draft=tmp_path/'saved.yml';draft.write_text(yaml.safe_dump({'kind':'setup-draft','schema_version':1,'answers':answers}))
+    replies=iter(['']*len(answers)+[':save'])
+    output=tmp_path/'resumed'
+    assert m.run_wizard(output,resume=draft,input_fn=lambda _:next(replies),output_fn=lambda _:None)=='draft'
+    assert yaml.safe_load((output/'draft.yml').read_text())['answers']==answers
+
+
+def test_untrusted_saved_relay_count_is_rejected_before_questions(tmp_path):
+    import pytest
+    draft=tmp_path/'bad.yml';draft.write_text(yaml.safe_dump({'kind':'setup-draft','schema_version':1,'answers':{'purpose':'independent','relay_count':'999999'}}))
+    with pytest.raises(ValueError):wizard().run_wizard(tmp_path/'unused',resume=draft,input_fn=lambda _:pytest.fail('Untrusted draft reached a prompt'))
