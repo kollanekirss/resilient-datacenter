@@ -98,8 +98,8 @@ def preflight(profile):
     return {'ownership':owner,'address':address,'existing':False}
 
 
-def pull_images():
-    pins=image_pins()
+def pull_images(pins=None):
+    pins=image_pins() if pins is None else pins
     with tempfile.TemporaryDirectory(prefix='rdc-image-auth-') as directory:
         auth=Path(directory)/'auth.json';auth.write_text('{"auths":{}}');auth.chmod(0o600)
         for item in pins.values():
