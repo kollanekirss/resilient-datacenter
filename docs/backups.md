@@ -47,9 +47,28 @@ sudo ./rdc backup run
 sudo ./rdc backup status
 ```
 
-Initialization requires an interactive acknowledgement that independent recovery access is saved. It refuses to overwrite an existing repository. The backup command reports success only after receiving a complete snapshot ID. Status shows the latest snapshot's age and explicitly distinguishes a snapshot from a verified recovery. No automatic retention, deletion or backup schedule is installed by these commands.
+Initialization requires an interactive acknowledgement that independent recovery access is saved. It refuses to overwrite an existing repository. The backup command reports success only after receiving a complete snapshot ID. Status shows the latest snapshot's age and explicitly distinguishes a snapshot from a verified recovery. No automatic retention or deletion is installed. Scheduling is a separate opt-in action below.
 
-Keep a routine for running backups and checking their age until scheduled maintenance is implemented. A successful upload is not evidence that an application can be recovered; perform the recovery exercise below with disposable data first.
+After a successful manual snapshot, optionally enable a schedule:
+
+```sh
+sudo ./rdc backup schedule enable --frequency daily
+sudo ./rdc backup schedule status
+```
+
+Choose `daily` (02:00 UTC) or `hourly`, with up to ten minutes of randomized delay. Enabling a schedule authorizes the same brief owned-service pause on each run. A missed timer event catches up after the server returns; this is not a guarantee of backup completion during an outage. The installer prepares required Ubuntu Python library packages and copies the backup program into private, root-owned `/opt/rdc-backup-runtime`. It does not execute a mutable home-directory checkout later. Runtime hashes and ownership are checked before each run; fetching newer project source does not silently update this installed copy.
+
+`backup status` shows timer state, last scheduled attempt and last scheduled success, along with the remote snapshot age. Failed attempts preserve the earlier success record. It reports overdue after the selected interval plus a 30-minute grace period; this threshold is a warning, not a recovery-point guarantee. An unreachable repository is reported as unverified, never fresh. No external alert recipient is configured automatically. Check status routinely and include it in the institution's existing monitoring.
+
+To stop future scheduled runs:
+
+```sh
+sudo ./rdc backup schedule disable
+```
+
+An already-running backup is allowed to finish. Enabling the same schedule resumes it. This experimental version refuses to replace an existing schedule with a different frequency or to overwrite its installed runtime; controlled schedule/runtime changes require a later maintenance path. No snapshots are pruned automatically, so capacity monitoring is essential.
+
+A successful upload is not evidence that an application can be recovered; perform the recovery exercise below with disposable data first.
 
 ## 4. Prepare a replacement and stage recovery
 

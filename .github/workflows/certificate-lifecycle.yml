@@ -22,7 +22,7 @@ jobs:
       - name: Prepare disposable runner dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y nftables
+          sudo apt-get install -y nftables openssh-server python3-yaml python3-cryptography
           python -m venv .venv
           .venv/bin/python -m pip install -r requirements.txt
       - name: Exercise real service certificate activation and rollback
@@ -31,4 +31,4 @@ jobs:
         run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT .venv/bin/python scripts/ci_certificate_lifecycle.py "$SERVICE_ROLE"
       - name: Collect disposable service diagnostics on failure
         if: failure()
-        run: sudo journalctl -u headscale -u sc-derp --no-pager --lines=100
+        run: sudo journalctl -u headscale -u sc-derp -u rdc-backup -u rdc-backup-sshd --no-pager --lines=100

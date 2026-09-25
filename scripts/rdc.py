@@ -67,6 +67,10 @@ def parser():
     backup_commands.add_parser('restore-stage',help='Decrypt a specific snapshot into private staging; never promote').add_argument('snapshot')
     for action in ('restore-plan','restore-apply'):
         backup_commands.add_parser(action,help='Review or explicitly promote an already staged snapshot').add_argument('snapshot')
+    schedule=backup_commands.add_parser('schedule',help='Opt-in consistent backups with brief service pauses')
+    scheduled=schedule.add_subparsers(dest='schedule_action',required=True)
+    scheduled.add_parser('enable').add_argument('--frequency',choices=('hourly','daily'),required=True)
+    for action in ('disable','status'): scheduled.add_parser(action)
     target=backup_commands.add_parser('target',help='Prepare dedicated SFTP storage over the private overlay')
     targets=target.add_subparsers(dest='target_action',required=True)
     targets.add_parser('prepare').add_argument('manifest',type=Path)
@@ -137,7 +141,7 @@ def dispatch(args) -> ActionResult:
             print('Backup action blocked: '+str(error))
             return result_for_state('blocked')
         print(json.dumps(outcome,indent=2))
-        return result_for_state({'no-backup':'blocked','cancelled':'cancelled','prepared':'prepared'}.get(outcome.get('state'),'checks-passed'))
+        return result_for_state({'no-backup':'blocked','backup-unreachable':'blocked','backup-overdue':'blocked','cancelled':'cancelled','prepared':'prepared'}.get(outcome.get('state'),'checks-passed'))
     if args.command=='release':
         try: fetch_release(args.version,args.commit,args.output_dir)
         except ValueError as error:
