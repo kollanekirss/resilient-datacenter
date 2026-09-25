@@ -122,15 +122,12 @@ def main():
                            'creation_content':{'m.federate':False},'initial_state':[{'type':'m.room.encryption','state_key':'',
                            'content':{'algorithm':'m.megolm.v1.aes-sha2'}}]},token=alice)['room_id']
     from ci_element_browser import prepare_encrypted
-    recovery_key=prepare_encrypted('@cialice:'+MATRIX,alice_password,encrypted_room)
+    backup_check=lambda:request('GET','/_matrix/client/v3/room_keys/version',token=alice).get('count',0)>0
+    recovery_key=prepare_encrypted('@cialice:'+MATRIX,alice_password,encrypted_room,backup_check)
     encrypted_history=request('GET','/_matrix/client/v3/rooms/'+urllib.parse.quote(encrypted_room,safe='')+'/messages?dir=b&limit=10',token=alice)
     encrypted_events=[e for e in encrypted_history['chunk'] if e['type']=='m.room.encrypted']
     assert encrypted_events and 'Encrypted history survives' not in json.dumps(encrypted_events)
-    import time
-    for attempt in range(30):
-        if request('GET','/_matrix/client/v3/room_keys/version',token=alice).get('count',0)>0:break
-        time.sleep(1)
-    else:raise AssertionError('Encrypted room key was not uploaded before the server snapshot')
+    assert backup_check()
     selected=snapshot(network_snapshot)
     from service_certificates import replace,activate_pair,Runtime as CertificateRuntime,BASE as CERTBASE
     from certificate_lifecycle import ActivationError

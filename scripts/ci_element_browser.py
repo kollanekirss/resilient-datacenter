@@ -62,7 +62,7 @@ def login(page,username,password,*,recovery_key=None):
     expect(user_menu).to_be_visible()
 
 
-def prepare_encrypted(username,password,room):
+def prepare_encrypted(username,password,room,backup_check):
     from playwright.sync_api import expect
     with session() as page:
         login(page,username,password)
@@ -82,8 +82,14 @@ def prepare_encrypted(username,password,room):
         page.goto('https://chat.ci.test/#/room/'+urllib.parse.quote(room,safe=''))
         composer=page.locator('.mx_MessageComposer').get_by_role('textbox')
         composer.fill('Encrypted history survives restored server and fresh browser')
-        composer.press('Enter')
+        with page.expect_response(lambda response:'/send/m.room.encrypted/' in response.url and response.request.method=='PUT') as sent:
+            composer.press('Enter')
+        assert sent.value.status==200 and sent.value.json().get('event_id')
         expect(page.get_by_text('Encrypted history survives restored server and fresh browser',exact=True)).to_be_visible()
+        for attempt in range(30):
+            if backup_check():break
+            page.wait_for_timeout(1000)
+        else:raise ValueError('Browser did not upload the encrypted room key before closing')
         print('Element encrypted message and independently captured test recovery key prepared; recovery not yet claimed.',flush=True)
         return recovery_key
 
@@ -95,7 +101,10 @@ def exercise(username,password,room,*,recovery_key=None,encrypted_room=None):
         page.goto('https://chat.ci.test/#/room/'+urllib.parse.quote(room,safe=''))
         expect(page.get_by_text('Disposable RDC application proof',exact=True)).to_be_visible()
         composer=page.locator('.mx_MessageComposer').get_by_role('textbox')
-        composer.fill('Message sent from the actual Element browser');composer.press('Enter')
+        composer.fill('Message sent from the actual Element browser')
+        with page.expect_response(lambda response:'/send/m.room.message/' in response.url and response.request.method=='PUT') as sent:
+            composer.press('Enter')
+        assert sent.value.status==200 and sent.value.json().get('event_id')
         expect(page.get_by_text('Message sent from the actual Element browser',exact=True)).to_be_visible()
         if encrypted_room is not None:
             page.goto('https://chat.ci.test/#/room/'+urllib.parse.quote(encrypted_room,safe=''))
