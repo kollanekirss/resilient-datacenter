@@ -135,11 +135,11 @@ Successful live checks write separate per-server JSON reports under `artifacts/`
 
 ## What is deliberately still pending
 
-- All real deployments and live acceptance checks, including the pinned Headscale runtime parser.
+- Real multi-site and home-NAT deployments, disconnected-operation acceptance and colleague usability. Disposable runtime tests are recorded in the validation guide.
 - Multiple controllers/relays, resilient bootstrap DNS, identity-service recovery and institutional trust governance.
-- OPNsense, Unbound, SSO, Matrix/Element, Nextcloud and their application-specific replication/restore designs.
+- Nextcloud, regional application federation, resilient DNS, optional institutional SSO and integration guidance for existing routers such as OPNsense.
 - A supported client-device installer and fleet lifecycle management.
-- Production security review, monitoring, certificate automation, offsite backups and evidence-based availability commitments.
+- Production security review, external monitoring/alerts, physical offsite acceptance, controlled application upgrades and measured availability commitments.
 
 There is one controller and one relay. The relay checks new client admission against the controller and fails closed. Existing direct sessions may continue during controller loss, but new enrollment, policy distribution and fresh relay admission are affected. There is no claim of high availability or disruption-free relocation. Tagged machine identities require explicit revocation and lifecycle management; the configured default expiry for untagged nodes does not imply tagged servers expire automatically.
 

@@ -63,7 +63,13 @@ def inspect_container(name,settings):
     result=subprocess.run(['/usr/bin/podman','container','exists',UNITS[name]],capture_output=True,timeout=15)
     if result.returncode==1:return None
     if result.returncode!=0: raise ValueError('Cannot inspect service container existence')
-    records=json.loads(podman('container','inspect',UNITS[name]))
+    try:records=json.loads(podman('container','inspect',UNITS[name]))
+    except subprocess.CalledProcessError:
+        # --rm cleanup can remove a stopped container between existence and
+        # inspection. Only verified absence is benign; retain all other errors.
+        remaining=subprocess.run(['/usr/bin/podman','container','exists',UNITS[name]],capture_output=True,timeout=15)
+        if remaining.returncode==1:return None
+        raise
     if not isinstance(records,list) or len(records)!=1: raise ValueError('Cannot identify one service container')
     validate_container(records[0],name,settings)
     return records[0]
@@ -80,7 +86,7 @@ def verify_image(name,settings):
 
 def container_command(name,settings):
     if name not in UNITS: raise ValueError('Unsupported service component')
-    common=['/usr/bin/podman','--runtime=/usr/bin/runc','run','--rm','--name',UNITS[name],'--network=host','--pull=never','--read-only',
+    common=['/usr/bin/podman','--runtime=/usr/bin/runc','run','--name',UNITS[name],'--network=host','--pull=never','--read-only',
             '--cap-drop=ALL','--security-opt=no-new-privileges','--pids-limit=512',
             '--label','org.rdc.owner='+owner_digest(settings),'--label','org.rdc.component='+name,
             '--tmpfs','/tmp:rw,nosuid,nodev,size=64m,mode=1777']

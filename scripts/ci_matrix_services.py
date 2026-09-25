@@ -148,9 +148,13 @@ def main():
         def verify(self,hostname,fingerprint):
             super().verify(hostname,fingerprint)
             if self.first:self.first=False;raise ValueError('Synthetic failure after actual new certificate verification')
-    try:activate_pair(CERTBASE,settings,cert.read_bytes(),key.read_bytes(),runtime=FailedActivation(settings))
-    except ActivationError as error:assert error.recovered
-    else:raise AssertionError('Failed certificate activation was reported as success')
+    for attempt in range(10):
+        cert,key=certificates()
+        try:activate_pair(CERTBASE,settings,cert.read_bytes(),key.read_bytes(),runtime=FailedActivation(settings))
+        except ActivationError as error:assert error.recovered
+        else:raise AssertionError('Failed certificate activation was reported as success')
+        time.sleep(3)
+    print('Ten consecutive failed certificate activations recovered the selected live certificate PASS.',flush=True)
     cert.write_bytes(selected_certificate);key.write_bytes(selected_key)
     assert Path('/etc/rdc-service-tls/active/tls.crt').read_bytes()==selected_certificate
     later=request('PUT','/_matrix/client/v3/rooms/'+encoded+'/send/m.room.message/ci-after-backup',{'msgtype':'m.text','body':'This later change must not survive restoration'},token=alice)['event_id']

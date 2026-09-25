@@ -30,7 +30,7 @@ def validate(data):
     if not all(_identifier(data[k]) for k in ('institution_id','node_name')): errors.append('Invalid institution or node name.')
     if not all(hostname(data[k]) for k in ('matrix_hostname','element_hostname')): errors.append('Provide actual Matrix and Element DNS names.')
     if data['matrix_hostname']==data['element_hostname']: errors.append('Matrix and Element require separate browser origins.')
-    if data['tls_mode']!='supplied': errors.append('This implementation step requires supplied TLS; managed service certificates are not implemented yet.')
+    if data['tls_mode']!='supplied': errors.append('Use the supplied certificate-file interface; the optional service issuer can provide and renew those files.')
     for name in ('tls_certificate','tls_private_key'):
         if not isinstance(data[name],str) or not Path(data[name]).is_absolute(): errors.append('TLS input paths must be absolute local paths on the service node.')
     if data['tls_certificate']==data['tls_private_key']: errors.append('Certificate and private key must be separate files.')
