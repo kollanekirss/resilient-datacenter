@@ -73,6 +73,7 @@ def container_command(name,settings):
                         '--tmpfs','/var/lock/apache2:rw,nosuid,nodev,size=16m,mode=1777',
                         '--volume',str(APP)+':/var/www/html:ro','--volume',str(regional.BASE/'runtime-config')+':/var/www/html/config:ro',
                         '--volume',str(STATE/'files')+':/var/www/data:rw',
+                        '--volume','/etc/ssl/certs:/etc/ssl/certs:ro',
                         '--volume',str(BASE/'ports.conf')+':/etc/apache2/ports.conf:ro',
                         '--volume',str(BASE/'site.conf')+':/etc/apache2/sites-enabled/000-default.conf:ro',image]
     return command+['--memory=256m','--cap-add=NET_BIND_SERVICE','--tmpfs','/config:rw,nosuid,nodev,size=16m',

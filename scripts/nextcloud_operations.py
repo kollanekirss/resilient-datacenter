@@ -198,14 +198,13 @@ def install_or_resume(profile,network,address,admin_user,admin_password):
     runtime.podman('exec','--user','999:999',runtime.UNITS['postgres'],'psql','-p','5434','-U','nextcloud','-d','nextcloud','-c','ALTER ROLE oc_admin NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION',timeout=30)
     if runtime.TLS.exists() and ((runtime.TLS/'tls.crt').read_bytes()!=cert or (runtime.TLS/'tls.key').read_bytes()!=key):raise ValueError('Use the explicit certificate replacement command')
     activate_certificate(settings,cert,key,initial=True)
+    runtime.synchronize_regional(settings)
     subprocess.run(['/bin/systemctl','start','rdc-nextcloud.service'],check=True,timeout=180)
-    # Disable external federation before exposing the application to users.
+    # Preserve only the currently reviewed connector's narrowly selected shares.
     for app in ('federation','updatenotification','sharebymail'):
         runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','app:disable',app,timeout=60)
-    for control in FEDERATION_CONTROLS:
-        runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:set','files_sharing',control,'--value=no',timeout=60)
-    runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:set','core','shareapi_allow_links','--value=no',timeout=60)
-    if federation_status()!='disabled' or public_links_status()!='disabled':raise ValueError('External sharing controls did not take effect')
+    expected='approved-gateway-configured' if runtime.regional.active(settings) else 'disabled'
+    if federation_status()!=expected or public_links_status()!='disabled':raise ValueError('External sharing controls did not take effect')
     runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','background:cron',timeout=60)
     subprocess.run(['/bin/systemctl','enable','--now','rdc-nextcloud.target','rdc-nextcloud-cron.timer'],check=True,timeout=180)
     subprocess.run(['/bin/systemctl','start','rdc-nextcloud-proxy.service'],check=True,timeout=180)
@@ -218,8 +217,10 @@ FEDERATION_CONTROLS=('outgoing_server2server_share_enabled','incoming_server2ser
 
 
 def federation_status():
-    values=[runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:get','files_sharing',name,timeout=30).strip() for name in FEDERATION_CONTROLS]
-    return 'disabled' if all(value=='no' for value in values) else 'configuration-changed'
+    config=runtime.regional.active(runtime.read_settings());expected=runtime.regional.controls(config)
+    values={name:runtime.podman('exec','--user','33:33',runtime.UNITS['nextcloud'],'php','occ','config:app:get','files_sharing',name,timeout=30).strip() for name in FEDERATION_CONTROLS}
+    if values!=expected:return 'configuration-changed'
+    return 'approved-gateway-configured' if config else 'disabled'
 
 
 def public_links_status():

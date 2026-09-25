@@ -96,8 +96,19 @@ def disable():
     require_platform()
     with operation_lock(lock_path=Path('/run/rdc-nextcloud-operation.lock')):
         settings=application.read_settings();verify_installed_runtime()
-        if connector.configured(settings) is None:return {'state':'connector-not-installed'}
-        connector.write(connector.BASE/'disabled.json',json.dumps({'reason':'operator-disabled'}),mode=0o600)
-        Runtime(settings).restart()
-        (connector.BASE/'pending.json').unlink(missing_ok=True)
+        return disable_transition(settings,Runtime(settings))
+
+
+def disable_transition(settings,runtime):
+    pending=connector.BASE/'pending.json'
+    if connector.configured(settings) is None and not (pending.exists() or pending.is_symlink()):
+        return {'state':'connector-not-installed'}
+    connector.write(connector.BASE/'disabled.json',json.dumps({'reason':'operator-disabled'}),mode=0o600)
+    runtime.restart()
+    if pending.exists() or pending.is_symlink():
+        connector.read(pending)  # Never remove an unowned or linked journal.
+        pending.unlink()
+        descriptor=os.open(connector.BASE,os.O_RDONLY)
+        try:os.fsync(descriptor)
+        finally:os.close(descriptor)
     return {'state':'connector-disabled','internal_service':'listeners-verified'}

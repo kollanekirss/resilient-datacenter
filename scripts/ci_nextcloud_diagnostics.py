@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def safe_message(value):
-    text=str(value)
+    text=str(value).replace('\\/','/')
     if any(term in text.lower() for term in ('password','secret','authorization','bearer','token=')):
         return '[sensitive diagnostic omitted]'
     text=re.sub(r'https?://[^\s<>"\']+', '[endpoint]', text)

@@ -17,10 +17,30 @@ def test_pinned_code_links_must_stay_within_readonly_application_tree(tmp_path):
 
 def test_external_sharing_requires_all_effective_controls(monkeypatch):
     m=importlib.import_module('nextcloud_operations')
+    from test_nextcloud_runtime import settings
+    monkeypatch.setattr(m.runtime,'read_settings',settings)
+    monkeypatch.setattr(m.runtime.regional,'active',lambda value:None)
     controls={name:'no' for name in m.FEDERATION_CONTROLS}
     monkeypatch.setattr(m.runtime,'podman',lambda *args,**kwargs:controls[args[-1]])
     assert m.federation_status()=='disabled'
     controls['incoming_server2server_share_enabled']='yes'
+    assert m.federation_status()=='configuration-changed'
+
+
+def test_file_status_accepts_only_exact_current_connector_controls(monkeypatch):
+    m=importlib.import_module('nextcloud_operations')
+    from test_nextcloud_runtime import settings
+    from test_nextcloud_regional import configuration
+    monkeypatch.setattr(m.runtime,'read_settings',settings)
+    monkeypatch.setattr(m.runtime.regional,'active',lambda value:configuration())
+    controls={name:'no' for name in m.FEDERATION_CONTROLS}
+    controls.update(incoming_server2server_share_enabled='yes',outgoing_server2server_share_enabled='yes')
+    monkeypatch.setattr(m.runtime,'podman',lambda *args,**kwargs:controls[args[-1]])
+    assert m.federation_status()=='approved-gateway-configured'
+    controls['incoming_server2server_group_share_enabled']='yes'
+    assert m.federation_status()=='configuration-changed'
+    controls['incoming_server2server_group_share_enabled']='no'
+    monkeypatch.setattr(m.runtime.regional,'active',lambda value:None)
     assert m.federation_status()=='configuration-changed'
 
 

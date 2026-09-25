@@ -61,6 +61,7 @@ def test_file_runtime_always_mounts_generated_proxy_policy_and_synchronizes_shar
     monkeypatch.setattr(m,'BASE',tmp_path/'connector')
     command=runtime.container_command('nextcloud',settings())
     assert str(m.BASE/'runtime-config')+':/var/www/html/config:ro' in command
+    assert '/etc/ssl/certs:/etc/ssl/certs:ro' in command
     controls=m.controls(None)
     assert controls['incoming_server2server_share_enabled']=='no'
     assert controls['outgoing_server2server_share_enabled']=='no'

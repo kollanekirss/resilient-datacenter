@@ -55,3 +55,17 @@ def test_file_attachment_recovers_empty_directory_interruption(tmp_path,monkeypa
     assert connector.configured(settings()) is None
     module.transition(configuration(),settings(),Runtime(connector))
     assert connector.active(settings())==configuration()
+
+
+def test_disable_clears_first_attachment_journal_even_before_configuration_commit(tmp_path,monkeypatch):
+    connector,module=setup(tmp_path,monkeypatch)
+    class Invalid(Runtime):
+        def validate(self,config):raise ValueError('native validation failed')
+    with pytest.raises(ValueError,match='native validation'):
+        module.transition(configuration(),settings(),Invalid(connector))
+    assert connector.configured(settings()) is None
+    assert (connector.BASE/'pending.json').exists()
+    assert module.disable_transition(settings(),Runtime(connector))['state']=='connector-disabled'
+    assert not (connector.BASE/'pending.json').exists()
+    module.transition(dict(configuration(),peers=[]),settings(),Runtime(connector))
+    assert connector.active(settings()) is None
