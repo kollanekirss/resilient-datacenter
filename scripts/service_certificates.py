@@ -1,5 +1,5 @@
 """Service TLS generations: validate both browser origins and verify activation."""
-from contextlib import ExitStack
+from contextlib import ExitStack,contextmanager
 import fcntl
 import os
 from pathlib import Path
@@ -8,6 +8,9 @@ from certificate_lifecycle import activate,validate_material
 import service_runtime
 
 BASE=Path('/etc/rdc-service-tls')
+PENDING=Path('/etc/rdc-restore-pending.json')
+BACKUP=Path('/etc/rdc-backup')
+LOCK=Path('/run/rdc-services-operation.lock')
 
 
 class Runtime:
@@ -35,11 +38,17 @@ def replace(certificate,private_key):
     profile=application_profile(settings['ownership'])
     profile.update(tls_certificate=str(certificate),tls_private_key=str(private_key))
     cert,key=tls_inputs(profile)
+    with operation_lock():
+        return activate_pair(BASE,settings,cert,key)
+
+
+@contextmanager
+def operation_lock():
     with ExitStack() as stack:
-        paths=[Path('/run/rdc-services-operation.lock')]
-        if Path('/etc/rdc-backup').exists():paths.insert(0,Path('/etc/rdc-backup/operation.lock'))
+        paths=[LOCK]
+        if BACKUP.exists():paths.insert(0,BACKUP/'operation.lock')
         for path in paths:
             fd=os.open(path,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
             stream=stack.enter_context(os.fdopen(fd,'a'));fcntl.flock(stream,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        if Path('/etc/rdc-restore-pending.json').exists():raise ValueError('Resolve the pending restore before replacing service certificates')
-        return activate_pair(BASE,settings,cert,key)
+        if PENDING.exists() or PENDING.is_symlink():raise ValueError('Resolve the pending restore before administering applications')
+        yield

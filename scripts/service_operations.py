@@ -231,19 +231,8 @@ def action(args):
     print('The application uses pinned containers. User login and application recovery remain unverified until exercised.')
     phrase='INSTALL MATRIX ON '+profile['node_name']
     if not sys.stdin.isatty() or input('Type '+phrase+' to proceed: ').strip()!=phrase:return {'state':'cancelled'}
-    fd=os.open('/run/rdc-services-operation.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
-    with os.fdopen(fd,'a') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        from contextlib import ExitStack
-        try:
-            with ExitStack() as stack:
-                backup_base=Path('/etc/rdc-backup')
-                if backup_base.exists():
-                    from backup_operations import configured
-                    configured()
-                    backup_fd=os.open(backup_base/'operation.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
-                    backup_lock=stack.enter_context(os.fdopen(backup_fd,'a'))
-                    fcntl.flock(backup_lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-                return apply(profile)
-        except KeyboardInterrupt:
-            raise ValueError('Installation interrupted. Existing application state was retained; rerun the same reviewed profile to resume and verify it.') from None
+    from service_certificates import operation_lock
+    try:
+        with operation_lock():return apply(profile)
+    except KeyboardInterrupt:
+        raise ValueError('Installation interrupted. Existing application state was retained; rerun the same reviewed profile to resume and verify it.') from None

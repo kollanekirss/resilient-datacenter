@@ -84,6 +84,12 @@ def main():
         time.sleep(3)  # Respect systemd's normal five-starts-per-ten-seconds guard.
     print('Twenty consecutive verified proxy restarts PASS.',flush=True)
     alice_password=secrets.token_urlsafe(24);bob_password=secrets.token_urlsafe(24)
+    pending=Path('/etc/rdc-restore-pending.json');pending.write_text('{}')
+    try:
+        try:create('cialice',alice_password,admin=True)
+        except ValueError as error:assert 'pending restore' in str(error)
+        else:raise AssertionError('Account creation bypassed pending recovery')
+    finally:pending.unlink()
     assert create('cialice',alice_password,admin=True)['state']=='account-created'
     assert create('cibob',bob_password)['state']=='account-created'
     opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),urllib.request.HTTPSHandler(context=ssl.create_default_context()))
