@@ -53,10 +53,11 @@ def main():
     if Path('/etc/server-connectivity-profile.json').exists():raise ValueError('Application fixture requires a fresh runner')
     subprocess.run(['ip','address','add',ADDRESS+'/32','dev','lo'],check=True)
     with Path('/etc/hosts').open('a') as stream:stream.write('\n'+ADDRESS+' '+MATRIX+' '+ELEMENT+'\n')
-    Path('/etc/systemd/system/tailscaled.service').write_text('[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/true\n')
-    subprocess.run(['systemctl','daemon-reload'],check=True);subprocess.run(['systemctl','start','tailscaled'],check=True)
+    from ci_matrix_backup import prepare_network,prepare_backup,snapshot,restore
+    prepare_network()
     network=local_ownership({'kind':'local-node','schema_version':1,'institution_id':'ci','node_name':'services','headscale_hostname':'control.ci.test','node_tag':'tag:services'})
     Path('/etc/server-connectivity-profile.json').write_text(json.dumps(network))
+    network_snapshot=prepare_backup(network)
     cert,key=certificates()
     profile={'kind':'matrix-services','schema_version':1,'institution_id':'ci','node_name':'services','matrix_hostname':MATRIX,'element_hostname':ELEMENT,
              'tls_mode':'supplied','tls_certificate':str(cert),'tls_private_key':str(key)}
@@ -108,6 +109,19 @@ def main():
     assert b'<html' in request('GET','/',host=ELEMENT,raw=True).lower()
     assert request('GET','/config.json',host=ELEMENT)['default_server_config']['m.homeserver']['base_url']=='https://'+MATRIX
     print('Actual pinned Matrix/PostgreSQL/Element/proxy: trusted HTTPS, two account logins, room permission denial, invited message read, media round trip and private admin/federation routes PASS.')
-    print('Real Tailscale enrollment, browser login interaction, end-to-end encryption recovery, application backup/restore and institutional acceptance NOT RUN by this package slice.')
+    import hashlib
+    signing=Path('/var/lib/rdc-services/synapse/server.signing.key')
+    signing_hash=hashlib.sha256(signing.read_bytes()).hexdigest()
+    selected=snapshot(network_snapshot)
+    later=request('PUT','/_matrix/client/v3/rooms/'+encoded+'/send/m.room.message/ci-after-backup',{'msgtype':'m.text','body':'This later change must not survive restoration'},token=alice)['event_id']
+    restore(selected)
+    assert request('GET',event_path,token=bob)['content']['body']=='Disposable RDC application proof'
+    assert request('GET','/_matrix/client/v1/media/download/'+server+'/'+identifier,token=alice,raw=True)==media
+    denied('/_matrix/client/v3/rooms/'+encoded+'/event/'+urllib.parse.quote(later,safe=''),token=alice,statuses=(404,))
+    assert hashlib.sha256(signing.read_bytes()).hexdigest()==signing_hash
+    result=install_or_resume(profile,network,ADDRESS)
+    assert result['state']=='service-listeners-verified' and hashlib.sha256(signing.read_bytes()).hexdigest()==signing_hash
+    print('Actual encrypted SFTP scheduled application backup, scope transition, selected snapshot restore, account tokens/message/media/signing identity preservation and installation resume PASS.',flush=True)
+    print('Real Tailscale enrollment, browser login interaction, end-to-end encryption recovery and institutional acceptance NOT RUN by this package slice.')
 
 if __name__=='__main__':main()

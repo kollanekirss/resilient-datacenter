@@ -64,7 +64,8 @@ def restoration_paths(owner):
 
 def plan(stage,owner,*,root=Path('/')):
     root=Path(root);metadata=validate_restore(stage,owner)
-    if json.loads((root/'etc/server-connectivity-profile.json').read_text())!=owner: raise ValueError('Replacement ownership differs from snapshot')
+    from backup_scope import verify_installed
+    verify_installed(root,owner)
     if component_hashes(root,owner)!=metadata['binary_sha256']: raise ValueError('Restoration requires the exact snapshot component binaries')
     pending=root/PENDING
     if pending.exists() or pending.is_symlink(): raise ValueError('Recover the pending restore transaction before starting another')
@@ -94,6 +95,8 @@ def retain_current_settings(root,name,candidate,owner):
     elif name=='etc/sc-derp' and owner.get('tls_mode')!='managed-acme':
         keep=[p.name for p in (root/name).iterdir() if p.suffix in ('.crt','.key')]
         if not keep: raise ValueError('The replacement relay has no supplied TLS material')
+    elif name=='etc/rdc-services':
+        keep=['runtime.json','Caddyfile']
     else: keep=[]
     for item in keep:
         source=root/name/item
@@ -105,6 +108,9 @@ def retain_current_settings(root,name,candidate,owner):
 
 def set_permissions(path,name,owner):
     import pwd,grp
+    if name in ('etc/rdc-services','var/lib/rdc-services'):
+        from service_backup import restore_permissions
+        return restore_permissions(path,name)
     group={'controller':'headscale','relay':'sc-derp','peer':'root'}[owner['role']]
     persistent=name.startswith('var/lib/')
     user=group if persistent else 'root'
@@ -162,7 +168,7 @@ def rollback(root,journal,runtime):
     if component_hashes(root,journal['ownership'])!=journal['binary_sha256']:
         raise ValueError('Components changed during restoration; previous data is retained but service restart is blocked')
     runtime.allow_validation()
-    for service,active in journal['original_active'].items():
+    for service,active in reversed(list(journal['original_active'].items())):
         if active: runtime.start(service)
     if any(journal['original_active'].values()): runtime.verify(journal['ownership'])
     journal['phase']='rolled-back';save(root,journal)
@@ -206,7 +212,7 @@ def apply(stage,owner,*,root=Path('/'),runtime=None,permissions=set_permissions)
         journal['phase']='validating';save(root,journal)
         if component_hashes(root,owner)!=journal['binary_sha256']: raise ValueError('Components changed during restoration')
         runtime.allow_validation()
-        for service in services: runtime.start(service)
+        for service in reversed(services): runtime.start(service)
         runtime.verify(owner)
         journal['phase']='committed';save(root,journal)
         finish(root,journal,runtime)
@@ -243,14 +249,14 @@ def recover(owner,*,root=Path('/'),runtime=None):
     runtime.finish_validation()
     if journal['phase']=='rolled-back':
         runtime.allow_validation()
-        for name,active in journal['original_active'].items():
+        for name,active in reversed(list(journal['original_active'].items())):
             if active: runtime.start(name)
         if any(journal['original_active'].values()): runtime.verify(owner)
         finish(root,journal,runtime)
         return {'state':'previous-data-restored'}
     if journal['phase']=='committed':
         runtime.allow_validation()
-        for name in resources(owner).services: runtime.start(name)
+        for name in reversed(resources(owner).services): runtime.start(name)
         runtime.verify(owner);finish(root,journal,runtime)
         return {'state':'restored-service-verified','user_operation_test':'not-run'}
     rollback(root,journal,runtime)

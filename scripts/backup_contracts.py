@@ -50,12 +50,18 @@ class Resources:
 
 
 def resources(owner):
+    if isinstance(owner,dict) and 'applications' in owner:
+        from backup_scope import validate as validate_scope
+        validate_scope(owner)
     catalogue={'controller':(('etc/headscale','var/lib/headscale'),('headscale',)),
                'relay':(('etc/sc-derp','var/lib/sc-derp'),('sc-derp',)),
                'peer':(('var/lib/tailscale',),('tailscaled',))}
     if not isinstance(owner,dict) or owner.get('role') not in catalogue: raise ValueError('Unknown ownership role')
     paths,services=catalogue[owner['role']]
     paths+=('etc/server-connectivity-profile.json',)
+    if 'applications' in owner:
+        paths+=('etc/rdc-services','var/lib/rdc-services')
+        services=('rdc-service-proxy','rdc-element','rdc-synapse','rdc-postgres')+services
     if owner.get('tls_mode')=='managed-acme': paths+=('etc/rdc-tls','etc/letsencrypt')
     elif 'tls_mode' in owner: raise ValueError('Unknown certificate ownership mode')
     return Resources(paths,services)
@@ -65,4 +71,6 @@ def binary_paths(owner):
     catalogue={'controller':('usr/bin/headscale',),'relay':('usr/local/bin/sc-derper',),
                'peer':('usr/local/bin/tailscale','usr/local/bin/tailscaled')}
     resources(owner)
-    return catalogue[owner['role']]
+    paths=catalogue[owner['role']]
+    if 'applications' in owner: paths+=('usr/local/lib/rdc-services/service_runtime.py','usr/local/lib/rdc-services/service_images.json')
+    return paths

@@ -26,6 +26,10 @@ WORK=Path('/var/lib/rdc-backup')
 
 
 def match_owner(profile,owner,*,expected=None):
+    from backup_scope import network_owner,validate as validate_scope
+    validate_scope(owner)
+    owner=network_owner(owner)
+    if expected is not None: expected=network_owner(expected)
     if validate(profile) or not isinstance(owner,dict) or not _safe_values(owner): raise ValueError('Invalid backup ownership')
     if owner.get('role')!=profile['role'] or owner.get('institution_id')!=profile['institution_id']:
         raise ValueError('Backup profile does not match this installed institution and role')
@@ -66,7 +70,11 @@ def validate_restore(stage,owner):
         if not any(relative==p or relative.startswith(p+'/') or p.startswith(relative+'/') for p in paths):
             raise ValueError('Snapshot contains data outside the managed resource catalogue')
     inspect_resources(stage/'data',paths)
-    if json.loads((stage/'data/etc/server-connectivity-profile.json').read_text())!=owner: raise ValueError('Restored ownership differs from snapshot metadata')
+    from backup_scope import verify_installed
+    verify_installed(stage/'data',owner)
+    if 'applications' in owner:
+        from service_backup import validate_data
+        validate_data(stage/'data',owner['applications'])
     return data
 
 
@@ -171,14 +179,18 @@ def configured():
         raise ValueError('Unknown backup installation contract')
     owner=root_json(Path('/etc/server-connectivity-profile.json'))
     match_owner(data['profile'],owner,expected=data['ownership'])
+    from backup_scope import verify_installed,tag
+    verify_installed(Path('/'),data['ownership'])
     with BINARY.open('rb') as stream: actual=hashlib.file_digest(stream,'sha256').hexdigest()
     if actual!=data['binary_sha256']: raise ValueError('Installed backup tool differs from the verified version')
-    transport=Restic(data['profile']);transport.check_credentials()
+    transport=Restic(data['profile'],scope=tag(data['ownership']));transport.check_credentials()
     return data,transport
 
 
 def backup_now():
     data,transport=configured()
+    if Path('/etc/rdc-services/ownership.json').exists() and 'applications' not in data['ownership']:
+        raise ValueError('Chat is installed but backup scope covers only networking. Review backup include-services before taking another snapshot.')
     WORK.mkdir(mode=0o700,exist_ok=True)
     if WORK.is_symlink() or WORK.stat().st_uid!=0 or WORK.stat().st_mode & 0o077: raise ValueError('Unsafe local backup workspace')
     with tempfile.TemporaryDirectory(prefix='snapshot-',dir=WORK) as temporary:
@@ -230,6 +242,9 @@ def action(args):
             summary={'state':'backup-unreachable','restore_test':'not-run','next_step':'Check backup storage reachability, credentials and pinned host key.'}
         summary['schedule']=schedule_status(summary.get('backup_age_seconds'))
         if summary['state']=='snapshot-present' and summary['schedule'].get('overdue'): summary['state']='backup-overdue'
+        summary['scope']='matrix-and-network' if 'applications' in data['ownership'] else 'network-only'
+        if Path('/etc/rdc-services/ownership.json').exists() and 'applications' not in data['ownership']:
+            summary['state']='application-backup-missing';summary['next_step']='Review backup include-services, then take and test an application backup.'
         return summary
     if args.action=='schedule' and args.schedule_action=='disable':
         from backup_schedule import disable
@@ -237,6 +252,12 @@ def action(args):
     fd=os.open(BASE/'operation.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,'a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        if args.action=='include-services':
+            from service_backup import include_services
+            print('Include Matrix accounts, messages, media, signing identity and database secrets in future encrypted backups. Preserve existing repository credentials and history; update the protected backup runtime if scheduled.')
+            phrase='INCLUDE SERVICES '+data['profile']['node_name']
+            if not sys.stdin.isatty() or input('Type '+phrase+' to proceed: ').strip()!=phrase:return {'state':'cancelled'}
+            return include_services()
         if args.action=='schedule' and args.schedule_action=='enable':
             from backup_schedule import enable
             return enable(args.frequency)

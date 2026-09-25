@@ -56,13 +56,29 @@ def preflight(profile):
     if validate(profile):raise ValueError('Invalid Matrix service profile')
     network=root_json(Path('/etc/server-connectivity-profile.json'));owner=ownership(profile,network)
     address=installed_address(network);tls_inputs(profile)
+    backup_base=Path('/etc/rdc-backup')
+    if (backup_base/'schedule.json').exists() and not (runtime.BASE/'ownership.json').exists():
+        from backup_schedule import owned_schedule
+        owned_schedule()
+        active=subprocess.run(['/bin/systemctl','is-active','rdc-backup.timer'],capture_output=True,text=True,timeout=15)
+        if active.returncode!=3:raise ValueError('Disable the backup schedule before adding applications; include-services and a new verified snapshot are required before re-enabling it')
     for hostname in (profile['matrix_hostname'],profile['element_hostname']):
         answers={r[4][0] for r in socket.getaddrinfo(hostname,443,type=socket.SOCK_STREAM)}
         if answers!={address}:raise ValueError('Both service DNS names must resolve only to this node overlay IPv4; review local DNS and disable public proxying')
     existing=runtime.BASE/'ownership.json'
     if existing.exists() or existing.is_symlink():
         if not same_installation(profile,network,root_json(existing)):raise ValueError('Application identity/version differs; migration requires a reviewed path')
-        if any(Path('/etc/systemd/system',name+'.service.d').exists() for name in runtime.UNITS.values()) or Path(str(TARGET)+'.d').exists(): raise ValueError('Unreviewed application unit overrides require administration review')
+        from restore_runtime import guard_files,check_guard
+        from backup_scope import include
+        known=guard_files(include(network,owner))
+        for unit_name in runtime.UNITS.values():
+            folder=Path('/etc/systemd/system',unit_name+'.service.d')
+            if folder.exists() or folder.is_symlink():
+                if folder.is_symlink() or folder.stat().st_uid!=0 or folder.stat().st_mode&0o022:raise ValueError('Unsafe application unit overrides')
+                for path in folder.iterdir():
+                    if path not in known:raise ValueError('Unreviewed application unit overrides require administration review')
+                    check_guard(path,known[path][0])
+        if Path(str(TARGET)+'.d').exists():raise ValueError('Unreviewed application target overrides require administration review')
         if (runtime.BASE/'runtime.json').exists():
             current=root_json(runtime.BASE/'runtime.json')
             if current['bind_address']!=address:raise ValueError('Service endpoint changed; address migration requires review')
@@ -155,7 +171,7 @@ def install_or_resume(profile,network,address):
         content=(SOURCE/name).read_bytes();write(runtime.INSTALLED/name,content,mode=0o644);hashes[name]=hashlib.sha256(content).hexdigest()
     write(runtime.INSTALLED/'manifest.json',json.dumps({'schema_version':1,'files':hashes}))
     for name,unit_name in runtime.UNITS.items():write(Path('/etc/systemd/system')/(unit_name+'.service'),runtime.unit(name),mode=0o644)
-    write(TARGET,'[Unit]\nDescription=RDC Matrix services\nAfter=tailscaled.service\nWants=rdc-service-proxy.service\n[Install]\nWantedBy=multi-user.target tailscaled.service\n',mode=0o644)
+    write(TARGET,'[Unit]\nDescription=RDC Matrix services\nAfter=tailscaled.service\nWants=rdc-service-proxy.service\n[Install]\nWantedBy=multi-user.target\n',mode=0o644)
     subprocess.run(['/bin/systemctl','daemon-reload'],check=True,timeout=30)
     subprocess.run(['/bin/systemctl','enable','rdc-services.target'],check=True,timeout=30)
     subprocess.run(['/bin/systemctl','start','rdc-services.target'],check=True,timeout=180)
@@ -167,9 +183,17 @@ def status():
     settings=runtime.read_settings()
     for name in runtime.UNITS:
         runtime.verify_image(name,settings);runtime.ready(name,settings,attempts=1)
+    backup={'state':'not-configured','restore_test':'not-run'}
+    if Path('/etc/rdc-backup/configuration.json').exists():
+        from backup_operations import configured,status_summary
+        data,transport=configured()
+        if 'applications' not in data['ownership']:backup['state']='network-only-applications-unprotected'
+        else:
+            try:backup=status_summary(transport.snapshots())
+            except (OSError,ValueError,subprocess.SubprocessError):backup={'state':'backup-unreachable','restore_test':'not-run'}
     return {'state':'service-listeners-verified','matrix_url':'https://'+settings['ownership']['matrix_hostname'],
             'element_url':'https://'+settings['ownership']['element_hostname'],'application_login_test':'not-run',
-            'application_backup':'not-configured','federation':'disabled'}
+            'application_backup':backup,'federation':'disabled'}
 
 
 def apply(profile):
@@ -199,6 +223,16 @@ def action(args):
     fd=os.open('/run/rdc-services-operation.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,'a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        try:return apply(profile)
+        from contextlib import ExitStack
+        try:
+            with ExitStack() as stack:
+                backup_base=Path('/etc/rdc-backup')
+                if backup_base.exists():
+                    from backup_operations import configured
+                    configured()
+                    backup_fd=os.open(backup_base/'operation.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+                    backup_lock=stack.enter_context(os.fdopen(backup_fd,'a'))
+                    fcntl.flock(backup_lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                return apply(profile)
         except KeyboardInterrupt:
             raise ValueError('Installation interrupted. Existing application state was retained; rerun the same reviewed profile to resume and verify it.') from None
