@@ -154,7 +154,15 @@ def setup_gateway(institution,index,identity,document,tls):
              'regional_controller':network.CONTROLLERS['regional']['hostname'],'lan_address':'10.203.'+str(index)+'.1','lan_subnet':'10.203.'+str(index)+'.0/24',
              'identity_file':'/root/public-identity.json','tls_certificate':str(folder/'tls.crt'),'tls_private_key':str(folder/'tls.key'),'upstreams':{'matrix':'10.203.'+str(index)+'.10'}}
     peers=gateway_contracts.peer_rules(identity,[document],[],now=int(time.time()))
-    (folder/'envoy.json').write_text(json.dumps(gateway_rendering.envoy(profile,identity,peers)))
+    rendered=gateway_rendering.envoy(profile,identity,peers)
+    # Fixture-only diagnostics contain no paths, query strings or credentials.
+    for listener in rendered['static_resources']['listeners']:
+        hcm=listener['filter_chains'][0]['filters'][0]['typed_config']
+        hcm['access_log']=[{'name':'envoy.access_loggers.stdout','typed_config':{
+            '@type':'type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog',
+            'log_format':{'json_format':{'method':'%REQ(:METHOD)%','authority':'%REQ(:AUTHORITY)%',
+                'source':'%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%','code':'%RESPONSE_CODE%','detail':'%RESPONSE_CODE_DETAILS%'}}}}]
+    (folder/'envoy.json').write_text(json.dumps(rendered))
     gateway_runtime.BASE=folder;gateway_runtime.CONTAINER=institution+'-gateway-proxy'
     launch(node,gateway_runtime.CONTAINER,gateway_runtime.container_command(identity))
     network.run('ip','netns','exec',node,'nft','-f','-',input=gateway_rendering.firewall(profile,peers,lan_interface='lan0',now=int(time.time()),replace=False))
