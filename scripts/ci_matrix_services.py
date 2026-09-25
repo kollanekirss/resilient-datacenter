@@ -160,6 +160,8 @@ def main():
     exercise('@cialice:'+MATRIX,alice_password,room,recovery_key=recovery_key,encrypted_room=encrypted_room)
     history=request('GET','/_matrix/client/v3/rooms/'+encoded+'/messages?dir=b&limit=10',token=bob)
     assert any(e.get('content',{}).get('body')=='Message sent from the actual Element browser' for e in history['chunk'])
+    from ci_service_issuer import exercise as issuer_exercise
+    issuer_exercise(certificates)
     print('Real Tailscale enrollment, home NAT, physical site separation and institutional acceptance NOT RUN by this package slice.')
 
 if __name__=='__main__':main()

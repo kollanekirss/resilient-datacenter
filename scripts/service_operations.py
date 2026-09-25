@@ -210,6 +210,9 @@ def action(args):
     import fcntl
     import sys
     from profile_config import load_profile
+    if args.action=='issuer':
+        from service_issuer import action as issuer_action
+        return issuer_action(args)
     if args.action=='setup':
         from service_setup import wizard
         return wizard(args.output_file)

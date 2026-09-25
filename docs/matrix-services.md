@@ -11,13 +11,31 @@ Use a dedicated Ubuntu 24.04 **amd64** machine with systemd, approximately 4 GiB
 1. Complete local-node installation and enrollment. Confirm `sudo ./rdc node status YOUR-NODE-PROFILE` succeeds.
 2. Choose a permanent Matrix hostname, for example `matrix.example.org`, and a separate Element hostname such as `chat.example.org`. User identities become `@name:matrix.example.org`. Changing that name later is a migration, not a configuration edit.
 3. Arrange for both names to resolve to this node's private overlay IPv4 from the server and user devices. The current checker requires exactly that IPv4 and no IPv6 answer. Private DNS distribution and resilient local resolvers remain separate product work.
-4. Obtain a browser-trusted certificate containing both names. Place its certificate chain and private key in separate root-owned files on the service node. The key must be readable only by root. The initial package requires supplied certificates; automatic service certificate issuance and renewal are not implemented yet. Public HTTP validation cannot reach a private overlay-only listener.
+4. Obtain a browser-trusted certificate containing both names, using your existing certificate process or the optional DNS issuer below. Place its certificate chain and private key in separate root-owned files on the service node. The key must be readable only by root. Public HTTP validation cannot reach a private overlay-only listener.
 5. Keep a console or other independent administration path available. Do not depend entirely on the service being repaired for recovery access.
 6. If this node already has scheduled networking backups, disable the schedule before installing applications. After installation, explicitly extend backup scope, take a new snapshot, and re-enable the schedule.
 
 The installer uses pinned upstream container image digests. It installs Ubuntu's Podman and selects runc. It does not publish container ports or replace the host firewall. PostgreSQL, Synapse and Element's static web server listen on loopback; the HTTPS proxy listens only on the overlay address. Open registration, guest accounts and external federation start disabled. Calls, TURN, bridges and SSO are not included in this package.
 
 ## Install on the service node
+
+If your public DNS zone is hosted on Cloudflare, the optional issuer can prepare certificates before application installation:
+
+```text
+./rdc services issuer setup --output-file inventories/lab/certificates.json
+sudo ./rdc services issuer issue inventories/lab/certificates.json
+```
+
+The request wizard asks for the node, both names, account email and explicit acceptance of Let's Encrypt's terms. Issue asks privately for a restricted Cloudflare API token. Give it DNS editing permission only for the relevant zones. The token stays in a root-only file on this node; it does not belong in GitHub or the non-secret request profile. Independently save emergency provider access.
+
+Successful issuance exports these two file paths for the ordinary application wizard:
+
+```text
+/etc/rdc-service-acme/issued/tls.crt
+/etc/rdc-service-acme/issued/tls.key
+```
+
+The application's `tls_mode: supplied` describes that file interface. The separate issuer owns issuance and renewal, so replacing a certificate provider does not rename application accounts. The issuer uses a dedicated Certbot directory and refuses to adopt another installation. Public DNS/provider issuance has not been exercised with a real account; this remains an experimental path requiring operator acceptance.
 
 From the reviewed project checkout with its documented Python environment prepared:
 
@@ -27,6 +45,15 @@ sudo ./rdc services check inventories/lab/matrix.yml
 sudo ./rdc services apply inventories/lab/matrix.yml
 sudo ./rdc services status
 ```
+
+If you used the optional issuer, enable its protected renewal timer after the application is working:
+
+```text
+sudo ./rdc services issuer enable
+sudo ./rdc services issuer status
+```
+
+Renewal checks twice daily with a randomized delay. A failed provider request retains the active certificate and reports failure; expiration still eventually interrupts access. The application backup preserves replacement certificates rather than recovering the provider account. A replacement therefore needs valid supplied certificates or independently held DNS-provider access.
 
 The setup questions create a private configuration file. They do not install anything. The check verifies the actual enrolled node, DNS, certificates and available resources. Apply shows the target node and requires its exact confirmation phrase. Run the same profile again to resume an interrupted installation. Existing passwords, database contents and signing keys are retained; changed identities or configuration are blocked for review.
 
@@ -79,8 +106,8 @@ If recovery is interrupted, use `sudo ./rdc backup restore-recover`. Startup gua
 
 Disposable Ubuntu testing has demonstrated actual pinned PostgreSQL/Synapse/Element/proxy startup, trusted HTTPS, two account logins, room access denial and invited message access, media upload/download, and blocked external administration/federation routes. The successful startup run is [36131039798](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36131039798).
 
-The application-recovery portion of [run 36131554969](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36131554969) also passed: actual scheduled SFTP snapshots preserved credentials and excluded network-only history from application status; recovery retained account sessions, messages, media and signing identity and removed a later message. The overall run failed afterward in its browser send-control test. Browser login and restored-history display succeeded; browser sending remains under test.
+The complete [Matrix recovery and browser run 36132446410](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36132446410) passed. Actual scheduled SFTP snapshots preserved credentials and excluded network-only history from application status; recovery retained account sessions, messages, media and signing identity and removed a later message. It also verified certificate replacement and rollback, actual browser login and sending, and encrypted-history recovery in a fresh browser with an independently held recovery key.
 
-That single-host disposable fixture uses a synthetic networking daemon and does not demonstrate home NAT or physical separation. Real DNS/provider issuance, encrypted-history recovery, controlled application upgrades, regional federation and colleague usability remain outstanding. Do not use these results as a claim that the complete product is ready.
+That single-host disposable fixture uses a synthetic networking daemon and does not demonstrate home NAT or physical separation. Real DNS/provider issuance, controlled application upgrades, regional federation and colleague usability remain outstanding. The optional issuer's frozen timer has a CI fixture with a simulated external issuer boundary; its acceptance is still pending. That fixture cannot prove public ACME issuance. Do not use these results as a claim that the complete product is ready.
 
 The explicit runc selection follows observed AppArmor failures with Ubuntu's crun combination. CI checks enforced container confinement; it does not disable AppArmor. Related upstream context: [container-libs issue 805](https://github.com/podman-container-tools/container-libs/issues/805).

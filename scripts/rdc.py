@@ -84,6 +84,11 @@ def parser():
     certificate=service_commands.add_parser('certificate',help='Validate and activate replacement TLS for both service names')
     certificate.add_argument('--certificate',type=Path,required=True)
     certificate.add_argument('--private-key',type=Path,required=True)
+    issuer=service_commands.add_parser('issuer',help='Optional DNS-based service certificates without public inbound HTTP')
+    issuers=issuer.add_subparsers(dest='issuer_action',required=True)
+    issuers.add_parser('setup').add_argument('--output-file',type=Path,required=True)
+    issue=issuers.add_parser('issue');issue.add_argument('profile',type=Path);issue.add_argument('--token-file',type=Path)
+    for action in ('enable','status'):issuers.add_parser(action)
     release=commands.add_parser('release',help='Download and verify an experimental release; never install')
     fetch=release.add_subparsers(dest='action',required=True).add_parser('fetch')
     fetch.add_argument('version')
@@ -154,6 +159,8 @@ def dispatch(args) -> ActionResult:
         except ValueError as error:
             print('Application action blocked: '+str(error));return result_for_state('blocked')
         print(json.dumps(outcome,indent=2))
+        if outcome.get('expires_within_14_days') or outcome.get('serving_verified') is False or outcome.get('state') in ('issuance-failed','renewal-failed'):
+            return result_for_state('blocked')
         return result_for_state({'prepared':'prepared','cancelled':'cancelled'}.get(outcome.get('state'),'checks-passed'))
     if args.command=='backup':
         try: outcome=backup_action(args)
