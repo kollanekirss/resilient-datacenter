@@ -117,6 +117,9 @@ def main():
                 cause=cause.__context__
             run(['nft','list','ruleset'])
             raise
+        if role=='controller':
+            from ci_scheduled_backup import exercise as scheduled_exercise
+            scheduled_exercise()
         run(['systemctl','stop',service])
     print(role+': actual service initial TLS, certificate replacement, failed restart and verified rollback PASS. Public ACME issuance NOT RUN.')
 

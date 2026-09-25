@@ -223,10 +223,23 @@ def action(args):
     if args.action=='configure':
         return configure(load_profile(str(args.profile)),password_file=args.recovery_password_file,ssh_key_file=args.recovery_ssh_key_file)
     data,transport=configured()
-    if args.action=='status': return status_summary(transport.snapshots())
+    if args.action=='status' or (args.action=='schedule' and args.schedule_action=='status'):
+        from backup_schedule import status as schedule_status
+        try: summary=status_summary(transport.snapshots())
+        except (ValueError,OSError,subprocess.SubprocessError):
+            summary={'state':'backup-unreachable','restore_test':'not-run','next_step':'Check backup storage reachability, credentials and pinned host key.'}
+        summary['schedule']=schedule_status(summary.get('backup_age_seconds'))
+        if summary['state']=='snapshot-present' and summary['schedule'].get('overdue'): summary['state']='backup-overdue'
+        return summary
+    if args.action=='schedule' and args.schedule_action=='disable':
+        from backup_schedule import disable
+        return disable()
     fd=os.open(BASE/'operation.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,'a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        if args.action=='schedule' and args.schedule_action=='enable':
+            from backup_schedule import enable
+            return enable(args.frequency)
         if args.action=='initialize':
             if not sys.stdin.isatty(): raise ValueError('Repository initialization requires interactive confirmation of independent recovery access')
             print('Keep the repository password and emergency storage access independently of this server. Confirm the destination is in a separate failure domain.')
