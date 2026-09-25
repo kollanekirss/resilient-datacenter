@@ -50,19 +50,22 @@ def proxy(original,config):
         '    handle @regional {\n        reverse_proxy 127.0.0.1:8008\n    }\n    handle {\n        respond "Regional endpoint not exposed" 403\n    }\n}\n'
 
 
-def read(path):
+def read(path,*,owner=None):
+    owner=os.geteuid() if owner is None else owner
     info=path.lstat()
-    if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode&0o022 or info.st_size>65536:raise ValueError('Unsafe regional connector file')
+    if not stat.S_ISREG(info.st_mode) or info.st_uid!=owner or info.st_mode&0o022 or info.st_size>65536:raise ValueError('Unsafe regional connector file')
     return path.read_bytes()
 
 
-def write(path,raw,*,mode=0o644):
+def write(path,raw,*,mode=0o644,owner=None,gid=None):
     if isinstance(raw,str):raw=raw.encode()
-    if path.exists() or path.is_symlink():read(path)
+    if path.exists() or path.is_symlink():read(path,owner=owner)
     descriptor,temporary=tempfile.mkstemp(prefix='.rdc-regional-',dir=path.parent)
     try:
         with os.fdopen(descriptor,'wb') as stream:stream.write(raw);stream.flush();os.fsync(stream.fileno())
-        os.chmod(temporary,mode);os.replace(temporary,path)
+        os.chmod(temporary,mode)
+        if owner is not None:os.chown(temporary,owner,gid if gid is not None else -1)
+        os.replace(temporary,path)
         descriptor=os.open(path.parent,os.O_RDONLY)
         try:os.fsync(descriptor)
         finally:os.close(descriptor)

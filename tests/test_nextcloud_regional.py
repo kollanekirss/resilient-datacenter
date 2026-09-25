@@ -44,6 +44,7 @@ def test_restore_or_missing_connector_uses_closed_outbound_policy(tmp_path,monke
     m.materialize(settings(),'internal config',b'original private identity')
     assert '127.0.0.1:9' in base64.b64decode(re.search(r'base64_decode\("([A-Za-z0-9+/=]+)"\)',(base/'runtime-config/zz-regional.config.php').read_text())[1]).decode()
     assert (base/'runtime-config/config.php').read_bytes()==b'original private identity'
+    assert (base/'runtime-config/config.php').stat().st_mode & 0o777 == 0o400
     m.write(base/'configuration.json',json.dumps(configuration()))
     pending.write_text('{}');m.materialize(settings(),'internal config')
     pending.unlink();assert m.active(settings()) is None

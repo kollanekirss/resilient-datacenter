@@ -81,10 +81,13 @@ def materialize(settings,original,application_config=None):
     if any(item.name not in ('config.php','zz-regional.config.php') for item in directory.iterdir()):raise ValueError('Unreviewed generated file configuration')
     if os.geteuid()==0:os.chown(directory,0,33)
     write(directory/'zz-regional.config.php',php_overlay(config),mode=0o640)
-    if application_config is not None:write(directory/'config.php',application_config,mode=0o640)
+    if application_config is not None:
+        # Nextcloud's CLI requires config.php to belong to the application UID.
+        # The parent remains root-owned and the container mount remains read-only.
+        uid=33 if os.geteuid()==0 else os.geteuid()
+        write(directory/'config.php',application_config,mode=0o400,owner=uid,gid=33 if os.geteuid()==0 else None)
     if os.geteuid()==0:
-        for name in ('config.php','zz-regional.config.php'):
-            if (directory/name).exists():os.chown(directory/name,0,33)
+        os.chown(directory/'zz-regional.config.php',0,33)
     write(BASE/'Caddyfile',proxy(original,config) if config else original)
 
 
