@@ -68,8 +68,8 @@ def container_command(name,settings):
                         'postgres','-c','listen_addresses=127.0.0.1','-c','port=5434','-c','max_connections=50','-c','shared_buffers=128MB']
     if name=='nextcloud':
         return command+['--user=33:33','--memory=2g','--entrypoint=apache2-foreground',
-                        '--tmpfs','/var/run/apache2:rw,nosuid,nodev,size=16m,uid=33,gid=33',
-                        '--tmpfs','/var/lock/apache2:rw,nosuid,nodev,size=16m,uid=33,gid=33',
+                        '--tmpfs','/var/run/apache2:rw,nosuid,nodev,size=16m,mode=1777',
+                        '--tmpfs','/var/lock/apache2:rw,nosuid,nodev,size=16m,mode=1777',
                         '--volume',str(APP)+':/var/www/html:ro','--volume',str(BASE/'config')+':/var/www/html/config:ro',
                         '--volume',str(STATE/'files')+':/var/www/data:rw',
                         '--volume',str(BASE/'ports.conf')+':/etc/apache2/ports.conf:ro',
