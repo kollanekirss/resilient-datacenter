@@ -28,7 +28,7 @@ class Store(Workspace):
         if errors:raise ValueError('; '.join(errors))
         created=False
         if not (self.base.exists() or self.base.is_symlink()):self.base.mkdir(mode=0o700);created=True
-        with self.lock():
+        with self.lock(wait_seconds=10):
             intent=self.base/'initialization.json'
             if not created and not intent.exists():raise ValueError('Existing directory is not an owned gateway')
             private_write(intent,agreements.canonical({'profile':profile,'identity':identity}))

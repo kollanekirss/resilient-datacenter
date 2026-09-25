@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import stat
 import tempfile
+import time
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 import regional_agreements as contracts
@@ -50,13 +51,19 @@ class Workspace:
         if not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.geteuid() or stat.S_IMODE(info.st_mode)!=0o700:raise ValueError('Use a private approval directory owned by the current operator')
 
     @contextmanager
-    def lock(self):
+    def lock(self,*,wait_seconds=0):
         self.check()
         descriptor=os.open(self.base/'operation.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
         with os.fdopen(descriptor,'a') as stream:
             info=os.fstat(stream.fileno())
             if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode&0o077:raise ValueError('Unsafe approval workspace lock')
-            fcntl.flock(stream,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            if type(wait_seconds) not in (int,float) or not 0<=wait_seconds<=30:raise ValueError('Invalid bounded lock wait')
+            deadline=time.monotonic()+wait_seconds
+            while True:
+                try:fcntl.flock(stream,fcntl.LOCK_EX|fcntl.LOCK_NB);break
+                except BlockingIOError:
+                    if time.monotonic()>=deadline:raise BlockingIOError('Another administration operation is running; retry after it completes') from None
+                    time.sleep(min(.05,max(0,deadline-time.monotonic())))
             yield
 
     def initialize(self,profile,passphrase):

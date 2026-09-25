@@ -45,3 +45,21 @@ def test_gateway_refuses_shared_state_or_symlink(tmp_path):
 def test_missing_initialized_gateway_state_is_not_recreated_and_cannot_erase_revocations(tmp_path):
     store,_=fixture(tmp_path);identity=store.identity();(store.base/'state.json').unlink()
     with pytest.raises(ValueError):store.initialize(profile(),identity)
+
+
+def test_operator_lock_can_wait_for_short_guard_without_losing_exclusion(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    store,_=fixture(tmp_path);started=Event();acquired=Event()
+    def operator():
+        started.set()
+        with store.lock(wait_seconds=1):acquired.set()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with store.lock():
+            future=pool.submit(operator);assert started.wait(1)
+            assert not acquired.wait(.1)
+        future.result(timeout=2)
+    assert acquired.is_set()
+    with store.lock():
+        with pytest.raises(BlockingIOError):
+            with store.lock(wait_seconds=.02):pass

@@ -80,7 +80,7 @@ def owned_file(path,content,*,mode=0o600):
 def install(profile,identity):
     preflight(profile,identity)
     store=Store(runtime.BASE);store.initialize(profile,identity)
-    with store.lock():
+    with store.lock(wait_seconds=10):
         # Read the complete frozen catalogue before any package/systemd changes.
         if runtime.INSTALLED.exists():
             info=runtime.INSTALLED.lstat()
@@ -113,7 +113,7 @@ def install(profile,identity):
 
 def change(documents=None,revoked_ids=None,*,resume=False):
     require_platform();runtime.verify_runtime();store=Store(runtime.BASE)
-    with store.lock():
+    with store.lock(wait_seconds=10):
         if resume:
             candidate=store.pending()
             if candidate is None:raise ValueError('No gateway transition is pending')
@@ -163,7 +163,7 @@ def action(args):
         from service_link import export_gateway
         from regional_operations import export
         require_platform();runtime.verify_runtime();store=Store(runtime.BASE)
-        with store.lock():return export(args.output_file,export_gateway(store,args.package))
+        with store.lock(wait_seconds=10):return export(args.output_file,export_gateway(store,args.package))
     require_platform();interactive();runtime.verify_runtime();store=Store(runtime.BASE)
     documents=None;revoked=None
     if command=='policy':
