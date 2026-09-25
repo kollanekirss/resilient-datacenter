@@ -22,8 +22,8 @@ jobs:
           .venv/bin/python -m pip install -r requirements.txt
           sudo apt-get update -qq
           sudo apt-get install -y podman nftables iptables
-      - name: Exercise real independent controller memberships
-        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT .venv/bin/python scripts/ci_regional_network.py
+      - name: Exercise real independent networks and approved Matrix exchange
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT .venv/bin/python scripts/ci_regional_matrix.py
       - name: Collect bounded disposable network diagnostics on failure
         if: failure()
         run: |
@@ -36,3 +36,9 @@ jobs:
                   if not any(term in line.lower() for term in ('auth','token','key=','key:','register')):
                       print(line[:500])
           PY
+          sudo podman ps --all --format '{{.Names}} {{.Status}}'
+          for node in north south; do
+            sudo podman logs --tail 70 "$node-synapse" || true
+            sudo podman logs --tail 50 "$node-proxy" || true
+            sudo podman logs --tail 50 "$node-gateway-proxy" || true
+          done
