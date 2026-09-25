@@ -33,6 +33,8 @@ Exit: all planned guests boot on an accepted Proxmox version and a repeated appl
 
 ## 3. Edge, DNS and local time
 
+An initial [local network preparation kit](../portable-local-network.md) now provides guided OPNsense configuration, static guest addressing, a guarded separate Unbound/time playbook and client diagnostics. Activation still includes console steps; live OPNsense/Proxmox and full playbook acceptance remain outstanding.
+
 Implement OPNsense configuration and separate Unbound deployment as distinct modules.
 
 - Configure WAN, staff, frontend, application and partner zones with explicit DHCP/DNS/firewall rules. Preserve a locally reachable management path independent of the edge VM.
@@ -82,6 +84,6 @@ Exit: changed-uplink, lost-relay/controller and partner-partition exercises pass
 
 ## First implementation boundary
 
-Stage 1 is the next bounded implementation. Stages 2–7 require their own detailed implementation plans because they modify different operational trust and recovery boundaries. Do not combine host provisioning, firewall changes and application migration into one opaque installer action.
+Stages 1–3 have initial implementations with their evidence boundaries above. Stage 4 is the next implementation boundary. Later stages require their own detailed implementation plans because they modify different operational trust and recovery boundaries. Do not combine host provisioning, firewall changes and application migration into one opaque installer action.
 
 No server software is to be executed on the preparation Mac. Linux deployment acceptance runs on disposable Ubuntu infrastructure; Proxmox/OPNsense acceptance needs a dedicated disposable virtualization environment. Unit tests and plan generation may run on the preparation computer.

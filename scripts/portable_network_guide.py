@@ -1,4 +1,6 @@
 """Human console instructions derived from the same reviewed network policy."""
+import ipaddress
+
 
 def render(plan, settings, policy):
     dns = plan['vms']['dns']['address']; admin = settings['administrator_address']
@@ -44,7 +46,7 @@ def render(plan, settings, policy):
               'Disable other DHCP servers on this segment, restrict DHCP to staff, disable router advertisements and disable Dnsmasq DNS listening (port 0). '
               'Set these options for the staff range explicitly; do not let DHCP advertise the router as a DNS fallback:', '',
               f'- Range: {settings["dhcp"]["start"]} – {settings["dhcp"]["end"]}',
-              f'- Subnet mask: {__import__("ipaddress").ip_network(plan["networks"]["staff"]["cidr"]).netmask}',
+              f'- Subnet mask: {ipaddress.ip_network(plan["networks"]["staff"]["cidr"]).netmask}',
               f'- Router, option 3: {policy["dhcp"]["router"]}',
               f'- DNS, option 6: {dns} only', f'- NTP, option 42: {dns}',
               '- Lease time: 12 hours; apply and verify the actual client lease.', '',

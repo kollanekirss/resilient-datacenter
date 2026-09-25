@@ -1,5 +1,6 @@
 """Private network preparation kit. Generation does not connect to any server."""
 import json
+import hashlib
 import os
 from pathlib import Path
 import sys
@@ -33,7 +34,7 @@ def prepare(plan, settings, destination):
             os.fchmod(stream.fileno(), 0o600)
             stream.write(value); stream.flush(); os.fsync(stream.fileno())
     manifest = {'schema_version': 1, 'site_sha256': policy['site_sha256'], 'settings_sha256': policy['settings_sha256'],
-                'files': {key: __import__('hashlib').sha256(value.encode()).hexdigest() for key, value in files.items()}}
+                'files': {key: hashlib.sha256(value.encode()).hexdigest() for key, value in files.items()}}
     from portable_state import write
     write(destination / 'manifest.json', manifest)
     verify(destination, plan=plan, settings=settings)
@@ -61,7 +62,7 @@ def verify(destination, *, plan=None, settings=None):
         directory(path.parent)
         with regular(path) as stream:
             actual = stream.read(131073)
-        require(actual == wanted.encode() and __import__('hashlib').sha256(actual).hexdigest() == manifest['files'][relative],
+        require(actual == wanted.encode() and hashlib.sha256(actual).hexdigest() == manifest['files'][relative],
                 'Kit files differ from their reviewed configuration. Regenerate in a new directory.')
     allowed = set(expected) | {'manifest.json'}
     for path in destination.rglob('*'):

@@ -38,8 +38,13 @@ def dns_name(packet, position):
 def dns_answer(packet, request, expected):
     require(12 <= len(packet) <= 4096, 'Invalid DNS response length.')
     identifier, flags, qd, an, ns, ar = struct.unpack('!6H', packet[:12])
-    require(packet[:2] == request[:2] and flags & 0x8000 and not flags & 0x7a00 and qd == 1,
+    require(packet[:2] == request[:2] and flags & 0x8000 and not flags & 0x7a00,
             'Mismatched or truncated DNS response.')
+    # Unbound ACL refusal can legitimately omit the question. Accept only an
+    # exact matching header-only REFUSED for a negative check, never as data.
+    if expected is None and qd == an == ns == ar == 0 and len(packet) == 12 and flags & 15 == 5:
+        return True
+    require(qd == 1, 'DNS response omitted the expected question.')
     question, offset = dns_name(packet, 12); wanted, qend = dns_name(request, 12)
     require(question == wanted and packet[offset:offset + 4] == request[qend:qend + 4], 'DNS question differs.')
     offset += 4; addresses = []

@@ -1,5 +1,4 @@
 """Strict local network settings; derive policy without touching infrastructure."""
-import copy
 import hashlib
 import ipaddress
 import json

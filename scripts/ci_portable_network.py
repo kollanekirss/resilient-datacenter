@@ -7,7 +7,6 @@ emulate OPNsense, DHCP, Proxmox or physical isolation. No namespace has a WAN ro
 import json
 import os
 from pathlib import Path
-import pwd
 import socket
 import subprocess
 import sys

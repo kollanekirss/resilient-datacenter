@@ -85,3 +85,13 @@ def test_actual_tcp_probe_handles_split_frame():
         thread=threading.Thread(target=respond);thread.start()
         assert dns_probe('127.0.0.1','chat.example.org','10.76.30.11',tcp=True,port=server.getsockname()[1]) is True
         thread.join(timeout=3)
+
+
+def test_header_only_refusal_is_valid_only_for_negative_probe():
+    from portable_network_probe import dns_query, dns_answer
+    request=dns_query('chat.example.org',123)
+    refused=struct.pack('!6H',123,0x8105,0,0,0,0)
+    assert dns_answer(refused,request,None) is True
+    with pytest.raises(ValueError):dns_answer(refused,request,'10.76.30.11')
+    for packet in (struct.pack('!6H',124,0x8105,0,0,0,0),struct.pack('!6H',123,0x8100,0,0,0,0)):
+        with pytest.raises(ValueError):dns_answer(packet,request,None)
