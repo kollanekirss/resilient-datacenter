@@ -114,7 +114,7 @@ def setup_application(institution,index,identity,document):
     synapse=config/'synapse';synapse.mkdir(mode=0o750);os.chown(synapse,0,991)
     logging=yaml.safe_load(service_rendering.logging_config())
     logging.setdefault('loggers',{})['synapse.http.federation.well_known_resolver']={'level':'INFO'}
-    for name,text in (('homeserver.yaml',service_rendering.synapse(profile,generated)),('log.config',yaml.safe_dump(logging)):
+    for name,text in (('homeserver.yaml',service_rendering.synapse(profile,generated)),('log.config',yaml.safe_dump(logging))):
         (synapse/name).write_text(text);os.chown(synapse/name,0,991);(synapse/name).chmod(0o640)
     password=config/'database-password';password.write_text(generated['database_password']+'\n');password.chmod(0o400);os.chown(password,999,999)
     (config/'Caddyfile').write_text(service_rendering.proxy(profile,settings['bind_address']))
