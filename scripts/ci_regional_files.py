@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Candidate file federation across actual isolated institutional networks.
+"""File federation across actual isolated institutional networks.
 
-This opts into unadvertised Nextcloud routes only in a disposable acceptance job.
-Normal gateway runtime stays Matrix-only until this acceptance is complete.
+Exercise the normal route catalogue on disposable independent networks.
 """
 import base64
 import json
@@ -131,7 +130,7 @@ def gateway(institution,index,identity,document,tls):
     profile={'kind':'regional-gateway','schema_version':1,'institution_id':institution,'node_name':institution+'-gateway','regional_controller':network.CONTROLLERS['regional']['hostname'],
         'lan_address':'10.203.'+str(index)+'.1','lan_subnet':'10.203.'+str(index)+'.0/24','identity_file':'/root/identity.json','tls_certificate':str(folder/'tls.crt'),'tls_private_key':str(folder/'tls.key'),'upstreams':{'nextcloud':'10.203.'+str(index)+'.10'}}
     peers=gateway_contracts.peer_rules(identity,[document],[],now=int(time.time()))
-    rendered=gateway_rendering.envoy(profile,identity,peers,services=('nextcloud',))
+    rendered=gateway_rendering.envoy(profile,identity,peers)
     for listener in rendered['static_resources']['listeners']:
         hcm=listener['filter_chains'][0]['filters'][0]['typed_config']
         hcm['access_log']=[{'name':'envoy.access_loggers.stdout','typed_config':{
@@ -141,7 +140,7 @@ def gateway(institution,index,identity,document,tls):
     (folder/'envoy.json').write_text(json.dumps(rendered))
     gateway_runtime.BASE=folder;gateway_runtime.CONTAINER=institution+'-gateway-proxy'
     fixture.launch(institution+'-gateway',gateway_runtime.CONTAINER,gateway_runtime.container_command(identity))
-    network.run('ip','netns','exec',institution+'-gateway','nft','-f','-',input=gateway_rendering.firewall(profile,peers,lan_interface='lan0',now=int(time.time()),replace=False,services=('nextcloud',)))
+    network.run('ip','netns','exec',institution+'-gateway','nft','-f','-',input=gateway_rendering.firewall(profile,peers,lan_interface='lan0',now=int(time.time()),replace=False))
     return profile
 
 
@@ -213,7 +212,7 @@ def main():
     assert code==400 and 'sign' in body.decode(errors='replace').lower(),(code,body[:500])
     ocs(north,'DELETE','shares/'+str(share['id']))
     assert request(south['user'],'GET','https://'+south['hostname']+mounted,password=south['password'],timeout=15)[0] in (401,403,404,503)
-    print('Actual candidate Nextcloud federation: separate internal users upload, explicitly accept and read an approved share; unrelated DAV/admin routes, unapproved regional node and revoked share are denied PASS.',flush=True)
+    print('Actual Nextcloud federation: separate internal users upload, explicitly accept and read an approved share; unrelated DAV/admin routes, unapproved regional node and revoked share are denied PASS.',flush=True)
     own(north,'MKCOL','/remote.php/dav/files/alice/partner-folder')
     ocs(north,'POST','shares',{'path':'/partner-folder','shareType':'6','shareWith':'alice@'+south['hostname'],'permissions':'1'})
     pending=ocs(south,'GET','remote_shares/pending');assert len(pending)==1,pending
@@ -223,12 +222,12 @@ def main():
     own(north,'PUT','/remote.php/dav/files/alice/partner-folder/before.txt',b'Previously approved')
     assert own(south,'GET',folder+'/before.txt')==b'Previously approved'
     for institution in ('north','south'):
-        network.run('ip','netns','exec',institution+'-gateway','nft','-f','-',input=gateway_rendering.firewall(profiles[institution],[],lan_interface='lan0',now=int(time.time()),replace=True,services=('nextcloud',)))
+        network.run('ip','netns','exec',institution+'-gateway','nft','-f','-',input=gateway_rendering.firewall(profiles[institution],[],lan_interface='lan0',now=int(time.time()),replace=True))
     after=b'Created only after partnership revocation '+os.urandom(32)
     own(north,'PUT','/remote.php/dav/files/alice/partner-folder/after.txt',after)
     code,body=request(south['user'],'GET','https://'+south['hostname']+folder+'/after.txt',password=south['password'],timeout=15)
     assert not (code==200 and body==after),'New file crossed a revoked partnership'
-    print('Actual candidate file partnership revocation blocks subsequently created content without claiming recall of delivered copies PASS.',flush=True)
+    print('Actual file partnership revocation blocks subsequently created content without claiming recall of delivered copies PASS.',flush=True)
     for institution in ('north','south'):network.run('podman','stop',institution+'-gateway-proxy')
     network.CONTROLLERS['regional']['process'].terminate();network.CONTROLLERS['regional']['process'].wait(timeout=10)
     for app in apps.values():

@@ -10,7 +10,7 @@ def wizard(identity,identity_file,output,*,input_fn=input,output_fn=print):
     own=agreements.verify_identity(identity)
     result={'kind':'regional-gateway','schema_version':1,'institution_id':own['institution_id'],
             'node_name':own['gateway_node'],'regional_controller':own['regional_controller'],'identity_file':str(Path(identity_file).absolute()),'upstreams':{}}
-    output_fn('Experimental dedicated gateway: one regional network identity, a private LAN to separate service VMs, no subnet forwarding. Matrix transport is available for testing; Nextcloud federation is still closed. Use :cancel to stop.')
+    output_fn('Experimental dedicated gateway: one regional network identity, a private LAN to separate service VMs, no subnet forwarding. Matrix and Nextcloud transport are available for testing with explicit bilateral approval. Use :cancel to stop.')
     output_fn('Pinned institution: '+own['institution_id']+'; regional address: '+own['gateway_ipv4']+'; approval fingerprint: '+agreements.fingerprint(identity))
     def ask(label,valid):
         while True:

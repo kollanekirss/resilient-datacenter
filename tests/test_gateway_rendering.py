@@ -26,8 +26,8 @@ def test_gateway_has_fixed_tls_upstreams_no_admin_or_dynamic_forwarding():
     text=json.dumps(config)
     assert 'direct_remote_ip' in text and 'connect_matcher' in text
     assert 'ORIGINAL_DST' not in text and 'dynamic_forward_proxy' not in text
-    # Nextcloud paths remain closed until its exact federation API is accepted.
-    assert 'local_nextcloud' not in text
+    # Both accepted catalogues retain exact method/path and peer boundaries.
+    assert 'local_nextcloud' in text
     assert '/_matrix/client' not in text and '/_synapse/admin' not in text
 
 

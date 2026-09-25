@@ -135,7 +135,7 @@ def status():
     timer=subprocess.run(['/bin/systemctl','is-active','rdc-regional-guard.timer'],capture_output=True,timeout=15).returncode==0
     return {'state':'gateway-change-pending' if pending else ('gateway-configured' if time_verified and timer else 'gateway-enforcement-unverified'),'time_checkpoint_recent':time_verified,'guard_timer_active':timer,'network_identity_verified':network,
             'proxy_running':bool(item and item.get('State',{}).get('Running')),'approved_peers':store.peers(),
-            'application_federation':'not-verified','supported_transport':['matrix'],'nextcloud_transport':'not-implemented'}
+            'application_federation':'not-verified','supported_transport':['matrix','nextcloud']}
 
 
 def action(args):

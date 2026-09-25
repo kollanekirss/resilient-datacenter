@@ -1,8 +1,4 @@
-"""Fixed application gateway configuration; no user-provided directives or URLs.
-
-Nextcloud federation is deliberately closed until its protocol acceptance exists.
-Only the reviewed Matrix server-to-server endpoints are currently rendered.
-"""
+"""Fixed method/path-scoped application routes and signed static peer targets."""
 import ipaddress
 import json
 import re
@@ -11,7 +7,7 @@ from regional_http import NEXTCLOUD_ROUTES
 
 HCM='type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager'
 ROUTER={'name':'envoy.filters.http.router','typed_config':{'@type':'type.googleapis.com/envoy.extensions.filters.http.router.v3.Router'}}
-SUPPORTED=('matrix',)
+SUPPORTED=('matrix','nextcloud')
 
 
 def socket(address,port):return {'socket_address':{'address':address,'port_value':port}}

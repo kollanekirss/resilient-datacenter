@@ -1,6 +1,6 @@
 # Experimental regional gateway
 
-This is a development milestone, not the completed regional service package. Matrix exchange across real independent Headscale networks, transport restrictions and gateway lifecycle have disposable Ubuntu evidence. Nextcloud exchange, gateway certificate renewal and gateway recovery remain in progress. Use disposable infrastructure for this path until the remaining checks pass.
+This is a development milestone, not the completed regional service package. Matrix and Nextcloud exchange across real independent Headscale networks, transport restrictions and interrupted policy changes have disposable Ubuntu evidence. Gateway certificate renewal and gateway recovery remain in progress. Use disposable infrastructure for this path until the remaining checks pass.
 
 ## What the gateway connects
 
@@ -44,7 +44,7 @@ sudo ./rdc gateway policy --agreement /root/partner-one-approved.json --agreemen
 sudo ./rdc gateway status
 ```
 
-The policy command replaces the selected set of agreement documents; an empty selection closes all peer access. At most eight peer documents are supported initially. Both parties' signatures and exact pinned local identity must match. Agreements that are expired, not yet active or locally revoked produce no access. Only Matrix transport is currently enabled, even when a signed agreement also names Nextcloud.
+The policy command replaces the selected set of agreement documents; an empty selection closes all peer access. At most eight peer documents are supported initially. Both parties' signatures and exact pinned local identity must match. Agreements that are expired, not yet active or locally revoked produce no access. Matrix and Nextcloud transport are enabled only for the services named in each current bilateral agreement.
 
 The gateway exposes Matrix federation/key endpoints over regional HTTPS. It blocks Matrix client/admin routes. Its LAN-only CONNECT proxy accepts the Matrix service's fixed source address and only the selected partner Matrix hostnames on port 443. It cannot be used as a general web proxy. The upstream service endpoint uses verified HTTPS on its dedicated LAN address, port 8443; configure it with the service attachment instructions below.
 
@@ -90,3 +90,24 @@ At first attachment, independently confirm the full institution signing fingerpr
 `sudo ./rdc services regional disable` removes the active connector from the running service configuration. Restoring application data also suspends the connector persistently; re-export and review current agreements before reattaching it. Application backup protects chat data and identity, not an automatic restoration of old partner admission.
 
 The attach operation's success reports configuration/readiness only. Send and read a real partner-room message before recording successful federation. The [Matrix connector and recovery run](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36144496260) passed actual LAN source/path restrictions, connector installation and persistent suspension after application restoration. The [independent network run](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36143267057) passed real separate memberships. The subsequent [actual regional Matrix run](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36145734658) passed room exchange in both directions, denial of unapproved access, blocked later delivery after revocation, and internal chat after regional shutdown. This is disposable API-level acceptance; physical sites and encrypted cross-institution browser acceptance remain separate.
+
+## Connect the file service
+
+After installing the independent Nextcloud package and applying current bilateral approvals on the dedicated gateway, export its public connector document:
+
+```sh
+sudo ./rdc gateway service-link --package nextcloud --output-file /root/nextcloud-link.json
+```
+
+Copy that public document to the institution's Nextcloud VM. Assign the declared private LAN address to that VM, then attach it:
+
+```sh
+sudo ./rdc files regional attach /root/nextcloud-link.json
+sudo ./rdc files regional status
+```
+
+The initial attachment asks you to confirm the institution's full approval fingerprint independently. It briefly restarts the application and HTTPS proxy. Users share with a partner's full account address and the recipient explicitly accepts the share. Public links, group federation and automatic acceptance remain disabled. A gateway approval enables transport; it does not give a partner access to every file.
+
+To suspend the local connector, use `sudo ./rdc files regional disable`. A restored file service stays suspended until current partner approvals are reviewed and attached again. Gateway revocation blocks future delivery but cannot remove copies already downloaded by a recipient.
+
+The current source passed disposable file exchange and destination-denial checks in run36151160141. This does not establish unattended gateway renewal, gateway disaster recovery or physical-site acceptance.
