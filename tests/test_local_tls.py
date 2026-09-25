@@ -43,3 +43,11 @@ def test_local_tls_check_rejects_expired_certificate(certs):
     try:
         assert tls_errors('a.pilot.test',connect_address=('127.0.0.1',server.server_port),context=ssl.create_default_context(cafile=str(cert)))
     finally: server.shutdown(); server.server_close(); thread.join()
+
+@pytest.mark.parametrize('hostname,trusted,outcome',[('a.pilot.test',True,'pass'),('wrong.pilot.test',True,'fail'),('a.pilot.test',False,'fail')])
+def test_structured_probe_verifies_real_tls(tls_server,monkeypatch,hostname,trusted,outcome):
+    import diagnostic_probe
+    server,context=tls_server
+    monkeypatch.setattr(diagnostic_probe.socket,'getaddrinfo',lambda *a,**kw:[(2,1,6,'',server.server_address)])
+    checks=diagnostic_probe.probe_controller(hostname,context=context if trusted else None)
+    assert any(c.code=='tls.verify' and c.outcome==outcome for c in checks)
