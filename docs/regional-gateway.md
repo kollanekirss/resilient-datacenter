@@ -69,3 +69,24 @@ Do not treat an ordinary network-only backup as a gateway backup. Keep public id
 - [Gateway lifecycle run](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36141569056): actual installation, frozen runtime, repeated installation, systemd restart, interrupted revocation, closed restart, explicit resume and replay denial.
 
 Both use explicit synthetic network fixtures. They are not evidence of home NAT traversal, real cross-controller membership or application federation.
+
+## Attach the Matrix service VM (development)
+
+On the gateway, export a public service-link document for the selected, currently approved Matrix agreements:
+
+```sh
+sudo ./rdc gateway service-link --output-file /root/matrix-service-link.json
+```
+
+Copy that public file through your normal administrator channel to the institution's Matrix VM. Do not copy the approval signing key or gateway private certificate key. The service VM must still belong to the separate internal network and must have the declared dedicated private LAN address. On that VM:
+
+```sh
+sudo ./rdc services regional attach /root/matrix-service-link.json
+sudo ./rdc services regional status
+```
+
+At first attachment, independently confirm the full institution signing fingerprint from the administrator workspace. Review the LAN addresses and partner names. Attachment briefly restarts chat and its proxy. It adds only the fixed LAN federation/key routes on HTTPS 8443 and the restricted outbound gateway proxy; ordinary users keep the existing internal HTTPS service. Older experimental runtime files need a reviewed upgrade first and are not silently replaced by attachment.
+
+`sudo ./rdc services regional disable` removes the active connector from the running service configuration. Restoring application data also suspends the connector persistently; re-export and review current agreements before reattaching it. Application backup protects chat data and identity, not an automatic restoration of old partner admission.
+
+The attach operation's success reports configuration/readiness only. Send and read a real partner-room message before recording successful federation. Native application connector acceptance is still in progress on this branch.

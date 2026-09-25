@@ -27,7 +27,13 @@ def require_ci():
     if os.geteuid()!=0 or os.environ.get('GITHUB_ACTIONS')!='true' or os.environ.get('RUNNER_ENVIRONMENT')!='github-hosted' or 'VERSION_ID="24.04"' not in Path('/etc/os-release').read_text():raise ValueError('Disposable GitHub-hosted Ubuntu 24.04 only')
 
 
-def run(*args,input=None,timeout=60):return subprocess.run(list(args),input=input,check=True,capture_output=True,text=True,timeout=timeout).stdout
+def run(*args,input=None,timeout=60):
+    try:return subprocess.run(list(args),input=input,check=True,capture_output=True,text=True,timeout=timeout).stdout
+    except subprocess.CalledProcessError as error:
+        lines=(error.stderr or '').splitlines()[-30:]
+        detail='\n'.join(line[:500] for line in lines if not any(term in line.lower() for term in ('auth','token','key=','key:','register')))
+        print('Disposable native command failed: '+detail,flush=True)
+        raise
 
 
 def spawn(name,args,*,env=None):

@@ -77,8 +77,11 @@ def configure(bundle,*,expected_fingerprint):
             connector.write(connector.BASE/'Caddyfile',connector.proxy((runtime.BASE/'Caddyfile').read_text(),config))
             # No shell snippets or arbitrary directives are accepted. Validate the
             # generated native proxy config before its listener can be started.
+            # The pinned Caddy executable carries cap_net_bind_service=ep; Linux
+            # refuses exec itself when that file capability is outside the bound.
+            # Keep its one required capability even for offline validation.
             image=settings['components']['proxy']['image']
-            subprocess.run(['/usr/bin/podman','--runtime=/usr/bin/runc','run','--rm','--network=none','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges',
+            subprocess.run(['/usr/bin/podman','--runtime=/usr/bin/runc','run','--rm','--network=none','--read-only','--cap-drop=ALL','--cap-add=NET_BIND_SERVICE','--security-opt=no-new-privileges',
                 '--tmpfs','/config:rw,nosuid,nodev,size=16m','--tmpfs','/data:rw,nosuid,nodev,size=16m',
                 '--volume',str(connector.BASE/'Caddyfile')+':/etc/caddy/Caddyfile:ro','--volume',str(runtime.TLS)+':/tls:ro',
                 image,'caddy','validate','--config','/etc/caddy/Caddyfile','--adapter','caddyfile'],check=True,capture_output=True,timeout=60)
@@ -107,3 +110,30 @@ def disable():
         pending=connector.BASE/'pending.json'
         if pending.exists():pending.unlink()
     return {'state':'connector-disabled','internal_service':'listeners-verified'}
+
+
+def action(args):
+    from backup_operations import require_platform
+    from regional_operations import imported,interactive
+    import service_runtime as runtime
+    require_platform();settings=runtime.read_settings();command=args.regional_service_action
+    if command=='status':
+        current=connector.configured(settings)
+        return {'state':'connector-not-installed' if current is None else ('connector-configured' if connector.active(settings) else 'connector-suspended'),
+                'application_federation':'not-verified','configuration':current,
+                'recovery':'Reapply a currently reviewed public service-link document after restoration.'}
+    if command=='disable':return disable()
+    if command!='attach':raise ValueError('Unsupported application connector action')
+    interactive();bundle=imported(args.document)
+    identity=bundle.get('gateway_identity')
+    fingerprint=agreements.fingerprint(identity)
+    current=connector.configured(settings)
+    if current is not None:expected=current['gateway_fingerprint']
+    else:
+        print('This is your institution approval identity: '+fingerprint)
+        expected=input('Enter the full fingerprint independently confirmed from your administrator workspace: ').strip()
+    candidate=prepare(bundle,settings,expected_fingerprint=expected,now=int(time.time()))
+    print(json.dumps(candidate,indent=2))
+    print('This briefly restarts chat and its HTTPS proxy. Internal network identity and application data remain owned by this service. Regional exchange still needs a real test.')
+    if input('Type ATTACH to configure this Matrix gateway connection: ').strip()!='ATTACH':return {'state':'cancelled'}
+    return configure(bundle,expected_fingerprint=expected)

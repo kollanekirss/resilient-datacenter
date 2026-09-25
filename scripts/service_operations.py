@@ -218,6 +218,9 @@ def action(args):
     import fcntl
     import sys
     from profile_config import load_profile
+    if args.action=='regional':
+        from service_link import action as regional_action
+        return regional_action(args)
     if args.action=='issuer':
         from service_issuer import action as issuer_action
         return issuer_action(args)

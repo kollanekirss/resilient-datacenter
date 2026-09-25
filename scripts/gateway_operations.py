@@ -152,6 +152,11 @@ def action(args):
         if input('Type INSTALL to install or resume this gateway: ').strip()!='INSTALL':return {'state':'cancelled'}
         return install(profile,identity)
     if command=='status':return status()
+    if command=='service-link':
+        from service_link import export_gateway
+        from regional_operations import export
+        require_platform();runtime.verify_runtime();store=Store(runtime.BASE)
+        with store.lock():return export(args.output_file,export_gateway(store))
     require_platform();interactive();runtime.verify_runtime();store=Store(runtime.BASE)
     documents=None;revoked=None
     if command=='policy':
