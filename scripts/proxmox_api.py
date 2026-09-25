@@ -59,3 +59,36 @@ class Client:
         except (OSError, ValueError, urllib.error.URLError, RecursionError):
             # A failed POST may already have reached the server. Never automatically repeat it.
             raise ValueError('Proxmox request failed. Check TLS, permissions and task state before retrying; no automatic retry was made.') from None
+
+    def upload(self, node, storage, filename, stream, size, sha256):
+        """Stream ISO multipart data with an explicit server-side checksum."""
+        import uuid
+        require(all(re.fullmatch(r'[a-z][a-z0-9-]{0,62}',s) for s in (node,storage))
+                and re.fullmatch(r'rdc-[a-f0-9-]+\.iso',filename)
+                and type(size) is int and size>0 and re.fullmatch('[a-f0-9]{64}',sha256), 'Invalid media upload parameters.')
+        boundary='rdc'+uuid.uuid4().hex
+        fields={'content':'iso','checksum':sha256,'checksum-algorithm':'sha256'}
+        prefix=''.join(f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n' for key,value in fields.items())
+        prefix+=(f'--{boundary}\r\nContent-Disposition: form-data; name="filename"; filename="{filename}"\r\nContent-Type: application/octet-stream\r\n\r\n')
+        prefix=prefix.encode();suffix=('\r\n--'+boundary+'--\r\n').encode()
+        def chunks():
+            yield prefix
+            remaining=size
+            while remaining:
+                data=stream.read(min(4*1024*1024,remaining))
+                require(bool(data),'Media ended during upload.')
+                remaining-=len(data);yield data
+            require(not stream.read(1),'Media grew during upload.')
+            yield suffix
+        request=urllib.request.Request(self.endpoint+f'/nodes/{node}/storage/{storage}/upload', data=chunks(),method='POST',
+                  headers={'Authorization':self.authorization,'Content-Type':'multipart/form-data; boundary='+boundary,
+                           'Content-Length':str(len(prefix)+size+len(suffix)),'Accept':'application/json'})
+        try:
+            with self.opener.open(request,timeout=120) as response:raw=response.read(65537)
+            require(len(raw)<=65536,'Upload response exceeded its size limit.')
+            record=json.loads(raw)
+            require(type(record) is dict and type(record.get('data')) is str and record['data'].startswith('UPID:') and not record.get('errors'),
+                    'Upload task could not be identified.')
+            return record['data']
+        except (OSError,ValueError,urllib.error.URLError,RecursionError):
+            raise ValueError('Upload outcome is uncertain. Inspect Proxmox tasks; this request will not be automatically repeated.') from None
