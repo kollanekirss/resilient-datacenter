@@ -126,4 +126,8 @@ def main():
     issuer_exercise(certificate_fixture.certificates,package='nextcloud')
     print('Actual Nextcloud browser login and uploaded file visibility PASS. Real VPN/home NAT and physical offsite placement NOT RUN.',flush=True)
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    try:main()
+    finally:
+        from ci_nextcloud_diagnostics import report
+        report(runtime.STATE/'files/nextcloud.log')

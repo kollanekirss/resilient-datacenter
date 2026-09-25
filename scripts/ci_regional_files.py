@@ -105,6 +105,7 @@ def setup(institution,index,identity,document):
         time.sleep(.5)
     else:raise ValueError('File fixture PostgreSQL not ready')
     network.run('nsenter','--net=/var/run/netns/'+node,sys.executable,str(Path(__file__)),'child',input=json.dumps({'action':'bootstrap','institution':institution,'settings':settings,'profile':profile,'password':password,'database_password':database_password}),timeout=300)
+    network.run('nsenter','--net=/var/run/netns/'+node,'podman','exec','--user','999:999',institution+'-postgres','psql','-p','5434','-U','nextcloud','-d','nextcloud','-c','ALTER ROLE oc_admin NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION',timeout=30)
     bundle={'kind':'regional-service-link','schema_version':1,'package':'nextcloud','gateway_identity':identity,'gateway_lan_address':'10.203.'+str(index)+'.1','service_lan_address':'10.203.'+str(index)+'.10','lan_subnet':'10.203.'+str(index)+'.0/24','agreements':[document]}
     prepared=service_link.prepare(bundle,settings,expected_fingerprint=agreements.fingerprint(identity),now=int(time.time()))
     connector.write(connector.BASE/'configuration.json',json.dumps(prepared))
@@ -130,7 +131,14 @@ def gateway(institution,index,identity,document,tls):
     profile={'kind':'regional-gateway','schema_version':1,'institution_id':institution,'node_name':institution+'-gateway','regional_controller':network.CONTROLLERS['regional']['hostname'],
         'lan_address':'10.203.'+str(index)+'.1','lan_subnet':'10.203.'+str(index)+'.0/24','identity_file':'/root/identity.json','tls_certificate':str(folder/'tls.crt'),'tls_private_key':str(folder/'tls.key'),'upstreams':{'nextcloud':'10.203.'+str(index)+'.10'}}
     peers=gateway_contracts.peer_rules(identity,[document],[],now=int(time.time()))
-    (folder/'envoy.json').write_text(json.dumps(gateway_rendering.envoy(profile,identity,peers,services=('nextcloud',))))
+    rendered=gateway_rendering.envoy(profile,identity,peers,services=('nextcloud',))
+    for listener in rendered['static_resources']['listeners']:
+        hcm=listener['filter_chains'][0]['filters'][0]['typed_config']
+        hcm['access_log']=[{'name':'envoy.access_loggers.stdout','typed_config':{
+            '@type':'type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog',
+            'log_format':{'json_format':{'method':'%REQ(:METHOD)%','code':'%RESPONSE_CODE%',
+                'detail':'%RESPONSE_CODE_DETAILS%'}}}}]
+    (folder/'envoy.json').write_text(json.dumps(rendered))
     gateway_runtime.BASE=folder;gateway_runtime.CONTAINER=institution+'-gateway-proxy'
     fixture.launch(institution+'-gateway',gateway_runtime.CONTAINER,gateway_runtime.container_command(identity))
     network.run('ip','netns','exec',institution+'-gateway','nft','-f','-',input=gateway_rendering.firewall(profile,peers,lan_interface='lan0',now=int(time.time()),replace=False,services=('nextcloud',)))
@@ -206,12 +214,9 @@ if __name__=='__main__':
         try:main()
         finally:
             for path in ROOT.glob('*-files/state/files/nextcloud.log'):
-                for line in path.read_text(errors='replace').splitlines()[-20:]:
-                    try:item=json.loads(line)
-                    except ValueError:continue
-                    # Application diagnostics omit request URLs, users, headers and tokens.
-                    message=str(item.get('message',''))
-                    if not any(term in message.lower() for term in ('token','secret','password','authorization')):
-                        print('File fixture '+path.parts[-4]+': '+message[:600],flush=True)
+                from ci_nextcloud_diagnostics import report
+                report(path)
+            for institution in ('north','south'):
+                subprocess.run(['podman','logs','--tail','15',institution+'-gateway-proxy'],timeout=15)
             for name in reversed(fixture.CONTAINERS):subprocess.run(['podman','stop','--time','5',name],capture_output=True,timeout=15)
             network.cleanup()
