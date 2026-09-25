@@ -107,7 +107,16 @@ def main():
         lifecycle.Runtime().verify(HOST,successful['fingerprint'])
         assert (base/'active/tls.crt').read_bytes()==cert2
         from ci_restore_lifecycle import exercise
-        exercise(role)
+        try: exercise(role)
+        except BaseException as failure:
+            # Synthetic disposable fixture only; production errors keep private values hidden.
+            import traceback
+            cause=failure
+            while cause is not None:
+                traceback.print_exception(type(cause),cause,cause.__traceback__,chain=False)
+                cause=cause.__context__
+            run(['nft','list','ruleset'])
+            raise
         run(['systemctl','stop',service])
     print(role+': actual service initial TLS, certificate replacement, failed restart and verified rollback PASS. Public ACME issuance NOT RUN.')
 
