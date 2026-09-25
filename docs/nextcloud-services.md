@@ -1,6 +1,6 @@
 # Nextcloud file service (development preview)
 
-This package is under active development. Its local contracts and recovery tests are implemented, but actual application acceptance is still being run. Do not treat a published draft branch as a supported institutional deployment. The old 0.2.0-alpha.1 download does not contain this package.
+This package is under active development. Actual application, browser, encrypted backup, fenced recovery and TLS lifecycle checks have passed on disposable Ubuntu runners. See [the validation record](validation-status.md) for exact evidence and remaining boundaries. Do not treat a published draft branch as a supported institutional deployment. The old 0.2.0-alpha.1 download does not contain this package.
 
 ## Prepare a file-service node
 
@@ -83,3 +83,7 @@ The replacement is checked for trust, name and validity. Activation verifies the
 ## Evidence
 
 Consult the current [Nextcloud draft pull request](https://github.com/kollanekirss/resilient-datacenter/pull/7) and its disposable Ubuntu checks. Current acceptance is still in progress. Synthetic network addresses, a local test CA and same-runner SFTP cannot establish home NAT, public provider issuance, physical offsite protection or beginner usability.
+
+## Implementation references
+
+Nextcloud 35 includes federation components that cannot be uninstalled. The package disables external sharing through the effective application settings and verifies their values; it does not claim those required components are absent. Public links use `core/shareapi_allow_links`, the setting checked by the [upstream share manager](https://github.com/nextcloud/server/blob/v35.0.1/lib/private/Share20/Manager.php). The [federated share provider](https://github.com/nextcloud/server/blob/v35.0.1/apps/federatedfilesharing/lib/FederatedShareProvider.php) defines the incoming/outgoing sharing controls.

@@ -1,6 +1,6 @@
 # Nextcloud package design
 
-Status: implementation next; no support claim yet. This implements the file-service portion of the approved product goal. Routine design choices are delegated by the user's instruction to continue through the whole specification.
+Status: experimental implementation with disposable application/recovery evidence; no supported multi-site deployment claim. This implements the file-service portion of the approved product goal. Routine design choices are delegated by the user's instruction to continue through the whole specification.
 
 ## Deployment and identity
 
