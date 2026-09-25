@@ -22,7 +22,7 @@ TIMER=Path('/etc/systemd/system/rdc-service-certificate.timer')
 LEGACY_FILES=('service_issuer_runner.py','service_issuer.py','service_issuer_contracts.py','service_certificates.py',
        'service_runtime.py','service_contracts.py','certificate_lifecycle.py','profile_config.py','setup_contracts.py',
        'validate_inventory.py','validate_tls.py')
-FILES=LEGACY_FILES+('nextcloud_runtime.py','nextcloud_certificates.py')
+FILES=LEGACY_FILES+('nextcloud_runtime.py','nextcloud_certificates.py','nextcloud_regional.py','service_regional.py','regional_http.py')
 
 
 def directory(path,*,create=True):

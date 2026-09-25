@@ -166,12 +166,32 @@ def main():
     for path in ('/index.php/login','/ocs/v2.php/cloud/users','/index.php/settings/admin'):
         assert request('south-gateway','GET','https://'+north['hostname']+path,timeout=5)[0] in (403,404)
     assert request('outsider','GET','https://'+north['hostname']+'/ocm-provider/',timeout=3)[0]==0
+    # A well-formed application share without the sender's signature is denied
+    # even though its source gateway has transport approval.
+    forged={'shareWith':'alice','name':'forged.txt','description':'unsigned fixture','providerId':'999999',
+            'owner':'alice@'+south['hostname'],'ownerDisplayName':'Alice','sharedBy':'alice@'+south['hostname'],'sharedByDisplayName':'Alice',
+            'protocol[name]':'webdav','protocol[options][sharedSecret]':secrets.token_hex(16),'protocol[options][permissions]':'1',
+            'shareType':'user','resourceType':'file'}
+    code,body=request('south-gateway','POST','https://'+north['hostname']+'/index.php/ocm/shares',body=forged,form=True)
+    assert code==400 and 'sign' in body.decode(errors='replace').lower(),(code,body[:500])
     ocs(north,'DELETE','shares/'+str(share['id']))
     assert request(south['user'],'GET','https://'+south['hostname']+mounted,password=south['password'],timeout=15)[0] in (401,403,404,503)
     print('Actual candidate Nextcloud federation: separate internal users upload, explicitly accept and read an approved share; unrelated DAV/admin routes, unapproved regional node and revoked share are denied PASS.',flush=True)
+    own(north,'MKCOL','/remote.php/dav/files/alice/partner-folder')
+    ocs(north,'POST','shares',{'path':'/partner-folder','shareType':'6','shareWith':'alice@'+south['hostname'],'permissions':'1'})
+    pending=ocs(south,'GET','remote_shares/pending');assert len(pending)==1,pending
+    incoming=pending[0];ocs(south,'POST','remote_shares/pending/'+str(incoming['id']),{})
+    folder='/remote.php/dav/files/alice'+urllib.parse.quote(incoming.get('mountpoint','/partner-folder'))
+    own(north,'PUT','/remote.php/dav/files/alice/partner-folder/before.txt',b'Previously approved')
+    assert own(south,'GET',folder+'/before.txt')==b'Previously approved'
     for institution in ('north','south'):
         network.run('ip','netns','exec',institution+'-gateway','nft','-f','-',input=gateway_rendering.firewall(profiles[institution],[],lan_interface='lan0',now=int(time.time()),replace=True,services=('nextcloud',)))
-        network.run('podman','stop',institution+'-gateway-proxy')
+    after=b'Created only after partnership revocation '+os.urandom(32)
+    own(north,'PUT','/remote.php/dav/files/alice/partner-folder/after.txt',after)
+    code,body=request(south['user'],'GET','https://'+south['hostname']+folder+'/after.txt',password=south['password'],timeout=15)
+    assert not (code==200 and body==after),'New file crossed a revoked partnership'
+    print('Actual candidate file partnership revocation blocks subsequently created content without claiming recall of delivered copies PASS.',flush=True)
+    for institution in ('north','south'):network.run('podman','stop',institution+'-gateway-proxy')
     network.CONTROLLERS['regional']['process'].terminate();network.CONTROLLERS['regional']['process'].wait(timeout=10)
     for app in apps.values():
         own(app,'PUT','/remote.php/dav/files/alice/local-only.txt',b'Internal files survive regional loss')

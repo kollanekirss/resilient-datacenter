@@ -56,3 +56,15 @@ def test_file_service_issuer_accepts_only_its_single_domain():
     assert command.count('-d')==1 and command[command.index('-d')+1]=='files.pilot.test'
     assert m.validate(dict(data,matrix_hostname='matrix.pilot.test'))
     with pytest.raises(ValueError):m.issue_command(dict(data,kind='unsupported'))
+
+
+def test_frozen_issuer_contains_file_runtime_dependency_closure(tmp_path):
+    import shutil
+    import subprocess
+    m=importlib.import_module('service_issuer');source=Path(m.__file__).parent
+    for name in m.FILES:shutil.copyfile(source/name,tmp_path/name)
+    command=[sys.executable,'-I','-c','import sys;sys.path.insert(0,sys.argv[1]);import service_issuer;import nextcloud_runtime',str(tmp_path)]
+    result=subprocess.run(command,capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+    (tmp_path/'regional_http.py').unlink()
+    assert subprocess.run(command,capture_output=True).returncode!=0
