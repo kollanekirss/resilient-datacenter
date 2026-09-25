@@ -248,6 +248,8 @@ def encrypted_recovery_acceptance(store,document,network_snapshot):
     assert curl('rdc-peer','/_matrix/federation/v1/version').stdout=='fixture:/_matrix/federation/v1/version'
     assert operations.install(store.profile(),store.identity())['partners']==1
     print('Actual encrypted gateway recovery: scheduled SFTP/Restic capture, retained later revocation and TLS, closed restored approvals across restart, private issuer archive outside Envoy, explicit fresh consent reopens PASS. Network enrollment remains synthetic.',flush=True)
+    from ci_gateway_replacement import exercise
+    exercise(identifier,document,sys.modules[__name__])
 
 
 def recovery_boundary_acceptance(store,document):

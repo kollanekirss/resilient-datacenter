@@ -132,3 +132,28 @@ sudo ./rdc gateway recovery export-token --output-file /root/private-recovery/dn
 ```
 
 Review or rotate the token, then use the explicit gateway issuer setup/issue/enable workflow. The export never prints the secret. It does not reopen the gateway or replace an active issuer account. Full disposable encrypted gateway acceptance is being run on the development branch; consult the current validation ledger before relying on it.
+
+### A fresh application or gateway replacement
+
+A newly enrolled replacement initially has a different VPN identity. Recover the original identity **before** installing chat, files or the gateway; otherwise its listeners or signed gateway address may not match after restoration. This development path is undergoing disposable acceptance.
+
+1. Prepare a fresh supported Ubuntu peer with the original institution/node/controller labels, temporary enrollment and approved access to the backup destination. Use its provider console or independent administration connection. Import the saved repository password and SSH key with `backup configure`; do not initialize the repository.
+2. Download the exact full application snapshot and prepare its network-only recovery stage. Choose its actual package (`matrix`, `nextcloud` or `gateway`):
+
+   ```sh
+   sudo ./rdc backup bootstrap-stage FULL_64_CHARACTER_SNAPSHOT_ID --package gateway
+   sudo ./rdc backup bootstrap-plan FULL_64_CHARACTER_SNAPSHOT_ID
+   ```
+
+   This validates the complete application snapshot but prepares only its original VPN state for promotion. It refuses a replacement with applications already installed, mismatched network ownership or different network binaries. Application data remains in separate private staging.
+3. Independently fence the old instance. Review the capture time and the identity change, then run:
+
+   ```sh
+   sudo ./rdc backup bootstrap-apply FULL_64_CHARACTER_SNAPSHOT_ID
+   ```
+
+   Enter the displayed `FENCED AND RESTORE NETWORK ...` phrase only after fencing. The original VPN address may replace the temporary address. A pending/interrupted operation uses the same `backup restore-recover` command as ordinary restoration.
+4. After network verification, install the same reviewed application version and original service identity on that replacement with valid current certificates. For a gateway, use its saved signed public identity and exact original profile; recreate the profile's input file paths with the reviewed identity and newly issued TLS material. No institution approval signing key is installed there.
+5. Run `backup include-services`, then use normal `restore-stage`, `restore-plan` and `restore-apply` with the **same full snapshot ID**. Do not take a new blank-application snapshot as a substitute. Test login and a real user operation. Gateway review and restored application connectors remain closed until explicitly approved again.
+
+A replacement can preserve revocations recorded in its selected snapshot and any later records already present locally. It cannot discover decisions absent from all surviving records. The fresh-approval boundary prevents historical agreements alone from reopening restored gateway access.

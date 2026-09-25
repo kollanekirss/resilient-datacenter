@@ -72,6 +72,9 @@ def parser():
     configure.add_argument('--recovery-ssh-key-file',type=Path)
     for action in ('initialize','run','status','restore-recover','include-services'): backup_commands.add_parser(action)
     backup_commands.add_parser('restore-stage',help='Decrypt a specific snapshot into private staging; never promote').add_argument('snapshot')
+    bootstrap=backup_commands.add_parser('bootstrap-stage',help='Prepare original VPN identity from a full application snapshot on a fresh replacement')
+    bootstrap.add_argument('snapshot');bootstrap.add_argument('--package',choices=('matrix','nextcloud','gateway'),required=True)
+    for action in ('bootstrap-plan','bootstrap-apply'):backup_commands.add_parser(action).add_argument('snapshot')
     for action in ('restore-plan','restore-apply'):
         backup_commands.add_parser(action,help='Review or explicitly promote an already staged snapshot').add_argument('snapshot')
     schedule=backup_commands.add_parser('schedule',help='Opt-in consistent backups with brief service pauses')

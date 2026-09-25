@@ -258,6 +258,9 @@ def action(args):
     fd=os.open(BASE/'operation.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,'a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        if args.action in ('bootstrap-stage','bootstrap-plan','bootstrap-apply'):
+            from backup_bootstrap import action as bootstrap_action
+            return bootstrap_action(args,data,input_fn=input)
         if args.action=='include-services':
             from backup_scope import installed_application,application_backup,package
             application=installed_application()
