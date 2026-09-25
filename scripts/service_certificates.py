@@ -51,4 +51,6 @@ def operation_lock(*,lock_path=None):
             fd=os.open(path,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
             stream=stack.enter_context(os.fdopen(fd,'a'));fcntl.flock(stream,fcntl.LOCK_EX|fcntl.LOCK_NB)
         if PENDING.exists() or PENDING.is_symlink():raise ValueError('Resolve the pending restore before administering applications')
+        upgrade=Path('/etc/rdc-upgrade-pending.json')
+        if upgrade.exists() or upgrade.is_symlink():raise ValueError('Run upgrade recover before administering applications')
         yield

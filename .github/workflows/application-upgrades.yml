@@ -1,0 +1,36 @@
+name: Disposable application upgrades
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  adjacent-upgrade:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [matrix, nextcloud]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Prepare disposable runner
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y podman nftables openssh-server
+      - name: Exercise actual adjacent version and recovery boundaries
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT .venv/bin/python scripts/ci_application_upgrade.py ${{ matrix.package }}
+      - name: Collect owned service diagnostics on failure
+        if: failure()
+        run: |
+          sudo systemctl status rdc-postgres rdc-synapse rdc-element rdc-service-proxy rdc-nextcloud-postgres rdc-nextcloud rdc-nextcloud-proxy rdc-nextcloud-cron --no-pager || true
+          sudo journalctl -u rdc-postgres -u rdc-synapse -u rdc-service-proxy -u rdc-nextcloud-postgres -u rdc-nextcloud -u rdc-nextcloud-proxy -u rdc-nextcloud-cron --no-pager --lines=100
+          sudo journalctl -u tailscaled -u rdc-backup --no-pager --lines=80

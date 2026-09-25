@@ -56,6 +56,9 @@ def groups(data,directory):
                         task('Review full restoration',machine,'backup','restore-plan','@snapshot'),
                         task('Restore the full snapshot after fencing',machine,'backup','restore-apply','@snapshot'),
                         task('Recover an interrupted restore transaction',machine,'backup','restore-recover')]
+    result['upgrades']=[task('Check the reviewed local version transition','THIS chat or file-service VM','upgrade','check'),
+                        task('Apply the reviewed upgrade during a maintenance window','THIS chat or file-service VM with verified encrypted backups','upgrade','apply'),
+                        task('Recover the exact interrupted upgrade','THIS node with its original private upgrade journal','upgrade','recover')]
     if a['purpose']=='regional':
         machine='institution approval workstation; keep the private approval key off the gateway';workspace=directory/'approvals'
         profile=directory/'regional-identity.json'

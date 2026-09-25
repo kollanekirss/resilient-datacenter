@@ -41,7 +41,7 @@ def test_every_fixed_guided_task_uses_the_existing_argument_parser(tmp_path):
                 if 'package' in prompt:return 'matrix'
                 return str(tmp_path/'reviewed document.json')
             argv=m.arguments(task,reply)
-            assert parser().parse_args(argv).command in ('setup','infrastructure','node','doctor','services','files','gateway','regional','backup')
+            assert parser().parse_args(argv).command in ('setup','infrastructure','node','doctor','services','files','gateway','regional','backup','upgrade')
 
 
 def test_invalid_selection_and_cancel_never_dispatch(tmp_path):

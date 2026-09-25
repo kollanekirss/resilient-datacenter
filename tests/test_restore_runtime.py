@@ -67,3 +67,18 @@ def test_restored_database_cleanup_failure_prevents_synapse_start():
         def prepare_restored_application(self,owner):events.append('cleanup');raise ValueError('database unavailable')
     with pytest.raises(ValueError):transaction.start_candidate(('rdc-service-proxy','rdc-element','rdc-synapse','rdc-postgres','tailscaled'),Runtime(),{})
     assert events==['tailscaled','rdc-postgres','cleanup']
+
+
+def test_upgrade_marker_also_blocks_automatic_startup(tmp_path):
+    m=api();pending=tmp_path/'restore';permit=tmp_path/'permit';upgrade=tmp_path/'upgrade';guard=tmp_path/'guard'
+    guard.write_text(m.guard_script(pending,permit,upgrade=upgrade));guard.chmod(0o700)
+    upgrade.write_text('{}')
+    assert subprocess.run([str(guard)],capture_output=True).returncode!=0
+    permit.touch()
+    assert subprocess.run([str(guard)],capture_output=True).returncode==0
+
+
+def test_peer_recovery_closes_application_ingress_on_every_non_loopback_interface():
+    rules=api().isolation_rules('peer','d'*32)
+    assert 'tcp dport { 443, 8443, 3128 } drop' in rules
+    assert rules.index('iifname "lo" accept')<rules.index('tcp dport { 443, 8443, 3128 } drop')
