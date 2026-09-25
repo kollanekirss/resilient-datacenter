@@ -1,8 +1,8 @@
 # Controlled application upgrades
 
-This development feature is undergoing disposable acceptance. It supports explicit reviewed transitions, not arbitrary container tags, unattended updates or database major-version jumps. Do not use it for production until the corresponding released source and acceptance evidence are published.
+This development feature has passed the bounded disposable acceptance described below. It supports explicit reviewed transitions, not arbitrary container tags, unattended updates or database major-version jumps. Do not use it for production until the corresponding released source and acceptance evidence are published.
 
-The initial transitions under test are Synapse 1.160.0 → 1.161.0 and Nextcloud 35.0.0 → 35.0.1, using the exact reviewed linux/amd64 component sets and helper contract. PostgreSQL and companion components remain at their pinned versions. These predecessor versions are migration fixtures; fresh installations always select the current package. Imported installations and other helper revisions are refused.
+The tested transitions are Synapse 1.160.0 → 1.161.0 and Nextcloud 35.0.0 → 35.0.1, using the exact reviewed linux/amd64 component sets and helper contract. PostgreSQL and companion components remain at their pinned versions. These predecessor versions are migration fixtures; fresh installations always select the current package. Imported installations and other helper revisions are refused.
 
 ## Operator sequence
 
@@ -22,3 +22,5 @@ Node/controller membership, service domains, local users, database credentials, 
 Only the upgrade engine can create a snapshot under its own preparing or committed maintenance marker. Ordinary backups, account administration, certificate activation and background file jobs remain guarded while maintenance is pending. A reboot must not start a partially promoted package.
 
 The disposable test uses actual old/new applications, PostgreSQL and encrypted storage, plus a separate network namespace to verify closed ingress during migration. Its VPN daemon is explicitly synthetic. That evidence does not cover physical sites, provider issuance, third-party Nextcloud apps, arbitrary legacy installations or a PostgreSQL major upgrade.
+
+Acceptance at source `a9ffb77`: [run 36163148509](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36163148509) passed both packages, including failed candidate migration recovery, interruption, post-commit write preservation, and new-version encrypted backup/restoration. Consult the current commit checks for subsequent changes.
