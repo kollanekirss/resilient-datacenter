@@ -39,6 +39,8 @@ CATALOGUE = {
     'client.unavailable': ('Persistent node state exists but tailscaled is unavailable. Inspect/start the existing daemon through local administration, then rerun.', 'inspect-service'),
     'client.inspect_denied': ('Could not verify current client identity/controller. Inspect locally; if access was denied, rerun the read-only check using sudo.', 'inspect-local-permissions'),
     'client.state_mismatch': ('Client state or controller does not match. Inspect existing identity; no reset was attempted.', 'review-migration'),
+    'client.awaiting_enrollment': ('Node is awaiting enrollment or administrator approval.', 'contact-controller-admin'),
+    'client.stopped': ('The client backend is not running. Inspect it through local administration.', 'inspect-service'),
     'client.verified': ('Existing client identity checks passed.', 'none'),
     'client.not_installed': ('The local client is not installed yet.', 'install-node'),
     'controller.connection_failed': ('Controller TLS/DNS connection failed. Check DNS, connectivity, certificate trust/hostname and the local clock; TLS verification was not bypassed.', 'check-connectivity'),
@@ -81,3 +83,8 @@ def result_for_state(state: str, *, details: dict | None = None) -> ActionResult
     if state not in codes:
         raise OperationError('operation.failed', Exit.FAILED)
     return ActionResult(state, codes[state], details=details or {})
+
+
+def blocking_checks(checks):
+    """A known pending enrollment must not prevent requesting approval."""
+    return [c for c in checks if c.outcome in ('fail','unknown') and c.code!='client.awaiting_enrollment']

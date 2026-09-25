@@ -13,7 +13,7 @@ from profile_config import load_profile
 from setup_contracts import validate_local_manifest
 from local_checks import check_local, inspect_local_checks
 from operation_environment import ansible_environment
-from operation_results import ActionResult, Exit, OperationError, result_for_state
+from operation_results import ActionResult, Exit, OperationError, result_for_state, blocking_checks
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -48,7 +48,7 @@ def execute_local(action: str, manifest_path: Path) -> ActionResult:
     if validate_local_manifest(manifest):
         raise OperationError('manifest.invalid',Exit.INVALID)
     checks=inspect_local_checks(manifest,require_owned=action in ('enroll','status'),check_tls=action!='status')
-    if any(c.outcome in ('fail','unknown') for c in checks):
+    if blocking_checks(checks):
         return ActionResult('blocked',Exit.BLOCKED,tuple(checks))
     try:
         if action=='apply': result=apply_manifest(manifest,manifest_path)
@@ -57,7 +57,7 @@ def execute_local(action: str, manifest_path: Path) -> ActionResult:
             from local_enrollment import NativeRuntime, enrollment_action
             result=enrollment_action(manifest,NativeRuntime(allow_sudo=action=='enroll'),start_requested=action=='enroll')
         return result_for_state(result['status'],details=result)
-    except ValueError:
+    except (ValueError,TypeError,AttributeError,KeyError):
         raise OperationError('client.state_mismatch',Exit.BLOCKED) from None
     except (OSError,subprocess.SubprocessError):
         raise OperationError('operation.failed',Exit.FAILED) from None

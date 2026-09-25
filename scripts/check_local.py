@@ -4,13 +4,14 @@ from pathlib import Path
 import os
 import subprocess
 import sys
+from operation_environment import ansible_environment
 ROOT=Path(__file__).resolve().parents[1]
 
 
 def main():
-    subprocess.run([sys.executable,'-m','pytest','tests','-q'],cwd=ROOT,check=True)
+    env=ansible_environment(ROOT)
+    subprocess.run([sys.executable,'-m','pytest','tests','-q'],cwd=ROOT,env=env,check=True)
     ansible=Path(sys.executable).parent/'ansible-playbook'
-    env=dict(os.environ,ANSIBLE_CONFIG=str(ROOT/'ansible.cfg'),ANSIBLE_HOME=str(ROOT/'.cache/ansible'),ANSIBLE_LOCAL_TEMP=str(ROOT/'.work/ansible-tmp'))
     for playbook in sorted((ROOT/'playbooks').glob('*.yml')):
         if playbook.name == 'local-node.yml':
             inventory='localhost,'

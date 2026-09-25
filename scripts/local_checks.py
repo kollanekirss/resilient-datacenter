@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from profile_config import load_profile
 from setup_contracts import validate_local_manifest, local_ownership
 from profile_state import inspect_peer
-from operation_results import Check, check, message
+from operation_results import Check, check, message, blocking_checks
 
 MARKER=Path('/etc/server-connectivity-profile.json')
 STATE=Path('/var/lib/tailscale')
@@ -77,10 +77,15 @@ def inspect_local_checks(manifest, *, require_owned=False, check_tls=True) -> li
             def read(args):
                 result=subprocess.run(['/usr/local/bin/tailscale',*args],capture_output=True,text=True,timeout=10,check=True)
                 return json.loads(result.stdout)
-            inspect_peer(read(['status','--json']),read(['debug','prefs']),manifest['headscale_hostname'],manifest['node_tag'])
+            status=read(['status','--json'])
+            state=inspect_peer(status,read(['debug','prefs']),manifest['headscale_hostname'],manifest['node_tag'])
+            if state['status']=='enrolled' and status.get('Self',{}).get('HostName')!=manifest['node_name']:
+                return [*results,check('client.state_mismatch','fail')]
         except (OSError,ValueError,TypeError,AttributeError,subprocess.SubprocessError):
             return [*results,check('client.inspect_denied','unknown')]
-        results.append(check('client.verified','pass'))
+        if state['status']=='enrolled': results.append(check('client.verified','pass'))
+        elif state['status']=='awaiting_enrollment': results.append(check('client.awaiting_enrollment','unknown'))
+        else: results.append(check('client.stopped','fail'))
     else:
         results.append(check('client.not_installed','not-applicable'))
     if check_tls:
@@ -90,8 +95,7 @@ def inspect_local_checks(manifest, *, require_owned=False, check_tls=True) -> li
 
 
 def check_local(manifest, *, require_owned=False, check_tls=True):
-    return [message(c) for c in inspect_local_checks(manifest,require_owned=require_owned,check_tls=check_tls)
-            if c.outcome in ('fail','unknown')]
+    return [message(c) for c in blocking_checks(inspect_local_checks(manifest,require_owned=require_owned,check_tls=check_tls))]
 
 
 def main():

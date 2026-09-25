@@ -102,3 +102,8 @@ def test_report_write_failure_does_not_hide_diagnostics(tmp_path,monkeypatch,cap
     monkeypatch.setattr(m,'diagnose',lambda _: (check('ownership.mismatch','fail'),))
     assert m.main(['doctor',str(path),'--report',str(tmp_path/'absent'/'report')])==1
     assert 'Ownership' in capsys.readouterr().out
+
+
+def test_doctor_pending_returns_pending_exit_code():
+    from operation_results import Check
+    assert api().doctor_exit((Check('client.awaiting_enrollment','unknown','contact-controller-admin'),))==4

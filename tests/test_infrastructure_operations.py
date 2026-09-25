@@ -72,3 +72,10 @@ def test_check_rejects_privilege_prompt(tmp_path):
     with pytest.raises(OperationError) as caught:
         api().run_infrastructure('check',tmp_path/'missing',ask_become_pass=True)
     assert caught.value.exit_code==2
+
+
+def test_ansible_environment_prepares_project_local_runtime_directories(tmp_path):
+    m=importlib.import_module('operation_environment')
+    m.ansible_environment(tmp_path)
+    assert (tmp_path/'.cache/ansible').is_dir()
+    assert (tmp_path/'.work/ansible-tmp').is_dir()

@@ -287,4 +287,4 @@ jobs:
 - Clean checkout/Ubuntu CI and operator instructions: task 6.
 - Certificate lifecycle, verified binary distribution and managed upgrades: explicitly out of increment A; retained as B/C/D in the approved design.
 
-Status: plan prepared and self-reviewed; no product implementation has begun. Execution method remains inline in this conversation with local self-review and no subagents. User review of this written plan is the next gate.
+Status: approved and executed inline through implementation and local verification. The original checklist above is preserved as planning detail; actual task evidence and rulings are recorded in .work/operations/progress.md and docs/validation-status.md. Clean-source verification and publication outcomes are recorded there as they complete. No subagents were used.

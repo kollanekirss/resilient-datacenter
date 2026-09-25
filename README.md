@@ -5,7 +5,7 @@ An Ansible connectivity kit for fresh **Ubuntu 24.04 LTS amd64** servers. It now
 - **Independent:** your own Headscale controller, separate DERP relay and one or more client nodes.
 - **Join:** your client nodes only, with explicit enrollment approval from an existing network administrator.
 
-Start with [guided setup and local installation](docs/guided-setup.md) to answer questions and prepare an offsite network plus local-node manifests. The new local installer is designed for home/private-network Ubuntu machines without public management SSH; actual Linux installation and NAT behaviour are still unverified.
+Start with the [common command interface](docs/operations.md) and [guided setup and local installation](docs/guided-setup.md) to answer questions and prepare an offsite network plus local-node manifests. The new local installer is designed for home/private-network Ubuntu machines without public management SSH; actual Linux installation and NAT behaviour are still unverified.
 
 The [deployment-profile operator guide](docs/deployment-profiles.md) remains available for the existing SSH-managed workflows. Matrix/Element, Nextcloud, application recovery and regional gateways are not yet implemented. The guided workflow still requires operator-supplied servers, DNS and certificates; beginner usability has not been validated.
 
@@ -22,8 +22,10 @@ git clone https://github.com/kollanekirss/resilient-datacenter.git
 cd resilient-datacenter
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python scripts/setup_wizard.py
+./rdc setup
 ```
+
+Run `./rdc` for the interactive menu, `./rdc doctor /absolute/path/node-NAME.yml` for diagnostics, and `./rdc version` for source identity. The GitHub Local checks workflow runs non-deployment checks on Ubuntu.
 
 Choose **independent** to prepare your own controller/relay or **join** to prepare a node for an existing network. The wizard asks for names, addresses and configuration paths, and can save a draft while you gather prerequisites. Preparation does not install anything on servers.
 

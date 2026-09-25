@@ -59,3 +59,57 @@ def test_new_status_never_requests_sudo(tmp_path,monkeypatch):
         return {'status':'awaiting_enrollment'}
     monkeypatch.setattr(local_enrollment,'enrollment_action',action)
     assert local_node.execute_local('status',path).exit_code==4
+
+
+def local_machine(tmp_path,monkeypatch,status):
+    import local_checks as m
+    import subprocess
+    from setup_contracts import local_ownership
+    marker=tmp_path/'marker.json'; marker.write_text(json.dumps(local_ownership(manifest())))
+    monkeypatch.setattr(m,'MARKER',marker)
+    monkeypatch.setattr(m,'STATE',tmp_path/'state')
+    monkeypatch.setattr(m,'RESERVED',[])
+    monkeypatch.setattr(m.platform,'system',lambda:'Linux')
+    monkeypatch.setattr(m.platform,'machine',lambda:'x86_64')
+    monkeypatch.setattr(m.platform,'freedesktop_os_release',lambda:{'ID':'ubuntu','VERSION_ID':'24.04'})
+    monkeypatch.setattr(m,'platform_errors',lambda *a:[])
+    real_stat=type(marker).stat
+    from types import SimpleNamespace
+    def stat(path,*a,**kw):
+        result=real_stat(path,*a,**kw)
+        if path==marker:
+            return SimpleNamespace(st_uid=0,st_mode=result.st_mode)
+        return result
+    monkeypatch.setattr(type(marker),'stat',stat)
+    def run(argv,**kwargs):
+        assert 'sudo' not in argv
+        if argv[0]=='/bin/systemctl': return subprocess.CompletedProcess(argv,0,'active','')
+        value={'ControlURL':'https://control.pilot.test'} if argv[-1]=='prefs' else status
+        return subprocess.CompletedProcess(argv,0,json.dumps(value),'')
+    monkeypatch.setattr(m.subprocess,'run',run)
+    return m
+
+
+def test_structured_check_rejects_wrong_runtime_node_name(tmp_path,monkeypatch):
+    status={'BackendState':'Running','TailscaleIPs':['100.64.0.4'],'Self':{'HostName':'wrong-node','Tags':['tag:home-services']}}
+    m=local_machine(tmp_path,monkeypatch,status)
+    checks=m.inspect_local_checks(manifest(),check_tls=False)
+    assert any(c.code=='client.state_mismatch' and c.outcome=='fail' for c in checks)
+
+
+def test_pending_state_is_visible_but_does_not_block_enrollment(tmp_path,monkeypatch):
+    m=local_machine(tmp_path,monkeypatch,{'BackendState':'NeedsMachineAuth'})
+    checks=m.inspect_local_checks(manifest(),check_tls=False)
+    assert any(c.code=='client.awaiting_enrollment' for c in checks)
+    assert m.check_local(manifest(),check_tls=False)==[]
+
+
+def test_malformed_runtime_state_returns_sanitized_error(tmp_path,monkeypatch):
+    import local_node, local_enrollment
+    path=tmp_path/'node.json'; path.write_text(json.dumps(manifest()))
+    monkeypatch.setattr(local_node,'inspect_local_checks',lambda *a,**kw:[])
+    def broken(*a,**kw): raise AttributeError('PRIVATE_RUNTIME_VALUE')
+    monkeypatch.setattr(local_enrollment,'enrollment_action',broken)
+    with pytest.raises(api().OperationError) as caught:
+        local_node.execute_local('status',path)
+    assert caught.value.exit_code==3 and 'PRIVATE' not in str(caught.value)

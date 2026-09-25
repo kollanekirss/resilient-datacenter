@@ -4,6 +4,8 @@ This milestone provides a question-and-answer wizard, offsite controller/relay p
 
 **Status:** locally tested, including simulated enrollment and local TLS tests. Actual Ubuntu installation, real enrollment and home-NAT connectivity have not been tested. Use disposable pilot machines first; this is not a production-ready release or a completed beginner-usability validation.
 
+Use the [common `rdc` interface](operations.md) for the menu, deployment commands, diagnostics and documented exit codes. The original Python/Ansible commands below remain supported as reference interfaces.
+
 ## Where each part runs
 
 | Location | What you do there |

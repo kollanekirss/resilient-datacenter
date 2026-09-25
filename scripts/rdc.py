@@ -12,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 # The launcher uses isolated Python; only the reviewed project supplies local modules.
 sys.path.insert(0,str(ROOT/'scripts'))
 try:
-    from operation_results import Exit, OperationError, ActionResult, message, result_for_state
+    from operation_results import Exit, OperationError, ActionResult, message, result_for_state, blocking_checks
     from setup_wizard import run_wizard
     from setup_contracts import validate_local_manifest
     from profile_config import load_profile
@@ -96,7 +96,8 @@ def doctor_exit(checks):
     if any(c.code=='manifest.invalid' for c in checks): return Exit.INVALID
     if any(c.code.startswith('probe.') for c in checks): return Exit.FAILED
     if any(c.code.startswith(('dns.','tcp.','tls.')) and c.outcome=='fail' for c in checks): return Exit.FAILED
-    if any(c.outcome in ('fail','unknown') for c in checks): return Exit.BLOCKED
+    if blocking_checks(checks): return Exit.BLOCKED
+    if any(c.code=='client.awaiting_enrollment' for c in checks): return Exit.PENDING
     return Exit.SUCCESS
 
 
@@ -128,7 +129,8 @@ def dispatch(args) -> ActionResult:
             except (OSError,ValueError): raise OperationError('report.failed',Exit.FAILED) from None
             print('Private support report written. Review it before sharing.')
         code=doctor_exit(checks)
-        return ActionResult('checks-passed' if code==Exit.SUCCESS else 'blocked' if code==Exit.BLOCKED else 'failed',code)
+        state={Exit.SUCCESS:'checks-passed',Exit.BLOCKED:'blocked',Exit.PENDING:'awaiting_enrollment'}.get(code,'failed')
+        return ActionResult(state,code)
     raise OperationError('operation.invalid',Exit.INVALID)
 
 
