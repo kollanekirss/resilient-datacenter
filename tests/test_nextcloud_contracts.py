@@ -39,6 +39,7 @@ def test_configuration_rendering_preserves_literals_without_executable_input():
     assert 'files.pilot.test' not in output  # Values encoded, never interpolated into PHP code.
     decoded=m.configuration_values(profile(),data)
     assert decoded['trusted_domains']==['files.pilot.test'] and decoded['trusted_proxies']==['127.0.0.1']
+    assert decoded['dbhost']=='127.0.0.1:5434' and 'dbport' not in decoded
     assert decoded['dbuser']=='oc_admin' and decoded['dbpassword']==data['dbpassword']
     assert decoded['config_is_read_only'] and not decoded['appstoreenabled']
     assert decoded['datadirectory']=='/var/www/data' and decoded['overwriteprotocol']=='https'
