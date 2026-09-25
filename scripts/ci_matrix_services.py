@@ -118,6 +118,19 @@ def main():
     import hashlib
     signing=Path('/var/lib/rdc-services/synapse/server.signing.key')
     signing_hash=hashlib.sha256(signing.read_bytes()).hexdigest()
+    encrypted_room=request('POST','/_matrix/client/v3/createRoom',{'preset':'private_chat','name':'Encrypted recovery proof',
+                           'creation_content':{'m.federate':False},'initial_state':[{'type':'m.room.encryption','state_key':'',
+                           'content':{'algorithm':'m.megolm.v1.aes-sha2'}}]},token=alice)['room_id']
+    from ci_element_browser import prepare_encrypted
+    recovery_key=prepare_encrypted('@cialice:'+MATRIX,alice_password,encrypted_room)
+    encrypted_history=request('GET','/_matrix/client/v3/rooms/'+urllib.parse.quote(encrypted_room,safe='')+'/messages?dir=b&limit=10',token=alice)
+    encrypted_events=[e for e in encrypted_history['chunk'] if e['type']=='m.room.encrypted']
+    assert encrypted_events and 'Encrypted history survives' not in json.dumps(encrypted_events)
+    import time
+    for attempt in range(30):
+        if request('GET','/_matrix/client/v3/room_keys/version',token=alice).get('count',0)>0:break
+        time.sleep(1)
+    else:raise AssertionError('Encrypted room key was not uploaded before the server snapshot')
     selected=snapshot(network_snapshot)
     from service_certificates import replace,activate_pair,Runtime as CertificateRuntime,BASE as CERTBASE
     from certificate_lifecycle import ActivationError
@@ -147,9 +160,9 @@ def main():
     assert result['state']=='service-listeners-verified' and hashlib.sha256(signing.read_bytes()).hexdigest()==signing_hash
     print('Actual encrypted SFTP scheduled application backup, scope transition, selected snapshot restore, account tokens/message/media/signing identity preservation and installation resume PASS.',flush=True)
     from ci_element_browser import exercise
-    exercise('@cialice:'+MATRIX,alice_password,room)
+    exercise('@cialice:'+MATRIX,alice_password,room,recovery_key=recovery_key,encrypted_room=encrypted_room)
     history=request('GET','/_matrix/client/v3/rooms/'+encoded+'/messages?dir=b&limit=10',token=bob)
     assert any(e.get('content',{}).get('body')=='Message sent from the actual Element browser' for e in history['chunk'])
-    print('Real Tailscale enrollment, end-to-end encryption recovery and institutional acceptance NOT RUN by this package slice.')
+    print('Real Tailscale enrollment, home NAT, physical site separation and institutional acceptance NOT RUN by this package slice.')
 
 if __name__=='__main__':main()
