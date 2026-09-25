@@ -143,7 +143,15 @@ def main():
     assert backup_check()
     from ci_service_connector import exercise as connector_exercise,verify_suspended_after_restore
     connector_exercise(settings)
+    key_owner=request('GET','/_matrix/client/v3/account/whoami',token=alice)
+    import base64
+    probe_key='curve25519:rdc_restore_probe'
+    probe_material=base64.b64encode(os.urandom(32)).decode().rstrip('=')
+    request('POST','/_matrix/client/v3/keys/upload',{'one_time_keys':{probe_key:probe_material}},token=alice)
     selected=snapshot(network_snapshot)
+    claim={'one_time_keys':{key_owner['user_id']:{key_owner['device_id']:'curve25519'}}}
+    consumed=request('POST','/_matrix/client/v3/keys/claim',claim,token=bob)
+    assert consumed['one_time_keys'][key_owner['user_id']][key_owner['device_id']][probe_key]==probe_material
     from service_certificates import replace,activate_pair,Runtime as CertificateRuntime,BASE as CERTBASE
     from certificate_lifecycle import ActivationError
     old_certificate=Path('/etc/rdc-service-tls/active/tls.crt').read_bytes()
@@ -167,6 +175,9 @@ def main():
     assert Path('/etc/rdc-service-tls/active/tls.crt').read_bytes()==selected_certificate
     later=request('PUT','/_matrix/client/v3/rooms/'+encoded+'/send/m.room.message/ci-after-backup',{'msgtype':'m.text','body':'This later change must not survive restoration'},token=alice)['event_id']
     restore(selected)
+    reclaimed=request('POST','/_matrix/client/v3/keys/claim',claim,token=bob)
+    assert probe_key not in reclaimed.get('one_time_keys',{}).get(key_owner['user_id'],{}).get(key_owner['device_id'],{})
+    print('One-time encryption key captured before consumption was not reissued after the actual encrypted restore PASS.',flush=True)
     verify_suspended_after_restore(settings)
     assert Path('/etc/rdc-service-tls/active/tls.crt').read_bytes()==selected_certificate
     assert request('GET',event_path,token=bob)['content']['body']=='Disposable RDC application proof'

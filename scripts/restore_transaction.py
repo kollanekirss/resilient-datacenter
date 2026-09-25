@@ -193,6 +193,12 @@ def finish(root,journal,runtime):
     (root/PENDING).unlink(missing_ok=True)
 
 
+def start_candidate(services,runtime,owner):
+    for service in reversed(services):
+        if service=='rdc-synapse':runtime.prepare_restored_application(owner)
+        runtime.start(service)
+
+
 def rollback(root,journal,runtime):
     for service in resources(journal['ownership']).services: runtime.stop(service)
     for index,name in reversed(list(enumerate(journal['paths']))):
@@ -254,7 +260,7 @@ def apply(stage,owner,*,root=Path('/'),runtime=None,permissions=set_permissions)
         journal['phase']='validating';save(root,journal)
         if component_hashes(root,owner)!=journal['binary_sha256']: raise ValueError('Components changed during restoration')
         runtime.allow_validation()
-        for service in reversed(services): runtime.start(service)
+        start_candidate(services,runtime,owner)
         runtime.verify(owner)
         journal['phase']='committed';save(root,journal)
         finish(root,journal,runtime)
