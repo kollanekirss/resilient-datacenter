@@ -84,7 +84,17 @@ def launch(node,name,command):
     # The normal product command runs in the foreground under systemd. This
     # fixture runs it detached inside the node's real isolated network namespace.
     arguments=list(command);arguments.insert(arguments.index('run')+1,'--detach')
-    network.run('ip','netns','exec',node,*arguments,timeout=120);CONTAINERS.append(name)
+    # ip-netns-exec remounts /sys and hides the host cgroup mount. Enter only
+    # the network namespace so Podman retains normal cgroup/resource confinement.
+    # Supply this node's resolver/hosts explicitly instead of changing mounts.
+    offset=arguments.index('run')+1
+    arguments[offset:offset]=['--volume','/etc/netns/'+node+'/resolv.conf:/etc/resolv.conf:ro','--volume','/etc/netns/'+node+'/hosts:/etc/hosts:ro']
+    network.run('nsenter','--net=/var/run/netns/'+node,*arguments,timeout=120);CONTAINERS.append(name)
+    record=json.loads(network.run('podman','inspect',name))[0];pid=record['State']['Pid']
+    assert os.stat('/proc/'+str(pid)+'/ns/net').st_ino==os.stat('/var/run/netns/'+node).st_ino,'Container escaped its one node network namespace'
+    assert record['HostConfig']['Memory']>0 and record['HostConfig']['PidsLimit']>0
+    confinement=Path('/proc/'+str(pid)+'/attr/current').read_text()
+    assert 'containers-default-' in confinement and '(enforce)' in confinement
 
 
 def setup_application(institution,index,identity,document):
@@ -116,7 +126,7 @@ def setup_application(institution,index,identity,document):
     node=institution+'-service'
     launch(node,institution+'-postgres',service_runtime.container_command('postgres',settings))
     for _ in range(60):
-        result=subprocess.run(['podman','exec',institution+'-postgres','pg_isready','-h','127.0.0.1','-p','5433','-U','synapse','-d','synapse'],capture_output=True)
+        result=subprocess.run(['nsenter','--net=/var/run/netns/'+node,'podman','exec',institution+'-postgres','pg_isready','-h','127.0.0.1','-p','5433','-U','synapse','-d','synapse'],capture_output=True)
         if result.returncode==0:break
         time.sleep(.5)
     else:raise ValueError('Fixture PostgreSQL did not become ready')

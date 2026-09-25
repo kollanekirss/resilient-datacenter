@@ -91,6 +91,19 @@ def verify_image():
         raise ValueError('Gateway image differs from its reviewed digest or platform')
 
 
+def policy_time(store):
+    """Never extend expired permission by silently accepting a backwards clock."""
+    now=int(time.time());path=store.base/'clock.json'
+    if path.exists() or path.is_symlink():
+        data=decode(private_read(path))
+        if not isinstance(data,dict) or set(data)!={'schema_version','latest_utc'} or type(data['schema_version']) is not int or data['schema_version']!=1 or type(data['latest_utc']) is not int or data['latest_utc']<0:raise ValueError('Invalid gateway clock checkpoint')
+        if now<data['latest_utc']:raise ValueError('Gateway clock moved backwards; synchronize time before reopening partnerships')
+    elif store.state()['generation']!=0:
+        raise ValueError('Gateway clock history is missing; keep access closed pending recovery review')
+    private_write(path,json.dumps({'schema_version':1,'latest_utc':now}).encode(),replace=True)
+    return now
+
+
 class Runtime:
     def __init__(self,store):self.store=store
 
@@ -103,14 +116,14 @@ class Runtime:
             metadata=[item['table'] for item in table['nftables'] if 'table' in item]
             if len(metadata)!=1 or metadata[0].get('comment')!='rdc-regional-gateway-v1':raise ValueError('The gateway firewall table belongs to another configuration')
         # Only this owned scoped table is replaced; other firewalls remain intact.
-        text=rendering.firewall(profile,peers,lan_interface=interface,now=int(time.time()),replace=exists)
+        text=rendering.firewall(profile,peers,lan_interface=interface,now=int(time.time())+1,replace=exists)
         command('/usr/sbin/nft','--check','-f','-',input=text)
         command('/usr/sbin/nft','-f','-',input=text)
 
     def close(self):self.firewall([])
 
     def validate(self,candidate):
-        network_check(self.store);verify_image()
+        network_check(self.store);policy_time(self.store);verify_image()
         generated=rendering.envoy(self.store.profile(),self.store.identity(),self.store.peers(candidate))
         private_write(BASE/'candidate.json',json.dumps(generated).encode(),replace=True)
         command(*container_command(self.store.identity(),validation=True),timeout=60)
@@ -126,7 +139,8 @@ class Runtime:
         if self.store.state()!=candidate:raise ValueError('Gateway policy changed before activation')
         item=inspect(self.store.identity())
         if item is None or not item.get('State',{}).get('Running'):raise ValueError('Gateway proxy is not running')
-        self.firewall(self.store.peers(candidate))
+        now=policy_time(self.store)
+        self.firewall(self.store.peers(candidate,now=now))
 
 
 def verify_runtime():
@@ -164,9 +178,27 @@ WantedBy=multi-user.target
 '''
 
 
+def guard_unit():
+    return '[Unit]\nDescription=RDC regional gateway policy recheck\nAfter=rdc-regional-gateway.service\n[Service]\nType=oneshot\nExecStart=/usr/bin/python3 -I -B /usr/local/lib/rdc-gateway/gateway_entry.py guard\nTimeoutStartSec=30\nUMask=0077\n'
+
+
+def guard_timer():
+    return '[Unit]\nDescription=Recheck regional approval time and interrupted changes\n[Timer]\nOnBootSec=5s\nOnUnitActiveSec=5s\nAccuracySec=1s\n[Install]\nWantedBy=timers.target\n'
+
+
 def main(action):
     verify_runtime();store=Store(BASE);runtime=Runtime(store)
     if action=='close':runtime.close();return 0
+    if action=='guard':
+        try:
+            with store.lock():
+                try:
+                    if store.pending():runtime.close()
+                    else:runtime.open(store.state())
+                except BaseException:
+                    runtime.close();raise
+        except BlockingIOError:pass  # The explicit operation owns this boundary.
+        return 0
     identity=store.identity()
     if action=='stop':
         item=inspect(identity)
@@ -178,12 +210,13 @@ def main(action):
             if item and item.get('State',{}).get('Running'):
                 # Local socket connection verifies that Envoy finished binding;
                 # packet/TLS validation across the boundary belongs to acceptance.
-                listeners=command('/usr/bin/ss','-H','-lnt')
-                if all(endpoint in listeners for endpoint in (identity['payload']['gateway_ipv4']+':443',store.profile()['lan_address']+':3128')):return 0
+                listeners=command('/usr/bin/ss','-H','-lntp').splitlines()
+                expected_pid='pid='+str(item['State']['Pid'])+','
+                if all(any(endpoint in line and expected_pid in line for line in listeners) for endpoint in (identity['payload']['gateway_ipv4']+':443',store.profile()['lan_address']+':3128')):return 0
             time.sleep(1)
         raise ValueError('Gateway listeners did not become ready')
     if action!='run':raise ValueError('Unsupported gateway runtime action')
-    runtime.close();network_check(store);verify_image()
+    runtime.close();network_check(store);policy_time(store);verify_image()
     state=store.state();runtime.install(state)
     item=inspect(identity)
     if item:

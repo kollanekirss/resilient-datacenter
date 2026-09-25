@@ -19,6 +19,8 @@ import gateway_contracts as contracts
 
 SOURCE=Path(__file__).resolve().parent
 UNIT=Path('/etc/systemd/system')/(runtime.UNIT+'.service')
+GUARD=Path('/etc/systemd/system/rdc-regional-guard.service')
+TIMER=Path('/etc/systemd/system/rdc-regional-guard.timer')
 SYSCTL=Path('/etc/sysctl.d/80-rdc-regional-gateway.conf')
 SYSCTL_TEXT='net.ipv4.ip_forward=0\nnet.ipv6.conf.all.forwarding=0\n'
 
@@ -52,7 +54,7 @@ def preflight(profile,identity):
             path=runtime.BASE/name
             if (path.exists() or path.is_symlink()) and private_read(path)!=content:raise ValueError('Use a reviewed certificate replacement; installation does not replace gateway TLS')
     else:
-        reserved=[runtime.INSTALLED,UNIT,Path(str(UNIT)+'.d'),SYSCTL]
+        reserved=[runtime.INSTALLED,UNIT,Path(str(UNIT)+'.d'),SYSCTL,GUARD,TIMER,Path(str(GUARD)+'.d'),Path(str(TIMER)+'.d')]
         if any(path.exists() or path.is_symlink() for path in reserved):raise ValueError('Unowned gateway resources already exist')
         if Path('/usr/sbin/nft').exists():
             tables=json.loads(runtime.command('/usr/sbin/nft','-j','list','tables'))
@@ -60,7 +62,7 @@ def preflight(profile,identity):
         if Path('/usr/bin/podman').exists() and json.loads(runtime.command('/usr/bin/podman','ps','--all','--format','json')):raise ValueError('Use a dedicated gateway without other root-managed containers')
         if re.search(r':(?:443|3128)\s',runtime.command('/usr/bin/ss','-H','-lntup')):raise ValueError('A gateway listener port is already in use')
         if shutil.disk_usage('/var/lib').free<3*1024**3:raise ValueError('Provide at least 3 GiB free disk for the gateway')
-    if Path(str(UNIT)+'.d').exists() or Path(str(UNIT)+'.d').is_symlink():raise ValueError('Unreviewed gateway unit overrides are present')
+    if any(Path(str(path)+'.d').exists() or Path(str(path)+'.d').is_symlink() for path in (UNIT,GUARD,TIMER)):raise ValueError('Unreviewed gateway unit overrides are present')
     return {'state':'gateway-preflight-passed','existing':existing,'partner_transport':'not-verified'}
 
 
@@ -90,6 +92,7 @@ def install(profile,identity):
         owned_file(runtime.INSTALLED/'manifest.json',json.dumps({'schema_version':1,'files':hashes},sort_keys=True))
         for name,raw in zip(('tls.crt','tls.key'),tls_inputs(profile,identity)):owned_file(runtime.BASE/name,raw)
         owned_file(UNIT,runtime.unit(),mode=0o644);owned_file(SYSCTL,SYSCTL_TEXT,mode=0o644)
+        owned_file(GUARD,runtime.guard_unit(),mode=0o644);owned_file(TIMER,runtime.guard_timer(),mode=0o644)
         runtime.command('/usr/bin/apt-get','update','-qq',timeout=300)
         runtime.command('/usr/bin/apt-get','install','-y','podman','runc','nftables','python3-cryptography','python3-yaml',timeout=600)
         runtime.command('/usr/sbin/sysctl','-p',str(SYSCTL))
@@ -103,6 +106,7 @@ def install(profile,identity):
             previous=store.state();candidate=store.candidate(previous['agreements'],[],now=int(time.time()))
         gateway_transition.apply(store,controller,candidate)
         runtime.command('/bin/systemctl','enable',runtime.UNIT+'.service')
+        runtime.command('/bin/systemctl','enable','--now','rdc-regional-guard.timer')
     return {'state':'gateway-listeners-installed','partners':len(store.peers()),'application_federation':'not-verified',
             'next_step':'Apply independently approved agreements and test application exchange; listener readiness alone proves no federation.'}
 
@@ -126,7 +130,10 @@ def status():
     try:runtime.network_check(store)
     except (OSError,ValueError,subprocess.SubprocessError):network=False
     item=runtime.inspect(store.identity());pending=store.pending()
-    return {'state':'gateway-change-pending' if pending else 'gateway-configured','network_identity_verified':network,
+    checkpoint=json.loads(private_read(runtime.BASE/'clock.json'));now=int(time.time())
+    time_verified=type(checkpoint.get('latest_utc')) is int and 0<=now-checkpoint['latest_utc']<=30
+    timer=subprocess.run(['/bin/systemctl','is-active','rdc-regional-guard.timer'],capture_output=True,timeout=15).returncode==0
+    return {'state':'gateway-change-pending' if pending else ('gateway-configured' if time_verified and timer else 'gateway-enforcement-unverified'),'time_checkpoint_recent':time_verified,'guard_timer_active':timer,'network_identity_verified':network,
             'proxy_running':bool(item and item.get('State',{}).get('Running')),'approved_peers':store.peers(),
             'application_federation':'not-verified','supported_transport':['matrix'],'nextcloud_transport':'not-implemented'}
 

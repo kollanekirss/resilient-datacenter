@@ -27,3 +27,23 @@ def test_gateway_container_is_owned_pinned_and_has_no_admin_listener_or_forwarde
     assert '--cap-add=NET_BIND_SERVICE' in command and 'NET_ADMIN' not in json.dumps(command)
     assert '--label' in command and '--pull=never' in command
     assert '/usr/local/bin/envoy' in command
+
+
+def test_gateway_clock_cannot_move_backwards_and_revive_expired_approval(tmp_path,monkeypatch):
+    m=importlib.import_module('gateway_runtime')
+    from gateway_store import Store
+    _,own,_=agreement();store=Store(tmp_path/'gateway');store.initialize(profile(),own)
+    current=[1800000000]
+    monkeypatch.setattr(m.time,'time',lambda:current[0])
+    clock=m.policy_time(store)
+    assert clock==1800000000
+    current[0]+=10;assert m.policy_time(store)==1800000010
+    current[0]-=30
+    with pytest.raises(ValueError):m.policy_time(store)
+    assert json.loads((store.base/'clock.json').read_text())['latest_utc']==1800000010
+
+
+def test_gateway_guard_timer_rechecks_clock_membership_and_interrupted_changes():
+    m=importlib.import_module('gateway_runtime')
+    assert 'gateway_entry.py guard' in m.guard_unit()
+    assert 'OnUnitActiveSec=5s' in m.guard_timer()

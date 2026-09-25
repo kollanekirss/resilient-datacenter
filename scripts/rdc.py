@@ -213,7 +213,7 @@ def dispatch(args) -> ActionResult:
         except ValueError as error:
             print('Gateway action blocked: '+str(error));return result_for_state('blocked')
         print(json.dumps(outcome,indent=2))
-        if outcome.get('state')=='gateway-change-pending' or outcome.get('network_identity_verified') is False or outcome.get('proxy_running') is False:return result_for_state('blocked')
+        if outcome.get('state') in ('gateway-change-pending','gateway-enforcement-unverified') or outcome.get('network_identity_verified') is False or outcome.get('proxy_running') is False:return result_for_state('blocked')
         return result_for_state({'prepared':'prepared','cancelled':'cancelled'}.get(outcome.get('state'),'checks-passed'))
     if args.command=='regional':
         from regional_operations import action

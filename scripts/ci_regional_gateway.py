@@ -153,6 +153,27 @@ def runtime_acceptance(profile,own,document):
     assert curl('rdc-peer','/_matrix/federation/v1/version').stdout=='fixture:/_matrix/federation/v1/version'
     assert operations.install(profile,own)['partners']==1
     store=Store(runtime.BASE);identifier=document['offer']['payload']['agreement_id']
+    assert run('systemctl','is-active','rdc-regional-guard.timer').strip()=='active'
+    from regional_workspace import private_write
+    original_clock=(runtime.BASE/'clock.json').read_bytes()
+    private_write(runtime.BASE/'clock.json',json.dumps({'schema_version':1,'latest_utc':int(time.time())+120}).encode(),replace=True)
+    time.sleep(3)
+    result=subprocess.run(['systemctl','start','rdc-regional-guard.service'],capture_output=True)
+    assert result.returncode!=0
+    assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
+    # Reset only the synthetic checkpoint created immediately above; the host
+    # clock itself is never changed. Real operators must correct/synchronize UTC.
+    private_write(runtime.BASE/'clock.json',original_clock,replace=True)
+    time.sleep(3)
+    run('systemctl','start','rdc-regional-guard.service')
+    assert curl('rdc-peer','/_matrix/federation/v1/version').stdout=='fixture:/_matrix/federation/v1/version'
+    with store.lock():
+        interrupted=store.candidate([document],[],now=int(time.time()));store.begin(interrupted)
+    time.sleep(3)
+    run('systemctl','start','rdc-regional-guard.service')
+    assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
+    assert operations.change(resume=True)['partners']==1
+    print('Actual scheduled gateway guard closes on backwards-clock evidence and an abandoned pending intent; explicit recovery restores only current approved peers PASS.',flush=True)
     class FailureAfterRestart(runtime.Runtime):
         def restart(self):super().restart();raise ValueError('Injected interruption after new policy installation')
     with store.lock():
