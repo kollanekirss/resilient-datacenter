@@ -29,7 +29,7 @@ def test_restore_manifest_requires_exact_ownership_and_catalogue(tmp_path):
     from setup_contracts import local_ownership
     from backup_contracts import resources
     owner=local_ownership(manifest())
-    meta={'schema_version':1,'ownership':owner,'paths':list(resources(owner).paths),'captured_at':'2026-09-25T10:00:00+00:00','services_originally_active':{'tailscaled':True},'binary_sha256':{'usr/local/bin/tailscale':'a'*64,'usr/local/bin/tailscaled':'b'*64}}
+    meta={'schema_version':1,'ownership':owner,'paths':list(resources(owner).paths),'captured_at':'2026-09-25T10:00:00+00:00','services_originally_active':{'tailscaled':True},'binary_sha256':{'usr/local/bin/tailscale':'a'*64,'usr/local/sbin/tailscaled':'b'*64}}
     (tmp_path/'snapshot.json').write_text(json.dumps(meta))
     for name in resources(owner).paths:
         p=tmp_path/'data'/name
