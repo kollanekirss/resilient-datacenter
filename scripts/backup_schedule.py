@@ -16,7 +16,7 @@ TIMER=Path('/etc/systemd/system/rdc-backup.timer')
 LEGACY_FILES=('backup_runner.py','backup_schedule.py','backup_operations.py','backup_contracts.py','backup_snapshot.py','backup_transport.py',
        'profile_config.py','setup_contracts.py','validate_inventory.py','validate_tls.py')
 MATRIX_FILES=LEGACY_FILES+('backup_scope.py','service_contracts.py','service_images.json','service_runtime.py','service_backup.py','service_rendering.py')
-FILES=MATRIX_FILES+('nextcloud_contracts.py','nextcloud_images.json','nextcloud_rendering.py','nextcloud_runtime.py','nextcloud_backup.py')
+FILES=MATRIX_FILES+('nextcloud_contracts.py','nextcloud_images.json','nextcloud_rendering.py','nextcloud_runtime.py','nextcloud_backup.py','nextcloud_regional.py','service_regional.py','regional_http.py')
 CALENDARS={'hourly':'*-*-* *:00:00 UTC','daily':'*-*-* 02:00:00 UTC'}
 
 

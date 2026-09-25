@@ -80,7 +80,7 @@ def binary_paths(owner):
     if 'applications' in owner:
         from backup_scope import package
         if package(owner['applications'])=='nextcloud':
-            paths+=tuple('usr/local/lib/rdc-nextcloud/'+n for n in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py'))
+            paths+=tuple('usr/local/lib/rdc-nextcloud/'+n for n in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py','nextcloud_regional.py','service_regional.py','regional_http.py'))
             paths+=tuple('etc/systemd/system/'+n for n in ('rdc-nextcloud.service','rdc-nextcloud-postgres.service','rdc-nextcloud-proxy.service','rdc-nextcloud-cron.service','rdc-nextcloud-cron.timer'))
         else:paths+=('usr/local/lib/rdc-services/service_runtime.py','usr/local/lib/rdc-services/service_images.json','usr/local/lib/rdc-services/service_regional.py')
     return paths

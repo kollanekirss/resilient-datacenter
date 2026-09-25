@@ -38,7 +38,7 @@ def inputs(profile):
 
 
 def reserved_paths():
-    return [runtime.BASE,runtime.STATE,runtime.APP,runtime.INSTALLED,TLSBASE,TARGET,CRON,TIMER,
+    return [runtime.BASE,runtime.STATE,runtime.APP,runtime.INSTALLED,runtime.regional.BASE,TLSBASE,TARGET,CRON,TIMER,
             *[Path('/etc/systemd/system',name+'.service') for name in runtime.UNITS.values()]]
 
 
@@ -186,7 +186,7 @@ def install_or_resume(profile,network,address,admin_user,admin_password):
     write(runtime.BASE/'ports.conf',apache_ports(),mode=0o644);write(runtime.BASE/'site.conf',apache_site(),mode=0o644)
     write(runtime.BASE/'Caddyfile',proxy(profile,address),mode=0o644)
     hashes={}
-    for name in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py'):
+    for name in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py','nextcloud_regional.py','service_regional.py','regional_http.py'):
         content=(SOURCE/name).read_bytes();write(runtime.INSTALLED/name,content,mode=0o644);hashes[name]=hashlib.sha256(content).hexdigest()
     write(runtime.INSTALLED/'manifest.json',json.dumps({'schema_version':1,'files':hashes}))
     for name,unitname in runtime.UNITS.items():write(Path('/etc/systemd/system',unitname+'.service'),runtime.unit(name),mode=0o644)
