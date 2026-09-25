@@ -7,6 +7,7 @@ from pathlib import Path
 import secrets
 import ssl
 import subprocess
+import time
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -80,6 +81,7 @@ def main():
     # rotation is insufficient evidence against container cleanup races.
     for attempt in range(20):
         subprocess.run(['systemctl','restart','rdc-service-proxy.service'],check=True,timeout=180)
+        time.sleep(3)  # Respect systemd's normal five-starts-per-ten-seconds guard.
     print('Twenty consecutive verified proxy restarts PASS.',flush=True)
     alice_password=secrets.token_urlsafe(24);bob_password=secrets.token_urlsafe(24)
     assert create('cialice',alice_password,admin=True)['state']=='account-created'
