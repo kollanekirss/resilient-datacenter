@@ -1,6 +1,6 @@
 # Contributing
 
-This is an experimental networking foundation. Contributions should preserve the independent, join and local-node workflows and distinguish local checks from live deployment evidence.
+This is an experimental self-hosted service kit. Contributions should preserve the independent, join and local-node workflows and distinguish local checks from live deployment evidence.
 
 ## Work locally
 
@@ -31,4 +31,6 @@ Do not put real inventories, private keys, enrollment links, credentials or pers
 
 ## Scope
 
-Matrix/Element, Nextcloud, backup/restore, regional gateways and automated recovery are future work. Networking enrollment alone is not evidence of application resilience.
+Preserve the networking, application, backup/recovery and regional boundaries described in the product design. Actual server/client/container execution belongs on disposable Ubuntu acceptance machines, not a contributor’s preparation computer. Automatic failover, SSO and new architectures need their own design and acceptance. Networking enrollment alone is not evidence of application resilience.
+
+Report suspected vulnerabilities through [private reporting](SECURITY.md), not public issues.

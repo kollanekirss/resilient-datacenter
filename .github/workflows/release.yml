@@ -42,5 +42,6 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
           RELEASE_COMMIT: ${{ github.sha }}
         run: |
-          printf 'Experimental networking release. Not production-ready. Applications and recovery are not included.\n\nSource commit: %s\n\nSee docs/releases.md for verification instructions.\n' "$RELEASE_COMMIT" > .work/release-notes.md
+          cp "docs/release-notes/${RELEASE_TAG#v}.md" .work/release-notes.md
+          printf '\nSource commit: %s\n' "$RELEASE_COMMIT" >> .work/release-notes.md
           gh release create "$RELEASE_TAG" artifacts/release/* --verify-tag --prerelease --title "$RELEASE_TAG — experimental" --notes-file .work/release-notes.md

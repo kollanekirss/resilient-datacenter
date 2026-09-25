@@ -1,8 +1,8 @@
 # Guided operations
 
-The `rdc` command is the common interface to this experimental networking pilot. It prepares configurations, checks/deploys the offsite controller and relay, and installs/enrolls local Ubuntu nodes. The development source also includes experimental Matrix/Element, encrypted backups, guarded recovery and certificate workflows. Nextcloud, regional gateways and managed application upgrades remain in development. See [Matrix services](matrix-services.md), [backups](backups.md) and [managed infrastructure certificates](managed-certificates.md). These additions are not in the older 0.2.0-alpha.1 download.
+The `rdc` command prepares a personal, institutional or regional plan, deploys offsite infrastructure, enrolls local Ubuntu nodes and manages the fixed chat/file, certificate, backup/recovery and regional packages. Begin with [the product guide](product-start.md). Use [upgrade guidance](upgrades.md) for the exact reviewed transitions; arbitrary versions are refused.
 
-Disposable Ubuntu tests exercise actual service startup and recovery; they do not establish home NAT traversal, physical site separation or institutional acceptance. Continue to treat this as a disposable pilot until the [live acceptance checklist](local-install-acceptance.md) has been exercised.
+This is experimental software with bounded disposable Ubuntu acceptance. Physical sites, actual public-provider issuance and unfamiliar-colleague usability remain external acceptance requirements. See [validation status](validation-status.md) and [the site worksheet](site-acceptance.md).
 
 ## Get started
 

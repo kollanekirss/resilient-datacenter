@@ -1,6 +1,6 @@
 # Verified experimental releases
 
-Releases package the networking foundation. They do not yet include Matrix/Element, Nextcloud, automatic recovery or verified production resilience. The downloaded relay targets **Linux amd64**; configuration and verification may run on macOS. There is no ARM binary and no automatic installation or upgrade.
+The 0.3.0-alpha.1 release candidate packages the guided product source: networking, Matrix/Element, Nextcloud, restricted federation, encrypted recovery and selected controlled upgrades. Publish it only after the matching source passes its required checks. The old 0.2.0-alpha.1 release packages the networking foundation only. Neither is a supported production release or automatic failover system. The downloaded relay targets **Linux amd64**; configuration and verification may run on macOS. There is no ARM binary and no automatic installation or upgrade.
 
 ## Download
 
@@ -9,7 +9,7 @@ Start from a reviewed checkout of this repository and prepare its Python environ
 Find a specific experimental release and its full source commit on the repository's Releases page. Check the tagged source and workflow; never take an expected commit from an untrusted mirror.
 
 ```sh
-./rdc release fetch 0.2.0-alpha.1 --commit FULL_40_CHARACTER_COMMIT --output-dir "$PWD/artifacts/verified-alpha1"
+./rdc release fetch 0.3.0-alpha.1 --commit FULL_40_CHARACTER_COMMIT --output-dir "$PWD/artifacts/verified-product-alpha1"
 ```
 
 The version is an example; use a published version. The output's parent directory must already exist, belong to you, and not allow other users to write. The destination must not exist. No symlink parents are accepted. A release fetch requires network access to GitHub and its attestation trust services; offline verification is not yet provided.
@@ -28,7 +28,7 @@ Keep the notices with any redistributed relay. Fetch does not extract archives, 
 
 ## Maintainer publication
 
-1. Review and merge changes, pass CI, and set `project-version.json` to a specific `alpha.N`, `beta.N` or `rc.N` version with channel `prerelease`.
+1. Review and merge changes, pass CI, and prepare matching reviewed notes in `docs/release-notes/VERSION.md` and set `project-version.json` to a specific `alpha.N`, `beta.N` or `rc.N` version with channel `prerelease`.
 2. Review the pinned Go/Tailscale inputs in `build/derper/`, `scripts/build_derper.py` and the dependency license report. The build blocks new/unclassified license families instead of silently omitting them. The initial approved families are MIT, BSD-2-Clause, BSD-3-Clause, ISC and Apache-2.0; all license and notice files must remain in the distribution. Assembly scanner warnings are retained for review; CGO is disabled.
 3. Create and push the corresponding `vVERSION` tag at the reviewed commit. Do not retarget a published tag.
 4. Manually run **Experimental release** using that tag. Ordinary pushes/PRs cannot publish. The workflow must exist on the default branch for dispatch to be available.
