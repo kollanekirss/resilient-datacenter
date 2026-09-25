@@ -141,6 +141,8 @@ def main():
     encrypted_events=[e for e in encrypted_history['chunk'] if e['type']=='m.room.encrypted']
     assert encrypted_events and 'Encrypted history survives' not in json.dumps(encrypted_events)
     assert backup_check()
+    from ci_service_connector import exercise as connector_exercise,verify_suspended_after_restore
+    connector_exercise(settings)
     selected=snapshot(network_snapshot)
     from service_certificates import replace,activate_pair,Runtime as CertificateRuntime,BASE as CERTBASE
     from certificate_lifecycle import ActivationError
@@ -165,6 +167,7 @@ def main():
     assert Path('/etc/rdc-service-tls/active/tls.crt').read_bytes()==selected_certificate
     later=request('PUT','/_matrix/client/v3/rooms/'+encoded+'/send/m.room.message/ci-after-backup',{'msgtype':'m.text','body':'This later change must not survive restoration'},token=alice)['event_id']
     restore(selected)
+    verify_suspended_after_restore(settings)
     assert Path('/etc/rdc-service-tls/active/tls.crt').read_bytes()==selected_certificate
     assert request('GET',event_path,token=bob)['content']['body']=='Disposable RDC application proof'
     assert request('GET','/_matrix/client/v1/media/download/'+server+'/'+identifier,token=alice,raw=True)==media

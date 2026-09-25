@@ -82,5 +82,5 @@ def binary_paths(owner):
         if package(owner['applications'])=='nextcloud':
             paths+=tuple('usr/local/lib/rdc-nextcloud/'+n for n in ('nextcloud_runtime.py','nextcloud_cron.py','nextcloud_images.json','service_runtime.py'))
             paths+=tuple('etc/systemd/system/'+n for n in ('rdc-nextcloud.service','rdc-nextcloud-postgres.service','rdc-nextcloud-proxy.service','rdc-nextcloud-cron.service','rdc-nextcloud-cron.timer'))
-        else:paths+=('usr/local/lib/rdc-services/service_runtime.py','usr/local/lib/rdc-services/service_images.json')
+        else:paths+=('usr/local/lib/rdc-services/service_runtime.py','usr/local/lib/rdc-services/service_images.json','usr/local/lib/rdc-services/service_regional.py')
     return paths

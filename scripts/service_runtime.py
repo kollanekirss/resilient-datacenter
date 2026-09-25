@@ -19,6 +19,7 @@ STATE=Path('/var/lib/rdc-services')
 TLS=Path('/etc/rdc-service-tls/active')
 INSTALLED=Path('/usr/local/lib/rdc-services')
 UNITS={'postgres':'rdc-postgres','synapse':'rdc-synapse','element':'rdc-element','proxy':'rdc-service-proxy'}
+if __name__=='__main__':sys.path.insert(0,str(INSTALLED))
 
 
 def root_json(path):
@@ -91,6 +92,8 @@ def container_command(name,settings):
             '--label','org.rdc.owner='+owner_digest(settings),'--label','org.rdc.component='+name,
             '--tmpfs','/tmp:rw,nosuid,nodev,size=64m,mode=1777']
     image=settings['components'][name]['image']
+    import service_regional
+    regional=service_regional.active(settings) if name in ('synapse','proxy') else None
     if name=='postgres':
         return common+['--user=999:999','--memory=512m','--tmpfs','/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777',
                        '--volume',str(STATE/'postgres')+':/var/lib/postgresql/data:rw',
@@ -100,15 +103,18 @@ def container_command(name,settings):
                        '--env','POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C',image,
                        'postgres','-c','listen_addresses=127.0.0.1','-c','port=5433','-c','max_connections=50','-c','shared_buffers=128MB']
     if name=='synapse':
-        return common+['--user=991:991','--memory=2g','--volume',str(STATE/'synapse')+':/data:rw',
+        extra=[]
+        if regional:extra=['--volume',str(service_regional.BASE)+':/regional:ro','--volume','/etc/ssl/certs:/etc/ssl/certs:ro']
+        arguments=['run','--config-path','/config/homeserver.yaml','--config-path','/regional/synapse.json'] if regional else []
+        return common+extra+['--user=991:991','--memory=2g','--volume',str(STATE/'synapse')+':/data:rw',
                        '--volume',str(BASE/'synapse')+':/config:ro','--env','SYNAPSE_CONFIG_PATH=/config/homeserver.yaml',
-                       '--env','PYTHONDONTWRITEBYTECODE=1',image]
+                       '--env','PYTHONDONTWRITEBYTECODE=1',image]+arguments
     if name=='element':
         return common+['--memory=256m','--entrypoint=nginx',
                        '--volume',str(BASE/'element.json')+':/app/config.json:ro',
                        '--volume',str(BASE/'element-nginx.conf')+':/etc/nginx/nginx.conf:ro',image,'-g','daemon off;']
     return common+['--memory=256m','--cap-add=NET_BIND_SERVICE','--tmpfs','/config:rw,nosuid,nodev,size=16m',
-                   '--tmpfs','/data:rw,nosuid,nodev,size=16m','--volume',str(BASE/'Caddyfile')+':/etc/caddy/Caddyfile:ro',
+                   '--tmpfs','/data:rw,nosuid,nodev,size=16m','--volume',str((service_regional.BASE if regional else BASE)/'Caddyfile')+':/etc/caddy/Caddyfile:ro',
                    '--volume',str(TLS)+':/tls:ro',image]
 
 
@@ -181,6 +187,11 @@ def main():
             if existing.get('State',{}).get('Running'):
                 return subprocess.run(['/usr/bin/podman','attach',UNITS[name]]).returncode
             phase='remove-stopped-container';podman('rm',UNITS[name])  # Exact owned stopped container; persistent bind data stays.
+        phase='prepare-regional-connector'
+        if name in ('synapse','proxy'):
+            import service_regional
+            if service_regional.BASE.exists() or service_regional.BASE.is_symlink():
+                service_regional.materialize(settings,(BASE/'Caddyfile').read_text())
         phase='launch-container'
         return subprocess.run(container_command(name,settings)).returncode
     except Exception as error:
