@@ -13,7 +13,9 @@ This follows the active resilient-services product design. User authorization is
 
 These are bounded disposable acceptance results. Consult validation-status.md for evidence and limitations rather than inferring complete product support.
 
-## Finish the regional increment
+## Regional increment — implemented and merged in PR #8
+
+Items 1–6 below are complete within their documented disposable boundaries. Physical sites and public issuance remain external.
 
 1. Finish Nextcloud's generated private connector configuration and startup controls. Preserve original identity/configuration in backups, keep public links and automatic acceptance disabled, and prevent recovered databases from reopening old partnerships. Validate actual startup, account maintenance, scheduled jobs, TLS rotation and backup/restore after runtime changes.
 2. Complete actual file federation: signed OCM discovery/exchange, explicit recipient acceptance, byte-for-byte read, unrelated-file denial, share revocation, partnership revocation and internal file operations after regional loss. Keep candidate routes disabled in the normal gateway until these checks pass.
@@ -24,8 +26,8 @@ These are bounded disposable acceptance results. Consult validation-status.md fo
 
 ## Complete operator lifecycle and infrastructure resilience
 
-7. Add an ordinary-purpose installation entry point covering personal, institution and regional journeys. Reuse existing validated commands; show machine roles, prerequisites, what belongs on each machine and each next action. Discover local facts where possible; retain explicit identity/secret inputs and exact resume behavior.
-8. Add unified read-only status with separate network, application, certificate, backup age, restore evidence and partner dimensions. Missing evidence means unknown or untested, not healthy. Surface actionable next commands. Do not make a single green “resilient” badge.
+7. Implemented and accepted in PR #9: an ordinary-purpose installation entry point covering personal, institution and regional journeys. Reuse existing validated commands; show machine roles, prerequisites, what belongs on each machine and each next action. Discover local facts where possible; retain explicit identity/secret inputs and exact resume behavior.
+8. Implemented and accepted in PR #9: unified read-only status with separate network, application, certificate, backup age, restore evidence and partner dimensions. Missing evidence means unknown or untested, not healthy. Surface actionable next commands. Do not make a single green “resilient” badge.
 9. Define reviewed product upgrade paths, compatibility manifests and preflight checks. Require a usable recent snapshot and stage verified artifacts. Preserve identities; serialize with certificate/backup changes; journal interruption; refuse unsupported application/database version jumps. Test the actual supported before/after path and injected failure, without running downloaded deployment artifacts on the developer computer.
 10. Add additional relay locations and controller recovery acceptance with actual enrolled clients. Verify useful traffic under loss of one relay and controller replacement. Explain which existing flows survive a control outage and which enrollment/policy operations require restored control. Do not claim shared regional coordination is decentralized control.
 11. Exercise installation behind simulated home NAT without inbound management SSH, then service use, encrypted remote backup and fenced replacement. Report the simulation boundary clearly; physical home routers, power/site independence and public DNS remain external acceptance items.
