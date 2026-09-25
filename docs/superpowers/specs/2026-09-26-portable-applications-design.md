@@ -1,6 +1,6 @@
 # Portable local applications
 
-Status: design for roadmap stage 4; no deployment acceptance claimed.
+Status: implemented roadmap stage 4 design; measured acceptance and remaining limits are recorded in the release notes.
 
 ## Intended outcome
 
@@ -98,3 +98,5 @@ No common writable database or automatic writable clone is introduced.
 - https://nginx.org/en/docs/http/ngx_http_proxy_module.html
 - https://element-hq.github.io/synapse/latest/reverse_proxy.html
 - https://docs.nextcloud.com/server/latest/admin_manual/configuration_server/reverse_proxy_configuration.html
+
+- https://caddyserver.com/docs/caddyfile/concepts (client IP placeholder)

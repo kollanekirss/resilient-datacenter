@@ -4,11 +4,13 @@ Run your own private network, chat and files, keep an encrypted recovery copy el
 
 **Experimental, not a supported production release.** Real applications, separate networks, federation, encrypted recovery and selected upgrades have disposable Ubuntu acceptance evidence. Fresh Ubuntu guest installation and recovery behind simulated home NAT also pass; [see the measured boundaries](docs/home-nat-recovery.md). Physical sites, public certificate-provider issuance and an unfamiliar colleague's complete installation/recovery exercise still need acceptance. There is no automatic failover or promise of uninterrupted relocation.
 
+Current development iteration: [0.4.0-dev.3 — portable local applications](docs/release-notes/0.4.0-dev.3.md).
+
 ## The purpose: take essential services with you
 
 An institution should be able to operate essential chat, files and recovery tools away from its main datacenter, including at a temporary crisis headquarters. The intended destination is a small, transportable system that works on its own local network, reaches other domestic sites when a route exists, and exchanges approved services with partners when connected. Moving a service box should not require a fixed public IP at its new location.
 
-**The current release is a foundation for this goal, not a complete offline crisis appliance.** It provides private networking, applications, encrypted backups and controlled partner connections. It does not yet supply independent local-LAN application access, resilient local DNS or a complete offline installation/recovery kit. The scenarios below distinguish available mechanisms from work still required. Moving a dependency to another provider is insufficient if both sites still need the same unavailable DNS, identity service, cable, power supply or recovery account.
+**The current release is a foundation for this goal, not a complete offline crisis appliance.** It provides private networking, applications, encrypted backups and controlled partner connections. The development portable profile now supplies local DNS/time preparation and separate NGINX/chat/files deployment without an overlay for local access. A complete offline installation/recovery kit and physical deployment acceptance remain outstanding. The scenarios below distinguish available mechanisms from work still required. Moving a dependency to another provider is insufficient if both sites still need the same unavailable DNS, identity service, cable, power supply or recovery account.
 
 ## Examples: why an institution would use this
 
@@ -18,14 +20,14 @@ These are planning scenarios, not predictions about Estonia's infrastructure or 
 |---|---|---|
 | International connectivity or sea cables are disrupted, but some domestic routes remain | A rescue coordination team uses domestic chat/files and reaches approved regional partners through in-country infrastructure. | Self-hosted Headscale and multiple DERP locations are available. Domestic routing, DNS, certificates, identity and cold-start operation must be independently provided and tested; physical location alone does not prove a domestic path. |
 | A headquarters loses power or must be evacuated | Staff carry a prepared mini-PC, router, power kit and essential data to another building; the same application identities are retained. | Service nodes can sit behind NAT. Safe shutdown/startup, changed-uplink reconnection and actual hardware relocation need acceptance. Transport causes downtime unless separately engineered continuity exists. |
-| A field headquarters has no usable upstream connection | People on its local Wi-Fi can sign in, exchange messages and use locally held files. Remote partners remain unavailable until a path returns. | **Not implemented as a supported mode.** Current application ingress is restricted to the overlay. A local access path, local DNS/trust/authentication and a disconnected cold-start test are required. |
+| A field headquarters has no usable upstream connection | People on its local Wi-Fi can sign in, exchange messages and use locally held files. Remote partners remain unavailable until a path returns. | The experimental [portable LAN profile](docs/portable-local-applications.md) provides local HTTPS and local accounts without an overlay. Prepare DNS, trust and time first; complete-kit and physical cold-start acceptance remain required. |
 | The main datacenter or its disks are lost | A second site restores essential services from an encrypted copy, using credentials held outside the failed site. | Guided backup and fenced recovery exist. Recovery loses changes newer than the selected snapshot and takes time. Recovery with all downloads and external certificate issuance blocked remains to be built and demonstrated. |
 | Two institutions need to cooperate during a crisis | Each keeps ownership of its accounts/data; approved rooms or files cross a restricted partner connection. | Matrix/Nextcloud federation through regional gateways is supported. This does not merge Headscale networks, duplicate every file, or provide a second writable copy of the same institution. |
 | A household wants the same independence on a smaller scale | Home-hosted services have an encrypted offsite copy and replacement capacity elsewhere. | The personal setup supports this recovery model. Two VMs on the same home PC do not survive loss of that PC or house together. |
 
 ## Three operating modes to build toward
 
-1. **Local island:** the box, router and prepared user devices work without WAN, external DNS, external sign-in or package downloads. Local operation must not depend on contacting regional Headscale first. This mode still needs implementation.
+1. **Local island:** the box, router and prepared user devices work without WAN, external DNS, external sign-in or package downloads. Local operation must not depend on contacting regional Headscale first. The experimental portable profile implements this local application path; complete-kit acceptance remains outstanding.
 2. **Domestic connection:** reachable in-country controllers and relays reconnect sites over surviving IP paths. Each institution retains its own control and recovery arrangements. This builds on the existing networking foundation; disconnected restart and bootstrap still need validation.
 3. **Partner connection:** a separate, explicitly approved gateway exchanges supported application traffic. Losing that connection must leave local work usable. Federation is application-specific; arbitrary databases and concurrent writable clones are not automatically reconciled.
 
@@ -43,16 +45,16 @@ The proposed domestic design therefore needs several independently reachable ren
 
 The agreed reference deployment is **Proxmox on the physical host, with separate OPNsense, Unbound, NGINX, Synapse/Element, Nextcloud and partner-connector VMs**. Service guests retain their own operating systems; Proxmox does not replace Linux inside those VMs. Prepare services, accounts and certificates during normal operation so local use does not require outside services during a crisis.
 
-This is a planned profile, not a capability of the current installer. Read the [reference architecture](docs/architecture/portable-proxmox.md) and [delivery roadmap](docs/architecture/portable-proxmox-roadmap.md). A [validated site-plan preview](docs/portable-site-plan.md) is available with `./rdc portable preview examples/portable-site.json`. It changes no servers. An [experimental Proxmox adapter](docs/proxmox-provisioning.md) can check an API and explicitly allocate stopped, disconnected VM shells. The [guided installation wizard](docs/portable-installation-wizard.md) now prepares and uploads pinned OS media and manages isolated console installation. The [local network kit](docs/portable-local-network.md), available in wizard step 8, adds guided OPNsense policy/DHCP setup, static addressing, a separate DNS/time module and client checks. Live Proxmox/OPNsense deployment acceptance and disconnected application access remain outstanding. The existing Ubuntu deployment remains available.
+This is an experimental development profile with guided installation stages. Read the [reference architecture](docs/architecture/portable-proxmox.md) and [delivery roadmap](docs/architecture/portable-proxmox-roadmap.md). A [validated site-plan preview](docs/portable-site-plan.md) is available with `./rdc portable preview examples/portable-site.json`. It changes no servers. An [experimental Proxmox adapter](docs/proxmox-provisioning.md) can check an API and explicitly allocate stopped, disconnected VM shells. The [guided installation wizard](docs/portable-installation-wizard.md) now prepares and uploads pinned OS media and manages isolated console installation. The [local network kit](docs/portable-local-network.md), available in wizard step 8, adds guided OPNsense policy/DHCP setup, static addressing, a separate DNS/time module and client checks. Wizard step 9 adds a [local application kit](docs/portable-local-applications.md), with separate NGINX, chat and files deployment commands. Live Proxmox/OPNsense deployment and combined physical-kit acceptance remain outstanding. The existing Ubuntu deployment remains available.
 
 ## Example hardware for a small institutional pilot
 
-These are **planning examples, not measured user-capacity guarantees or a shopping list**. Reuse existing equipment first and size it against actual data, concurrent users and the recovery window. The supported deployment target remains fresh Ubuntu 24.04 amd64 VMs or machines; a hypervisor such as Proxmox is optional and is administered separately.
+These are **planning examples, not measured user-capacity guarantees or a shopping list**. Reuse existing equipment first and size it against actual data, concurrent users and the recovery window. Application guests target fresh Ubuntu 24.04 amd64. The modular profile uses Proxmox and an OPNsense guest; the existing standalone Ubuntu deployment is also available.
 
 | Item | Example starting point | Purpose and independence requirement |
 |---|---|---|
 | Portable service host | NUC-class x86-64 mini-PC, virtualization support, 32 GiB RAM and 1 TB SSD as an initial lab budget | Separate chat and file VMs, plus headroom for staging. Large datasets or other institutional tools need more capacity. One host is one failure domain. |
-| Local network kit | Router/firewall, small Ethernet switch and Wi-Fi access point; optional second upstream | Keeps the local LAN available during relocation. OPNsense is an option, but this installer does not configure it. Local DNS and offline access remain planned work. |
+| Local network kit | Router/firewall, small Ethernet switch and Wi-Fi access point; optional second upstream | Keeps the local LAN available during relocation. The portable wizard generates guided OPNsense configuration and a separate local DNS/time module. Physical routing and power independence still need testing. |
 | Power kit | UPS or battery supplying the host **and** router/switch/AP | Measure the whole kit's watts and actual runtime. Include conversion losses, battery ageing and safe shutdown; a second server on the same dead circuit does not help. |
 | Recovery kit | Encrypted removable SSD, offline instructions and independently held recovery credentials | Intended to carry data plus verified installers/images/configuration. The current release does not assemble a complete offline kit. Include Matrix users' encryption recovery keys through an appropriate separate process. |
 | Second physical location | Independent backup storage and capacity to run the essential workload | Survives loss of the first box or site. Current guided backup targets accept one writer each, so chat and files need separate target instances. |
@@ -66,17 +68,17 @@ Reserve space for backup history and simultaneous original/restored data during 
 1. **Select the essential workload.** Name the staff, rooms, documents and institutional tools needed during a crisis. Decide acceptable downtime and maximum lost work. Other tools require their own deployment, backup and recovery procedures; this package currently includes chat and files.
 2. **Map dependencies and locations.** Choose the portable site, independent backup/replacement site and domestic controller/relay locations. Write down which DNS, power, upstream, time, sign-in and administrator access each requires. Remove circular dependencies, such as recovery credentials stored only in the failed Nextcloud.
 3. **Prepare machines and identities while connected.** Create separate supported Ubuntu VMs, choose permanent application domains, arrange DNS/TLS and prepare user devices. Follow the [prerequisites](docs/prerequisites.md). Pre-enroll devices and establish application accounts; network membership alone is not application access.
-4. **Deploy the current foundation.** Use `./rdc start` below, choose institution, and follow its saved journey with `./rdc guide`. Deploy the controller, geographically separate relays, enrolled chat/file VMs and restricted access policies. Test real logins, messages and file transfers before adding data.
+4. **Choose the deployment profile.** For the portable kit, use `./rdc start --platform proxmox` and follow guest installation, local network setup and local applications. For the existing overlay deployment, use `./rdc start`, choose institution and follow `./rdc guide`. Test real logins, messages and file transfers before adding data.
 5. **Prepare independent recovery.** Configure encrypted offsite backups and keep the credentials outside the primary site. Restore onto a disposable replacement, independently stop or isolate the original before reusing its identity, and measure recovery time and snapshot age. Follow the [backup procedure](docs/backups.md).
 6. **Add partners deliberately.** Start with one partner and the [regional gateway procedure](docs/regional-gateway.md). Approve only the required application traffic. Test revocation and a lost regional connection. Keep local administration and accounts independent of the partnership.
-7. **Build and validate the missing portable mode before relying on it.** Complete the local access/DNS/trust and offline recovery work below. The current installer does not make this step happen automatically. Perform the full disconnected exercise with disposable data and a colleague following the written procedure.
+7. **Validate the complete portable kit before relying on it.** Follow the [local application exercise](docs/portable-local-applications.md), then the full disconnected exercise below with disposable data and a colleague following the instructions. Offline empty-host recovery and portable partner reconnection remain separate development stages.
 
 ## Next milestone: prove a portable crisis box
 
-The next engineering priority is **local operation after a complete disconnected restart**, followed by domestic reconnection. Additional applications should come after this foundation.
+The portable application implementation adds the local HTTPS path. The next engineering priorities are **complete offline reconstruction and domestic reconnection**, alongside real Proxmox/OPNsense and physical-kit acceptance. Additional applications should come after this foundation.
 
-- Provide an explicitly approved LAN HTTPS entry point with the same stable service names and valid trust, while preserving access controls. Do not merely remove the current overlay-only firewall restriction.
-- Provide locally served institutional DNS records and offline bootstrap information. A recursive Unbound cache alone cannot guarantee answers after cache expiry or a fresh start. Include local time and certificate lifecycle planning.
+- Validate the implemented LAN HTTPS path on the complete kit with stable names, prepared trust and enforced source restrictions.
+- Validate the implemented local DNS/time module together with client addressing and certificate lifecycle planning. Preserve authoritative local records and recovery instructions independently.
 - Make local application accounts, emergency administration and prepared client trust usable without external identity providers. Define enrollment, expiry and revocation behaviour during a partition.
 - Package verified OS/application dependencies, configuration, certificates, encrypted backups and instructions for recovery without GitHub, container registries or a public certificate issuer. Handle secrets separately from public release artifacts.
 - Define controller recovery and authenticated bootstrap-address updates across independent domestic sites. Do not advertise active-active Headscale or transparent controller federation without a supported, tested design.
@@ -96,7 +98,7 @@ The first resilience model is **one active service plus recoverable backup**. Fe
 
 ## Start here
 
-For the new modular Proxmox guest-installation journey, prepare the dependencies below and run `./rdc start --platform proxmox --output-dir /absolute/private/path/my-portable-site`. Follow the [wizard guide](docs/portable-installation-wizard.md). This development profile includes guided console installation and does not yet configure the local services.
+For the new modular Proxmox guest-installation journey, prepare the dependencies below and run `./rdc start --platform proxmox --output-dir /absolute/private/path/my-portable-site`. Follow the [wizard guide](docs/portable-installation-wizard.md). This development profile includes guided console installation, network preparation and a local application kit. Deployment commands run inside the intended separate guests; see the [local application guide](docs/portable-local-applications.md).
 
 
 Read the [machine and access checklist](docs/prerequisites.md). On your preparation computer, install Git and Python 3.11 or newer, then:
@@ -113,7 +115,7 @@ Choose personal, institution or regional. The wizard asks questions and saves a 
 
 Use a reviewed commit or [verified experimental release](docs/releases.md), and record `./rdc version`. Main is development source. The older 0.2.0-alpha.1 archive contains only the networking foundation; it cannot deploy the current product.
 
-## How the roles connect
+## How the existing overlay roles connect
 
 ```mermaid
 flowchart TB

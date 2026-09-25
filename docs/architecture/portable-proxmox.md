@@ -1,6 +1,6 @@
 # Portable crisis node: Proxmox reference architecture
 
-Status: accepted project direction, proposed deployment profile; not implemented by the 0.3 installer. This document records the user's agreed modular topology and the engineering decisions needed to implement it. It extends the earlier Ubuntu service-product scope without changing existing deployments.
+Status: accepted project direction, incrementally implemented in the 0.4 development profile; not implemented by the older 0.3 installer. This document records the user's agreed modular topology and the engineering decisions needed to implement it. It extends the earlier Ubuntu service-product scope without changing existing deployments.
 
 ## Outcome
 
@@ -82,12 +82,12 @@ Relocation procedure: verify backup/recovery material; stop writers and shut dow
 
 ## Integration with current code
 
-The current implementation uses per-application Caddy configuration, overlay-bound application access and ingress guards. Adding NGINX in front does not automatically allow LAN clients. Introduce a new explicit portable deployment profile; keep existing installations unchanged until a separately reviewed migration is available.
+The original implementation uses per-application Caddy configuration, overlay-bound access and ingress guards. The [portable application profile](../portable-local-applications.md) now adds explicit LAN ownership, frontend-only backend ingress and a separate NGINX VM. Existing installations retain their defaults; migration remains a separately reviewed operation.
 
 Relevant integration points:
 
 - `scripts/product_journey.py`, `scripts/product_guide.py`: new platform choice and stage reporting.
-- `scripts/service_access.py`, `scripts/service_rendering.py`, `scripts/nextcloud_rendering.py`: explicit frontend/backend contracts; preserve overlay-only defaults.
+- `scripts/application_access.py`, `scripts/portable_frontend.py`, `scripts/service_rendering.py`, `scripts/nextcloud_rendering.py`: explicit frontend/backend contracts; preserve overlay-only defaults.
 - `scripts/service_certificates.py`, `scripts/nextcloud_certificates.py`: separate frontend certificates and trusted backend identities.
 - `scripts/service_backup.py`, `scripts/nextcloud_backup.py`, `scripts/restore_transaction.py`: include portable access/naming configuration in coordinated recovery without weakening application consistency.
 - `scripts/gateway_*`, `scripts/service_link.py`, `scripts/nextcloud_link.py`: preserve narrow regional endpoint rules.
