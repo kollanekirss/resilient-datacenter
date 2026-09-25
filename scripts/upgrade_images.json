@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "paths": [
+    {
+      "package": "matrix",
+      "source": {
+        "synapse": {
+          "version": "1.160.0",
+          "image": "ghcr.io/element-hq/synapse@sha256:f113a71cfa9a4900002255983efedf2973875f9ce8d79ee2987f7f05864f0c6b",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:46541738701e24e221c45603d9518b83282acb0c1c3a9245874760f6755b915c"
+        },
+        "element": {
+          "version": "1.12.29",
+          "image": "docker.io/vectorim/element-web@sha256:665ed1b1c723e531e4e56bed18500d13e154b3a71609bb5ed3ad584778b3a7aa",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:bc61512533cba11c55536796ef4688aafe3716f5161a7303718fb404ae8a2cbf"
+        },
+        "postgres": {
+          "version": "17.11",
+          "image": "docker.io/library/postgres@sha256:91eb910c44c7ed13f7f1a4ccadaa9ca72ef14cddc04cacb6e070e48eb44731a3",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:248efd5e58cd743f2a0e0daec8ea4649e5580145ec2a12e2345bc710d4a77201"
+        },
+        "proxy": {
+          "version": "2.11.4",
+          "image": "docker.io/library/caddy@sha256:040e9f7480b80b6d4a7e5013a21159b950a63dcbdb956e38abe2387fb28d9ec0",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:2d8b1708bf8008935c0e2a9b6564f7f080cf9a73af3b27718f286230449b7101"
+        }
+      },
+      "target": {
+        "synapse": {
+          "version": "1.161.0",
+          "image": "ghcr.io/element-hq/synapse@sha256:1f2afd3ddcafd771e93888227ec50dde7a83b6c4b89a6dc9287104ba13582fdf",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:03ad696f05d58bcec75cda97a6e0ef9f2187065b8dc37cb1316413711c3795f1"
+        },
+        "element": {
+          "version": "1.12.29",
+          "image": "docker.io/vectorim/element-web@sha256:665ed1b1c723e531e4e56bed18500d13e154b3a71609bb5ed3ad584778b3a7aa",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:bc61512533cba11c55536796ef4688aafe3716f5161a7303718fb404ae8a2cbf"
+        },
+        "postgres": {
+          "version": "17.11",
+          "image": "docker.io/library/postgres@sha256:91eb910c44c7ed13f7f1a4ccadaa9ca72ef14cddc04cacb6e070e48eb44731a3",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:248efd5e58cd743f2a0e0daec8ea4649e5580145ec2a12e2345bc710d4a77201"
+        },
+        "proxy": {
+          "version": "2.11.4",
+          "image": "docker.io/library/caddy@sha256:040e9f7480b80b6d4a7e5013a21159b950a63dcbdb956e38abe2387fb28d9ec0",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:2d8b1708bf8008935c0e2a9b6564f7f080cf9a73af3b27718f286230449b7101"
+        }
+      }
+    },
+    {
+      "package": "nextcloud",
+      "source": {
+        "postgres": {
+          "version": "17.11",
+          "image": "docker.io/library/postgres@sha256:91eb910c44c7ed13f7f1a4ccadaa9ca72ef14cddc04cacb6e070e48eb44731a3",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:248efd5e58cd743f2a0e0daec8ea4649e5580145ec2a12e2345bc710d4a77201"
+        },
+        "proxy": {
+          "version": "2.11.4",
+          "image": "docker.io/library/caddy@sha256:040e9f7480b80b6d4a7e5013a21159b950a63dcbdb956e38abe2387fb28d9ec0",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:2d8b1708bf8008935c0e2a9b6564f7f080cf9a73af3b27718f286230449b7101"
+        },
+        "nextcloud": {
+          "version": "35.0.0",
+          "image": "docker.io/library/nextcloud@sha256:e594a5d68fa32d4b16686a60e0beb39c55766de776338ba03761e9e7ca22a740",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:cd80445714fe772a0093f55ca339d36b60e537f0138fe38d36198b40a76fbb35"
+        }
+      },
+      "target": {
+        "postgres": {
+          "version": "17.11",
+          "image": "docker.io/library/postgres@sha256:91eb910c44c7ed13f7f1a4ccadaa9ca72ef14cddc04cacb6e070e48eb44731a3",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:248efd5e58cd743f2a0e0daec8ea4649e5580145ec2a12e2345bc710d4a77201"
+        },
+        "proxy": {
+          "version": "2.11.4",
+          "image": "docker.io/library/caddy@sha256:040e9f7480b80b6d4a7e5013a21159b950a63dcbdb956e38abe2387fb28d9ec0",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:2d8b1708bf8008935c0e2a9b6564f7f080cf9a73af3b27718f286230449b7101"
+        },
+        "nextcloud": {
+          "version": "35.0.1",
+          "image": "docker.io/library/nextcloud@sha256:fc04168b172e09d9b9bc7665476a77898634fe2833f0a320366fb9eb0db491db",
+          "platform": "linux/amd64",
+          "config_digest": "sha256:05b7779142c379ddcf7c327cd4606375d2614d07bb25c386b596923e2e2cfe33"
+        }
+      }
+    }
+  ]
+}
