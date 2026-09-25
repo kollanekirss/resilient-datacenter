@@ -52,6 +52,7 @@ def preflight(profile,identity):
         if store.profile()!=profile or store.identity()!=identity:raise ValueError('This gateway has a different pinned identity or network configuration')
         store.state()
         if certificates.pending(store):raise ValueError('Resume the pending gateway certificate replacement before installation')
+        if store.recovery_pending():raise ValueError('Review gateway recovery and apply current fresh agreements before repeating installation')
         if not (runtime.BASE/'tls/active').exists() and not (runtime.BASE/'tls/active').is_symlink() and store.state()['generation']==0:
             cert,key=tls_inputs(profile,identity)  # Resume interrupted first installation.
         else:cert,key=certificates.managed_material(store)
@@ -126,7 +127,11 @@ def change(documents=None,revoked_ids=None,*,resume=False):
             if candidate is None:raise ValueError('No gateway transition is pending')
         else:
             state=store.state()
-            candidate=store.candidate(state['agreements'] if documents is None else documents,revoked_ids or [],now=int(time.time()))
+            selected=state['agreements'] if documents is None else documents
+            if documents is None and revoked_ids and store.recovery_pending():
+                from gateway_recovery import fresh_documents
+                selected=[document for document in selected if fresh_documents(store.recovery(),[document])]
+            candidate=store.candidate(selected,revoked_ids or [],now=int(time.time()))
         gateway_transition.apply(store,runtime.Runtime(store),candidate)
     return {'state':'gateway-policy-applied','generation':candidate['generation'],'partners':len(store.peers()),
             'application_federation':'not-verified','revocations_recorded':len(candidate['revoked_ids'])}
@@ -140,7 +145,8 @@ def status():
     checkpoint=json.loads(private_read(runtime.BASE/'clock.json'));now=int(time.time())
     time_verified=type(checkpoint.get('latest_utc')) is int and 0<=now-checkpoint['latest_utc']<=30
     timer=subprocess.run(['/bin/systemctl','is-active','rdc-regional-guard.timer'],capture_output=True,timeout=15).returncode==0
-    return {'state':'gateway-change-pending' if pending else ('gateway-configured' if time_verified and timer else 'gateway-enforcement-unverified'),'time_checkpoint_recent':time_verified,'guard_timer_active':timer,'network_identity_verified':network,
+    review=store.recovery()
+    return {'recovery_review':review,'state':'gateway-recovery-review-required' if store.recovery_pending() else ('gateway-change-pending' if pending else ('gateway-configured' if time_verified and timer else 'gateway-enforcement-unverified')),'time_checkpoint_recent':time_verified,'guard_timer_active':timer,'network_identity_verified':network,
             'proxy_running':bool(item and item.get('State',{}).get('Running')),'approved_peers':store.peers(),
             'application_federation':'not-verified','supported_transport':['matrix','nextcloud']}
 
@@ -183,10 +189,14 @@ def action(args):
     if command=='policy':
         documents=[imported(path) for path in args.agreement]
         candidate=store.candidate(documents,[],now=int(time.time()))
-        print(json.dumps({'proposed_peers':store.peers(candidate),'note':'This replaces the active agreement selection; recorded revocations remain permanent.'},indent=2))
+        print(json.dumps({'recovery_review':store.recovery(),'proposed_peers':store.peers(candidate),'note':'This replaces the active agreement selection; recorded revocations remain permanent.'},indent=2))
     elif command=='revoke':
         revoked=[args.agreement_id]
-        store.candidate(store.state()['agreements'],revoked,now=int(time.time()))
+        selected=store.state()['agreements']
+        if store.recovery_pending():
+            from gateway_recovery import fresh_documents
+            selected=[document for document in selected if fresh_documents(store.recovery(),[document])]
+        store.candidate(selected,revoked,now=int(time.time()))
         print('Record this agreement as revoked on THIS gateway and close its future traffic: '+args.agreement_id)
     elif command=='resume':
         if store.pending() is None:raise ValueError('No gateway change is pending')

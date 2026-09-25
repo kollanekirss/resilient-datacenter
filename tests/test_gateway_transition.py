@@ -9,6 +9,7 @@ class Store:
     def __init__(self,events):self.events=events;self.pending=False
     def begin(self,candidate):self.events.append('journal');self.pending=True
     def commit(self,candidate):self.events.append('commit')
+    def review_recovery(self,candidate):self.events.append('review')
     def finish(self):self.events.append('finish');self.pending=False
 
 
@@ -27,7 +28,7 @@ class Runtime:
 def test_changes_journal_and_close_before_touching_approved_configuration():
     m=importlib.import_module('gateway_transition');events=[];store=Store(events)
     m.apply(store,Runtime(events),{'generation':2})
-    assert events==['journal','close','validate','commit','install','restart','open','finish']
+    assert events==['journal','close','validate','commit','install','restart','review','open','finish']
     assert not store.pending
 
 

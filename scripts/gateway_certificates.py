@@ -51,7 +51,8 @@ class Runtime:
                 time.sleep(1)
     def reopen(self):
         from gateway_runtime import Runtime as Gateway
-        Gateway(self.store).open(self.store.state())
+        if self.store.recovery_pending():Gateway(self.store).close()
+        else:Gateway(self.store).open(self.store.state())
 
 
 def activate_certificate(store,cert,key,*,initial=False,validator=validate_material,runtime=None,gid=0):

@@ -17,6 +17,7 @@ def apply(store,runtime,candidate):
         store.commit(candidate)
         runtime.install(candidate)
         runtime.restart()
+        store.review_recovery(candidate)
         runtime.open(candidate)
         store.finish()
     except BaseException as error:

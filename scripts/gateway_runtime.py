@@ -146,6 +146,7 @@ class Runtime:
     def restart(self):command('/bin/systemctl','restart',UNIT+'.service',timeout=120)
 
     def open(self,candidate):
+        if self.store.recovery_pending():raise ValueError('Gateway recovery requires current partner approval review')
         if certificates.pending(self.store):raise ValueError('Complete the pending gateway certificate verification before opening partners')
         network_check(self.store)
         if self.store.state()!=candidate:raise ValueError('Gateway policy changed before activation')
@@ -166,7 +167,7 @@ def verify_runtime():
 
 
 RUNTIME_FILES=('gateway_entry.py','gateway_runtime.py','gateway_store.py','gateway_contracts.py','gateway_images.json','gateway_rendering.py','regional_http.py',
-               'gateway_transition.py','gateway_certificates.py','certificate_lifecycle.py','regional_workspace.py','regional_agreements.py','profile_config.py','validate_inventory.py','validate_tls.py')
+               'gateway_transition.py','gateway_certificates.py','gateway_recovery.py','certificate_lifecycle.py','regional_workspace.py','regional_agreements.py','profile_config.py','validate_inventory.py','validate_tls.py')
 
 
 def unit():
@@ -205,7 +206,7 @@ def main(action):
         try:
             with store.lock():
                 try:
-                    if store.pending() or certificates.pending(store):runtime.close()
+                    if store.pending() or certificates.pending(store) or store.recovery_pending():runtime.close()
                     else:runtime.open(store.state())
                 except BaseException:
                     runtime.close();raise
@@ -236,5 +237,5 @@ def main(action):
         command('/usr/bin/podman','rm',CONTAINER)
     # Pending changes launch the candidate listeners behind a closed firewall.
     # The explicit transaction opens them only after verified restart.
-    if not store.pending() and not certificates.pending(store):runtime.firewall(store.peers(state))
+    if not store.pending() and not certificates.pending(store) and not store.recovery_pending():runtime.firewall(store.peers(state))
     return subprocess.run(container_command(identity)).returncode

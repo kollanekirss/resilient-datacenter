@@ -55,9 +55,24 @@ class Store(Workspace):
     def state(self):
         self.check();return self.validate_state(decode(private_read(self.base/'state.json')))
 
+    def recovery(self):
+        from gateway_recovery import load
+        return load(self)
+
+    def recovery_pending(self):
+        record=self.recovery()
+        return bool(record and record['review_pending'])
+
+    def review_recovery(self,candidate):
+        from gateway_recovery import review
+        review(self,candidate)
+
     def peers(self,state=None,*,now=None):
         state=self.state() if state is None else self.validate_state(state)
-        return contracts.peer_rules(self.identity(),state['agreements'],state['revoked_ids'],now=int(time.time()) if now is None else now)
+        from gateway_recovery import fresh_documents
+        record=self.recovery()
+        documents=[document for document in state['agreements'] if fresh_documents(record,[document])]
+        return contracts.peer_rules(self.identity(),documents,state['revoked_ids'],now=int(time.time()) if now is None else now)
 
     def pending(self):
         self.check();path=self.base/'pending.json'
@@ -72,7 +87,10 @@ class Store(Workspace):
         previous=self.state()
         if not isinstance(revoked_ids,list) or any(not agreements._hex(value,32) for value in revoked_ids):raise ValueError('Use signed agreement identifiers for revocation')
         result={'schema_version':1,'generation':previous['generation']+1,'agreements':documents,'revoked_ids':sorted(set(previous['revoked_ids'])|set(revoked_ids))}
-        self.validate_state(result);self.peers(result,now=now)
+        self.validate_state(result)
+        from gateway_recovery import fresh_documents
+        if not fresh_documents(self.recovery(),documents):raise ValueError('Gateway recovery requires newly issued bilateral approvals; review current partners')
+        self.peers(result,now=now)
         return result
 
     def _write(self,name,state):private_write(self.base/name,json.dumps(state,sort_keys=True,separators=(',',':')).encode(),replace=True)

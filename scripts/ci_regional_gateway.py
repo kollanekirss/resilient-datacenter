@@ -13,6 +13,7 @@ import regional_agreements as agreements
 ROOT=Path('/var/lib/rdc-gateway-ci')
 BASE=ROOT/'config'
 PROCESSES=[]
+APPROVAL_KEYS={}
 
 
 def run(*args,**kwargs):return subprocess.run(list(args),check=True,text=True,capture_output=True,**kwargs).stdout
@@ -38,6 +39,7 @@ def certificates():
 def documents():
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     a,b=Ed25519PrivateKey.generate().private_bytes_raw(),Ed25519PrivateKey.generate().private_bytes_raw()
+    APPROVAL_KEYS.update(north=a,south=b)
     def identity(key,name,address):return agreements.identity(key,institution_id=name,regional_controller='regional.ci.test',gateway_node=name+'-gateway',gateway_ipv4=address,services={'matrix':name+'.matrix.ci.test'})
     own,peer=identity(a,'north','100.64.0.10'),identity(b,'south','100.64.0.11');now=int(time.time())
     offered=agreements.offer(a,own,peer,['matrix'],expected_peer=agreements.fingerprint(peer),now=now-1,expires_at=now+1800)
@@ -173,7 +175,7 @@ def runtime_acceptance(profile,own,document):
     time.sleep(3)
     run('systemctl','start','rdc-regional-guard.service')
     assert curl('rdc-peer','/_matrix/federation/v1/version').stdout=='fixture:/_matrix/federation/v1/version'
-    with store.lock():
+    with store.lock(wait_seconds=10):
         interrupted=store.candidate([document],[],now=int(time.time()));store.begin(interrupted)
     time.sleep(3)
     run('systemctl','start','rdc-regional-guard.service')
@@ -182,7 +184,7 @@ def runtime_acceptance(profile,own,document):
     print('Actual scheduled gateway guard closes on backwards-clock evidence and an abandoned pending intent; explicit recovery restores only current approved peers PASS.',flush=True)
     class FailureAfterRestart(runtime.Runtime):
         def restart(self):super().restart();raise ValueError('Injected interruption after new policy installation')
-    with store.lock():
+    with store.lock(wait_seconds=10):
         candidate=store.candidate([document],[identifier],now=int(time.time()))
         try:gateway_transition.apply(store,FailureAfterRestart(store),candidate)
         except gateway_transition.TransitionError as error:assert error.closed
@@ -196,6 +198,42 @@ def runtime_acceptance(profile,own,document):
     assert operations.change([document])['partners']==0
     assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
     print('Actual gateway installer/frozen runtime: initially closed, approved policy, repeated installation, systemd restart, interrupted revocation, closed restart, explicit resume and replay denial PASS. VPN identity remains a synthetic fixture.',flush=True)
+    recovery_boundary_acceptance(store,document)
+
+
+def recovery_boundary_acceptance(store,document):
+    import gateway_operations as operations
+    import gateway_runtime as runtime
+    import gateway_recovery
+    import gateway_certificates
+    def issued(now):
+        own=store.identity();peer=document['offer']['payload']['recipient']
+        offered=agreements.offer(APPROVAL_KEYS['north'],own,peer,['matrix'],now=now,expires_at=now+1800,expected_peer=agreements.fingerprint(peer))
+        return agreements.accept(APPROVAL_KEYS['south'],offered,now=now,expected_peer=agreements.fingerprint(own))
+    old=issued(int(time.time())-2)
+    assert operations.change([old])['partners']==1
+    history=store.state()['revoked_ids']
+    with store.lock(wait_seconds=10):gateway_recovery.suspend(store,'a'*32,now=int(time.time()))
+    run('systemctl','restart',runtime.UNIT)
+    assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
+    try:operations.change([old])
+    except ValueError as error:assert 'recovery' in str(error)
+    else:raise AssertionError('Pre-recovery agreement reopened the gateway')
+    # Certificate maintenance is independent of permission to share.
+    active=store.base/'tls/active'
+    inputs=ROOT/'recovery-maintenance-tls';inputs.mkdir(mode=0o700)
+    for name in ('tls.crt','tls.key'):(inputs/name).write_bytes((active/name).read_bytes());(inputs/name).chmod(0o600)
+    gateway_certificates.replace(inputs/'tls.crt',inputs/'tls.key')
+    assert store.recovery_pending()
+    assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
+    current=issued(int(time.time()))
+    assert operations.change([current])['partners']==1
+    assert not store.recovery_pending() and store.state()['revoked_ids']==history
+    assert curl('rdc-peer','/_matrix/federation/v1/version').stdout=='fixture:/_matrix/federation/v1/version'
+    try:operations.change([old])
+    except ValueError as error:assert 'recovery' in str(error)
+    else:raise AssertionError('Reviewed recovery forgot its historical approval floor')
+    print('Actual gateway recovery boundary: old approvals remain closed across restart and TLS maintenance; fresh bilateral approval reopens, revocations and replay floor remain retained PASS. Encrypted gateway restore is tested separately.',flush=True)
 
 
 def certificate_acceptance(store):

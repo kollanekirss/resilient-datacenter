@@ -37,3 +37,5 @@ A replacement normally retains its signed network/domain identity only when the 
 5. Failed and interrupted operations remain resumable and closed. No missing marker/state may be interpreted as a new empty gateway.
 
 The existing regional protocol acceptance must pass before enabling Nextcloud in the ordinary route catalogue. Gateway lifecycle acceptance is independent of real-world site/NAT/colleague exercises.
+
+Recovery implementation refinement: see `2026-09-25-gateway-recovery-design.md`. Optional issuer credentials are archived in a separate root-only recovery directory outside the proxy mount. Promotion retains the replacement’s verified TLS and active issuer configuration; historical issuer material is available only for an explicit recovery step.

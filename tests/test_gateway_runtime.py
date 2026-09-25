@@ -83,3 +83,12 @@ def test_gateway_cannot_open_while_certificate_activation_is_unverified(tmp_path
     private_write(store.base/'certificate-pending.json',json.dumps({'schema_version':1,'material_digest':'a'*64}).encode())
     with pytest.raises(ValueError,match='certificate'):
         m.Runtime(store).open(store.state())
+
+
+def test_gateway_cannot_open_while_recovery_review_is_pending(tmp_path):
+    from test_gateway_store import fixture
+    from gateway_recovery import suspend
+    m=importlib.import_module('gateway_runtime');store,_=fixture(tmp_path)
+    suspend(store,'a'*32,now=1800000000)
+    with pytest.raises(ValueError,match='recovery'):
+        m.Runtime(store).open(store.state())
