@@ -115,3 +115,10 @@ def test_release_download_requires_exact_identity_and_never_deploys(tmp_path,mon
     assert m.main(['release','fetch','0.2.0-alpha.1','--commit','a'*40,'--output-dir',str(tmp_path/'release')])==0
     assert calls==[('0.2.0-alpha.1','a'*40,tmp_path/'release')]
     assert 'No servers' in capsys.readouterr().out
+
+
+def test_backup_routing_preserves_explicit_actions_without_install_passthrough(monkeypatch,tmp_path):
+    m=api();calls=[]
+    monkeypatch.setattr(m,'backup_action',lambda args:calls.append(args) or {'state':'snapshot-present'})
+    assert m.main(['backup','status'])==0 and calls[0].action=='status'
+    assert m.main(['backup','run','--extra-vars','unsafe'])==2

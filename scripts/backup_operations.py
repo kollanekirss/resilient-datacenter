@@ -1,0 +1,209 @@
+"""Ownership checks and backup/restore preparation. Promotion is a separate guarded operation."""
+import bz2
+from datetime import datetime,timezone
+import hashlib
+import json
+import os
+from pathlib import Path
+import platform
+import secrets
+import re
+import shutil
+import stat
+import subprocess
+import tempfile
+import urllib.request
+from backup_contracts import validate,resources,binary_paths,RESTIC_VERSION,RESTIC_SHA256
+from backup_snapshot import capture,inspect_resources
+from backup_transport import Restic
+from profile_config import _identifier,_safe_values
+from setup_contracts import validate_local_manifest,local_ownership
+from validate_inventory import hostname
+
+BASE=Path('/etc/rdc-backup')
+BINARY=Path('/usr/local/bin/rdc-restic')
+WORK=Path('/var/lib/rdc-backup')
+
+
+def match_owner(profile,owner,*,expected=None):
+    if validate(profile) or not isinstance(owner,dict) or not _safe_values(owner): raise ValueError('Invalid backup ownership')
+    if owner.get('role')!=profile['role'] or owner.get('institution_id')!=profile['institution_id']:
+        raise ValueError('Backup profile does not match this installed institution and role')
+    if owner['role']=='peer':
+        manifest={'kind':'local-node','schema_version':1,'institution_id':owner.get('institution_id'),'node_name':owner.get('node_name'),
+                  'headscale_hostname':owner.get('controller_hostname'),'node_tag':owner.get('node_tag')}
+        if validate_local_manifest(manifest) or local_ownership(manifest)!=owner or owner['node_name']!=profile['node_name']:
+            raise ValueError('Only the current local-node ownership contract is supported')
+    else:
+        fields={'schema_version','deployment_mode','institution_id','role','controller_hostname'}
+        managed=owner.get('schema_version')==3
+        if managed: fields|={'tls_mode','certificate_hostname'}
+        if (set(owner)!=fields or type(owner.get('schema_version')) is not int or owner['schema_version'] not in (2,3) or
+            owner['deployment_mode']!='independent' or not hostname(owner['controller_hostname']) or
+            (managed and (owner['tls_mode']!='managed-acme' or not hostname(owner['certificate_hostname'])))):
+            raise ValueError('Only current independent infrastructure ownership is supported')
+    if expected is not None and owner!=expected: raise ValueError('Installed identity changed since backup configuration')
+
+
+def validate_restore(stage,owner):
+    stage=Path(stage)
+    metadata=stage/'snapshot.json'
+    if metadata.is_symlink() or not metadata.is_file() or metadata.stat().st_size>65536: raise ValueError('Missing or unsafe snapshot metadata')
+    data=json.loads(metadata.read_text());catalogue=resources(owner)
+    if (not isinstance(data,dict) or set(data)!={'schema_version','ownership','paths','captured_at','services_originally_active','binary_sha256'} or
+        type(data['schema_version']) is not int or data['schema_version']!=1 or data['ownership']!=owner or data['paths']!=list(catalogue.paths) or
+        not isinstance(data['services_originally_active'],dict) or set(data['services_originally_active'])!=set(catalogue.services) or
+        any(type(v) is not bool for v in data['services_originally_active'].values())):
+        raise ValueError('Snapshot does not match the expected identity, schema or resource catalogue')
+    if not isinstance(data['binary_sha256'],dict) or set(data['binary_sha256'])!=set(binary_paths(owner)) or any(not isinstance(v,str) or not re.fullmatch('[a-f0-9]{64}',v) for v in data['binary_sha256'].values()):
+        raise ValueError('Snapshot has no supported component identity')
+    if not isinstance(data['captured_at'],str) or datetime.fromisoformat(data['captured_at']).tzinfo is None: raise ValueError('Snapshot timestamp is invalid')
+    if (stage/'data').is_symlink() or set(p.name for p in stage.iterdir())!={'data','snapshot.json'}:
+        raise ValueError('Unexpected snapshot contents')
+    paths=catalogue.paths
+    for path in (stage/'data').rglob('*'):
+        relative=path.relative_to(stage/'data').as_posix()
+        if not any(relative==p or relative.startswith(p+'/') or p.startswith(relative+'/') for p in paths):
+            raise ValueError('Snapshot contains data outside the managed resource catalogue')
+    inspect_resources(stage/'data',paths)
+    if json.loads((stage/'data/etc/server-connectivity-profile.json').read_text())!=owner: raise ValueError('Restored ownership differs from snapshot metadata')
+    return data
+
+
+def status_summary(snapshots,*,now=None):
+    result={'state':'no-backup','restore_test':'not-run','offsite_location':'operator-verification-required'}
+    if not snapshots: return result
+    current=datetime.fromisoformat(now) if now else datetime.now(timezone.utc)
+    dated=[(datetime.fromisoformat(s['time'].replace('Z','+00:00')),s) for s in snapshots]
+    if current.tzinfo is None or any(t.tzinfo is None or t>current for t,_ in dated): raise ValueError('Cannot establish backup age from the supplied timestamps')
+    when,snapshot=max(dated,key=lambda pair:pair[0])
+    return dict(result,state='snapshot-present',snapshot_id=snapshot['id'],captured_at=when.isoformat(),backup_age_seconds=int((current-when).total_seconds()))
+
+
+def root_json(path):
+    info=path.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_mode & 0o022: raise ValueError('Unsafe administration file ownership or permissions')
+    if info.st_size>65536: raise ValueError('Administration file is oversized')
+    return json.loads(path.read_text())
+
+
+def require_platform():
+    if os.geteuid()!=0: raise ValueError('Run this action through sudo on the managed server')
+    if platform.system()!='Linux' or platform.machine()!='x86_64': raise ValueError('Backup administration supports Ubuntu 24.04 amd64 only')
+    os_release=Path('/etc/os-release').read_text()
+    if 'ID=ubuntu' not in os_release or 'VERSION_ID="24.04"' not in os_release or not Path('/run/systemd/system').is_dir():
+        raise ValueError('Backup administration supports Ubuntu 24.04 with systemd only')
+
+
+def private_write(path,content):
+    fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+    with os.fdopen(fd,'w') as stream: stream.write(content)
+
+
+def install_binary(path):
+    url=f'https://github.com/restic/restic/releases/download/v{RESTIC_VERSION}/restic_{RESTIC_VERSION}_linux_amd64.bz2'
+    with urllib.request.urlopen(url,timeout=60) as source: compressed=source.read(64*1024*1024+1)
+    if len(compressed)>64*1024*1024 or hashlib.sha256(compressed).hexdigest()!=RESTIC_SHA256:
+        raise ValueError('Restic artifact failed pinned checksum verification')
+    binary=bz2.decompress(compressed)
+    if len(binary)>256*1024*1024 or binary[:4]!=b'\x7fELF' or binary[18:20]!=b'\x3e\x00': raise ValueError('Unexpected Restic target executable')
+    fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o755)
+    with os.fdopen(fd,'wb') as stream: stream.write(binary)
+    return hashlib.sha256(binary).hexdigest()
+
+
+def configure(profile):
+    require_platform()
+    owner=root_json(Path('/etc/server-connectivity-profile.json'));match_owner(profile,owner)
+    if BASE.exists() or BASE.is_symlink() or BINARY.exists() or BINARY.is_symlink():
+        raise ValueError('Existing backup installation requires review; configuration does not replace identities or secrets')
+    BASE.mkdir(mode=0o700)
+    installed=False
+    try:
+        private_write(BASE/'password',secrets.token_urlsafe(32)+'\n')
+        subprocess.run(['/usr/bin/ssh-keygen','-q','-t','ed25519','-N','','-C','rdc-backup-writer','-f',str(BASE/'ssh_key')],check=True,timeout=30)
+        (BASE/'ssh_key').chmod(0o600)
+        transport=Restic(profile)
+        private_write(BASE/'known_hosts',transport.known_hosts())
+        digest=install_binary(BINARY);installed=True
+        private_write(BASE/'configuration.json',json.dumps({'schema_version':1,'profile':profile,'ownership':owner,'restic_version':RESTIC_VERSION,'binary_sha256':digest},indent=2)+'\n')
+    except BaseException:
+        shutil.rmtree(BASE)
+        if installed: BINARY.unlink()
+        raise
+    print('Backup credentials created on this server. No repository was initialized and no backup was taken.')
+    print('Authorize the public key in /etc/rdc-backup/ssh_key.pub on the backup destination.')
+    print('Keep the repository password in /etc/rdc-backup/password and an emergency access method in an independent recovery store before initialization.')
+
+
+def configured():
+    require_platform()
+    data=root_json(BASE/'configuration.json')
+    if set(data)!={'schema_version','profile','ownership','restic_version','binary_sha256'} or data['schema_version']!=1 or data['restic_version']!=RESTIC_VERSION:
+        raise ValueError('Unknown backup installation contract')
+    owner=root_json(Path('/etc/server-connectivity-profile.json'))
+    match_owner(data['profile'],owner,expected=data['ownership'])
+    with BINARY.open('rb') as stream: actual=hashlib.file_digest(stream,'sha256').hexdigest()
+    if actual!=data['binary_sha256']: raise ValueError('Installed backup tool differs from the verified version')
+    transport=Restic(data['profile']);transport.check_credentials()
+    return data,transport
+
+
+def backup_now():
+    data,transport=configured()
+    WORK.mkdir(mode=0o700,exist_ok=True)
+    if WORK.is_symlink() or WORK.stat().st_uid!=0 or WORK.stat().st_mode & 0o077: raise ValueError('Unsafe local backup workspace')
+    with tempfile.TemporaryDirectory(prefix='snapshot-',dir=WORK) as temporary:
+        stage=Path(temporary)/'snapshot'
+        capture(Path('/'),stage,data['ownership'])
+        identifier=transport.backup(stage)
+    return {'state':'snapshot-created','snapshot_id':identifier,'restore_test':'not-run'}
+
+
+def stage_restore(identifier):
+    from backup_snapshot import component_hashes
+    from backup_transport import SNAPSHOT
+    data,transport=configured()
+    if not isinstance(identifier,str) or not SNAPSHOT.fullmatch(identifier): raise ValueError('Supply a complete snapshot ID')
+    WORK.mkdir(mode=0o700,exist_ok=True)
+    if WORK.is_symlink() or WORK.stat().st_uid!=0 or WORK.stat().st_mode & 0o077: raise ValueError('Unsafe restore workspace')
+    parent=WORK/'restores';parent.mkdir(mode=0o700,exist_ok=True)
+    if parent.is_symlink() or parent.stat().st_uid!=0 or parent.stat().st_mode & 0o077: raise ValueError('Unsafe restore workspace')
+    stage=parent/identifier
+    transport.restore(identifier,stage)
+    try:
+        metadata=validate_restore(stage,data['ownership'])
+        if metadata['binary_sha256']!=component_hashes(Path('/'),data['ownership']):
+            raise ValueError('Installed component bytes differ from the snapshot; restore compatibility has not been established')
+    except BaseException:
+        shutil.rmtree(stage)
+        raise
+    return {'state':'restore-staged','snapshot_id':identifier,'captured_at':metadata['captured_at'],
+            'directory':str(stage),'restore_test':'not-run','promotion':'not-performed'}
+
+
+def action(args):
+    import fcntl
+    import sys
+    from profile_config import load_profile
+    if args.action=='target':
+        from backup_target import prepare,authorize
+        return prepare(load_profile(str(args.manifest))) if args.target_action=='prepare' else authorize(args.public_key)
+    if args.action=='configure':
+        configure(load_profile(str(args.profile)));return {'state':'configured-not-initialized'}
+    data,transport=configured()
+    if args.action=='status': return status_summary(transport.snapshots())
+    fd=os.open(BASE/'operation.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
+    with os.fdopen(fd,'a') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        if args.action=='initialize':
+            if not sys.stdin.isatty(): raise ValueError('Repository initialization requires interactive confirmation of independent recovery access')
+            print('Keep the repository password and emergency storage access independently of this server. Confirm the destination is in a separate failure domain.')
+            if input('Type RECOVERY ACCESS SAVED to initialize the encrypted repository: ').strip()!='RECOVERY ACCESS SAVED':
+                raise ValueError('Initialization cancelled; no completed backup is claimed')
+            transport.initialize();return {'state':'repository-initialized-no-backup'}
+        if args.action=='run':
+            print('Taking a consistent snapshot briefly pauses the owned service. It is restarted before encrypted upload.')
+            return backup_now()
+        if args.action=='restore-stage': return stage_restore(args.snapshot)
+    raise ValueError('Unsupported backup action')

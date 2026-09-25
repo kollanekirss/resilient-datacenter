@@ -56,6 +56,15 @@ def parser():
     doctor=commands.add_parser('doctor',help='Read-only local and controller diagnostics; no sudo prompts')
     doctor.add_argument('manifest',type=Path)
     doctor.add_argument('--report',type=Path)
+    backup=commands.add_parser('backup',help='Encrypted backups and isolated restore staging on the managed Ubuntu server')
+    backup_commands=backup.add_subparsers(dest='action',required=True)
+    backup_commands.add_parser('configure',help='Create local backup credentials; never replace existing keys').add_argument('profile',type=Path)
+    for action in ('initialize','run','status'): backup_commands.add_parser(action)
+    backup_commands.add_parser('restore-stage',help='Decrypt a specific snapshot into private staging; never promote').add_argument('snapshot')
+    target=backup_commands.add_parser('target',help='Prepare dedicated SFTP storage over the private overlay')
+    targets=target.add_subparsers(dest='target_action',required=True)
+    targets.add_parser('prepare').add_argument('manifest',type=Path)
+    targets.add_parser('authorize').add_argument('public_key',type=Path)
     release=commands.add_parser('release',help='Download and verify an experimental release; never install')
     fetch=release.add_subparsers(dest='action',required=True).add_parser('fetch')
     fetch.add_argument('version')
@@ -107,10 +116,22 @@ def doctor_exit(checks):
     return Exit.SUCCESS
 
 
+def backup_action(args):
+    from backup_operations import action
+    return action(args)
+
+
 def dispatch(args) -> ActionResult:
     if args.command=='setup':
         state=run_wizard(args.output_dir,resume=args.resume,input_fn=input)
         return result_for_state(state)
+    if args.command=='backup':
+        try: outcome=backup_action(args)
+        except ValueError as error:
+            print('Backup action blocked: '+str(error))
+            return result_for_state('blocked')
+        print(json.dumps(outcome,indent=2))
+        return result_for_state('blocked' if outcome.get('state')=='no-backup' else 'checks-passed')
     if args.command=='release':
         try: fetch_release(args.version,args.commit,args.output_dir)
         except ValueError as error:
