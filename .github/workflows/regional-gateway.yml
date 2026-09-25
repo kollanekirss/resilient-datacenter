@@ -28,6 +28,8 @@ jobs:
         if: failure()
         run: |
           sudo podman logs --tail 100 rdc-gateway-fixture || true
+          sudo podman logs --tail 100 rdc-regional-gateway || true
+          sudo journalctl -u rdc-regional-gateway --no-pager --lines=100
           sudo nft list table inet rdc_gateway || true
           sudo cat /var/lib/rdc-gateway-ci/rdc-peer.log /var/lib/rdc-gateway-ci/rdc-service.log || true
           sudo journalctl -k --no-pager --lines=100

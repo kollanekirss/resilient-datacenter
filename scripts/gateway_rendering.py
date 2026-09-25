@@ -87,7 +87,7 @@ def firewall(profile,peers,*,lan_interface,now,replace):
         seconds=peer['expires_at']-now
         if seconds>0 and set(peer['services'])&set(SUPPORTED):members.append(str(ipaddress.IPv4Address(peer['address']))+' timeout '+str(seconds)+'s')
     lines=['delete table inet rdc_gateway'] if replace else []
-    lines+=['add table inet rdc_gateway',
+    lines+=['add table inet rdc_gateway { comment "rdc-regional-gateway-v1"; }',
         'add set inet rdc_gateway peers { type ipv4_addr; flags timeout; }']
     if members:lines+=['add element inet rdc_gateway peers { '+', '.join(members)+' }']
     for name,hook in (('input','input'),('output','output'),('forward','forward')):

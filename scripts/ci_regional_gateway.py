@@ -27,10 +27,10 @@ def namespace(name,host,remote,host_address,remote_address):
 
 
 def certificates():
-    run('openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(ROOT/'ca.key'),'-out',str(ROOT/'ca.crt'),'-days','2','-subj','/CN=Disposable Gateway CI CA')
+    run('openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(ROOT/'ca.key'),'-out',str(ROOT/'ca.crt'),'-days','30','-subj','/CN=Disposable Gateway CI CA')
     run('openssl','req','-newkey','rsa:2048','-nodes','-keyout',str(BASE/'tls.key'),'-out',str(ROOT/'leaf.csr'),'-subj','/CN=north.matrix.ci.test')
     (ROOT/'extensions').write_text('subjectAltName=DNS:north.matrix.ci.test,DNS:south.matrix.ci.test\nextendedKeyUsage=serverAuth\n')
-    run('openssl','x509','-req','-in',str(ROOT/'leaf.csr'),'-CA',str(ROOT/'ca.crt'),'-CAkey',str(ROOT/'ca.key'),'-CAcreateserial','-out',str(BASE/'tls.crt'),'-days','2','-extfile',str(ROOT/'extensions'))
+    run('openssl','x509','-req','-in',str(ROOT/'leaf.csr'),'-CA',str(ROOT/'ca.crt'),'-CAkey',str(ROOT/'ca.key'),'-CAcreateserial','-out',str(BASE/'tls.crt'),'-days','30','-extfile',str(ROOT/'extensions'))
     Path('/usr/local/share/ca-certificates/rdc-gateway-ci.crt').write_bytes((ROOT/'ca.crt').read_bytes());run('update-ca-certificates')
     (BASE/'tls.key').chmod(0o600)
 
@@ -45,7 +45,7 @@ def documents():
     profile={'kind':'regional-gateway','schema_version':1,'institution_id':'north','node_name':'north-gateway','regional_controller':'regional.ci.test',
              'lan_address':'10.203.1.1','lan_subnet':'10.203.1.0/24','identity_file':'/root/identity.json','tls_certificate':str(BASE/'tls.crt'),'tls_private_key':str(BASE/'tls.key'),
              'upstreams':{'matrix':'10.203.1.10'}}
-    return profile,own,contracts.peer_rules(own,[accepted],[],now=now)
+    return profile,own,contracts.peer_rules(own,[accepted],[],now=now),accepted
 
 
 def curl(namespace_name,path,*,proxy=False,source=None,host=None,timeout=8,stream=None):
@@ -67,7 +67,7 @@ def main():
     run('ip','netns','exec','rdc-peer','ip','address','add','100.64.0.12/24','dev','peer0')
     namespace('rdc-service','rdc-lan','service0','10.203.1.1/24','10.203.1.10/24')
     run('ip','netns','exec','rdc-service','ip','address','add','10.203.1.11/24','dev','service0')
-    certificates();profile,own,peers=documents()
+    certificates();profile,own,peers,document=documents()
     for name,address,port in [('rdc-peer','100.64.0.11',443),('rdc-service','10.203.1.10',8443)]:
         log=(ROOT/(name+'.log')).open('w')
         PROCESSES.append(subprocess.Popen(['ip','netns','exec',name,sys.executable,str(Path(__file__).with_name('ci_gateway_endpoint.py')),address,str(port),str(BASE/'tls.crt'),str(BASE/'tls.key')],stdout=log,stderr=log))
@@ -111,7 +111,55 @@ def main():
         assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
         assert curl('rdc-service','/',proxy=True,timeout=2).returncode!=0
         print('Actual kernel '+mode+': both existing stream directions stop and new access is denied PASS.',flush=True)
-    print('This run does not establish application federation, real Headscale memberships or installation/recovery readiness.',flush=True)
+    runtime_acceptance(profile,own,document)
+    print('This run does not establish application federation or real Headscale memberships. The network status below is an explicit synthetic fixture.',flush=True)
+
+
+def runtime_acceptance(profile,own,document):
+    # Remove only the fixture resources created above; this is a fresh disposable
+    # runner. Test the actual frozen runtime/installer with declared fake VPN facts.
+    run('podman','stop','rdc-gateway-fixture');run('podman','rm','rdc-gateway-fixture')
+    run('nft','delete','table','inet','rdc_gateway')
+    network={'schema_version':2,'deployment_mode':'join','institution_id':'north','role':'peer',
+             'controller_hostname':'regional.ci.test','node_name':'north-gateway','node_tag':'tag:gateway','install_method':'local'}
+    Path('/etc/server-connectivity-profile.json').write_text(json.dumps(network))
+    status={'BackendState':'Running','Self':{'TailscaleIPs':['100.64.0.10']}}
+    prefs={'ControlURL':'https://regional.ci.test','AdvertiseRoutes':[],'ExitNodeID':''}
+    executable=Path('/usr/local/bin/tailscale')
+    if executable.exists():raise ValueError('Synthetic gateway fixture requires no existing VPN client')
+    executable.write_text('#!/usr/bin/python3\nimport json,sys\nprint(json.dumps('+repr(status)+' if sys.argv[1:]==["status","--json"] else '+repr(prefs)+'))\n');executable.chmod(0o755)
+    Path('/etc/systemd/system/tailscaled.service').write_text('[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/true\n')
+    run('systemctl','daemon-reload');run('systemctl','start','tailscaled')
+    import gateway_operations as operations
+    import gateway_runtime as runtime
+    import gateway_transition
+    from gateway_store import Store
+    assert operations.install(profile,own)['state']=='gateway-listeners-installed'
+    assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
+    assert operations.change([document])['partners']==1
+    assert curl('rdc-peer','/_matrix/federation/v1/version').stdout=='fixture:/_matrix/federation/v1/version'
+    assert curl('rdc-service','/_matrix/federation/v1/version',proxy=True).stdout=='fixture:/_matrix/federation/v1/version'
+    # Native systemd/container restart retains the exact approved installation.
+    run('systemctl','restart',runtime.UNIT)
+    assert curl('rdc-peer','/_matrix/federation/v1/version').stdout=='fixture:/_matrix/federation/v1/version'
+    assert operations.install(profile,own)['partners']==1
+    store=Store(runtime.BASE);identifier=document['offer']['payload']['agreement_id']
+    class FailureAfterRestart(runtime.Runtime):
+        def restart(self):super().restart();raise ValueError('Injected interruption after new policy installation')
+    with store.lock():
+        candidate=store.candidate([document],[identifier],now=int(time.time()))
+        try:gateway_transition.apply(store,FailureAfterRestart(store),candidate)
+        except gateway_transition.TransitionError as error:assert error.closed
+        else:raise AssertionError('Failed policy was reported as activated')
+    assert store.pending()
+    assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
+    # Restarting during the interrupted change must not reopen previous access.
+    run('systemctl','restart',runtime.UNIT)
+    assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
+    assert operations.change(resume=True)['partners']==0 and not store.pending()
+    assert operations.change([document])['partners']==0
+    assert curl('rdc-peer','/_matrix/federation/v1/version',timeout=2).returncode!=0
+    print('Actual gateway installer/frozen runtime: initially closed, approved policy, repeated installation, systemd restart, interrupted revocation, closed restart, explicit resume and replay denial PASS. VPN identity remains a synthetic fixture.',flush=True)
 
 if __name__=='__main__':
     try:main()

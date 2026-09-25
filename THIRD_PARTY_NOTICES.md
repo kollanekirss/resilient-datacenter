@@ -13,3 +13,7 @@ The project's MIT licence covers its own deployment code. It does not relicense 
 Exact image and configuration digests are recorded in `scripts/service_images.json` and `scripts/nextcloud_images.json`. Images also contain dependencies with their own notices. Preserve upstream notices when redistributing or modifying those components and consult their licence terms for applicable source-distribution requirements. Installing this kit does not purchase an upstream support contract or commercial licence.
 
 Networking and backup component provenance is documented in [the provenance guide](docs/provenance.md), [releases](docs/releases.md) and [backup documentation](docs/backups.md). Ubuntu packages retain their package copyright and licence files under `/usr/share/doc` on the installed server.
+
+## Envoy regional gateway
+
+The experimental regional transport uses Envoy 1.39.1 (Apache-2.0), pinned to the Linux amd64 image digest in `scripts/gateway_images.json`. Upstream source and notices: https://github.com/envoyproxy/envoy/tree/v1.39.1. The upstream container also contains separately licensed operating-system dependencies. No Envoy binary is bundled in this source repository.
