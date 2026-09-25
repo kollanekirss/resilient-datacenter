@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from portable_plan import validate,preview,render,load,require,MODULES
 from portable_state import directory,read,write
 from portable_operations import action
+from guest_installation import PHASES
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -20,6 +21,8 @@ def ask(label,default='',*,input_fn=input):
 
 
 def prepare(folder,*,input_fn=input,output_fn=print):
+    require(not folder.exists() or (folder.is_dir() and not folder.is_symlink() and not any(folder.iterdir())),
+            'Choose a new or empty portable workspace; existing unrelated files will not be adopted.')
     plan=json.loads((ROOT/'examples/portable-site.json').read_text())
     plan['site']=ask('Site name',plan['site'],input_fn=input_fn)
     plan['recovery_site']=ask('Independent recovery site',plan['recovery_site'],input_fn=input_fn)
@@ -50,7 +53,7 @@ def instructions(role,output_fn=print):
         output_fn('OPNsense: log into the installation environment as installer (initial password opnsense), select the intended disk and install. Set a private root password. Assign interfaces manually if prompted; do not rely on automatic link detection. Keep all links disconnected. Shut down after installation.')
     else:
         output_fn('Ubuntu: choose Server installation without networking, skip online mirror/update steps, install to the single planned disk and create your own administrator account. Do not reuse default/shared passwords. Shut down after installation. Configure application software in the later service phase.')
-    output_fn('Choose finish only after installation and credential setup. Then choose boot to eject the ISO and start from disk. Check the OS/version and log in through the console; choose confirm-login to record your observation. VM running alone does not prove a successful OS boot.')
+    output_fn('Choose finish only after installation and credential setup. Finish detaches the ISO; then choose boot to start from disk. Check the OS/version and log in through the console; choose confirm-login to record your observation. VM running alone does not prove a successful OS boot.')
 
 
 def wizard(folder,*,input_fn=input,output_fn=print):
@@ -61,7 +64,13 @@ def wizard(folder,*,input_fn=input,output_fn=print):
             progress=[]
             for role in MODULES:
                 journal=folder/'guest-state'/(role+'.json')
-                phase=read(journal).get('phase','unknown') if journal.exists() else 'not-started'
+                phase='not-started'
+                if journal.exists():
+                    try:
+                        saved=read(journal)
+                        phase=saved.get('phase') if type(saved) is dict else None
+                        if phase not in PHASES:phase='invalid-record'
+                    except ValueError:phase='invalid-record'
                 progress.append(role+': '+phase)
             output_fn('Last recorded progress (not a live health check): '+', '.join(progress))
             output_fn('Portable installation: 1 Preview | 2 Host check | 3 Allocate shells | 4 Fetch media | 5 Upload media | 6 Guest installation | 7 Instructions | q Save and exit')
@@ -97,7 +106,12 @@ def wizard(folder,*,input_fn=input,output_fn=print):
                 if ask('Type RUN to perform this operation, or anything else to return','',input_fn=input_fn)!='RUN':continue
             try:
                 result=action(args)
-                output_fn(render(result) if args.portable_action=='preview' else json.dumps(result,indent=2))
+                if args.portable_action=='preview':output_fn(render(result))
+                elif result.get('notice'):output_fn(result['notice'])
+                elif result.get('phase'):output_fn('Guest progress: '+result['phase']+'. Network links remain disconnected; applications are not installed.')
+                elif args.portable_action=='media-fetch':output_fn('Verified '+result['kind']+' '+result['version']+' installation media. Nothing was executed.')
+                elif args.portable_action=='media-upload':output_fn('ISO upload completed with server checksum verification. Select a guest to attach it.')
+                else:output_fn('Step completed. Continue with the next menu operation.')
             except ValueError as error:
                 output_fn('Operation needs attention: '+str(error))
             except OSError:

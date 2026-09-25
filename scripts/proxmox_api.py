@@ -1,5 +1,6 @@
 """Bounded, TLS-verified Proxmox API transport. Never log credentials or responses."""
 import json
+import http.client
 import os
 import re
 import ssl
@@ -56,7 +57,7 @@ class Client:
             record = json.loads(raw)
             require(type(record) is dict and 'data' in record and not record.get('errors'), 'Unexpected Proxmox response.')
             return record['data']
-        except (OSError, ValueError, urllib.error.URLError, RecursionError):
+        except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException, RecursionError):
             # A failed POST may already have reached the server. Never automatically repeat it.
             raise ValueError('Proxmox request failed. Check TLS, permissions and task state before retrying; no automatic retry was made.') from None
 
@@ -90,5 +91,5 @@ class Client:
             require(type(record) is dict and type(record.get('data')) is str and record['data'].startswith('UPID:') and not record.get('errors'),
                     'Upload task could not be identified.')
             return record['data']
-        except (OSError,ValueError,urllib.error.URLError,RecursionError):
+        except (OSError,ValueError,urllib.error.URLError,http.client.HTTPException,RecursionError):
             raise ValueError('Upload outcome is uncertain. Inspect Proxmox tasks; this request will not be automatically repeated.') from None

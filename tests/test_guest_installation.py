@@ -117,3 +117,12 @@ def test_remote_drift_blocks_disk_start(tmp_path):
     api.configs[201]['net0']='virtio,bridge=vmbr0'
     with pytest.raises(ValueError):m.boot(plan(),'edge',media(),api,folder)
     assert not any(c[0]=='POST' for c in api.calls)
+
+
+def test_corrupt_journal_is_rejected_without_mutation(tmp_path):
+    from portable_state import directory,write
+    m=importlib.import_module('guest_installation');api=setup();folder=directory(tmp_path/'state')
+    bind=m.context(plan(),'edge',media())[3]
+    write(folder/'edge.json',{'binding':bind})
+    with pytest.raises(ValueError):m.attach(plan(),'edge',media(),api,folder)
+    assert not any(c[0]=='POST' for c in api.calls)

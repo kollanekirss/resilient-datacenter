@@ -7,6 +7,8 @@ from portable_plan import validate, require, MODULES
 from portable_state import lock, read, write
 from proxmox_provision import payloads, owned, wait_task
 
+PHASES=('new','attach-requested','media-attached','installer-start-requested','finish-requested','disk-ready','disk-start-requested','disk-boot-observed','guest-installed-attested')
+
 
 def context(plan,role,medium):
     plan=validate(plan);require(role in MODULES,'Select a planned guest role.')
@@ -39,7 +41,8 @@ def observed(api,base,wanted,plan,medium,binding,stage):
 def load_state(folder,role,binding):
     path=folder/(role+'.json')
     record=read(path) if path.exists() else {'binding':binding,'phase':'new'}
-    require(type(record) is dict and record.get('binding')==binding,'Guest journal belongs to different media or site plan.')
+    require(type(record) is dict and record.get('binding')==binding and record.get('phase') in PHASES,
+            'Guest journal is invalid or belongs to different media or site plan.')
     return path,record
 
 

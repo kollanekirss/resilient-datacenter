@@ -5,7 +5,7 @@ import re
 import uuid
 from portable_plan import validate,require,name
 from portable_state import lock,read,write,regular
-from guest_media import verify
+from guest_media import verify,catalogue
 from proxmox_provision import wait_task
 
 
@@ -17,7 +17,7 @@ def receipt(plan,kind,folder,api):
     require(kind in ('ubuntu','opnsense'),'Unknown media kind.')
     record=read(Path(folder)/('upload-'+kind+'.json'))
     require(type(record) is dict and record.get('binding')==binding(plan) and record.get('phase')=='uploaded'
-            and record.get('kind')==kind and name(record.get('storage'))
+            and record.get('kind')==kind and record.get('source_sha256')==catalogue()[kind]['sha256'] and name(record.get('storage'))
             and re.fullmatch(r'rdc-[a-f0-9-]+\.iso',str(record.get('filename','')))
             and re.fullmatch('[a-f0-9]{64}',str(record.get('sha256','')))
             and type(record.get('size')) is int and record['size']>0,
@@ -37,7 +37,7 @@ def upload(plan,kind,cache,storage,api,folder):
         path=folder/('upload-'+kind+'.json')
         if path.exists():
             record=read(path)
-            require(record.get('binding')==binding(plan) and record.get('sha256')==medium['sha256'] and record.get('storage')==storage,
+            require(type(record) is dict and record.get('source_sha256')==catalogue()[kind]['sha256'] and record.get('binding')==binding(plan) and record.get('sha256')==medium['sha256'] and record.get('storage')==storage,
                     'Existing upload belongs to different media, storage or plan.')
             require(record.get('phase') in ('upload-requested','uploaded'),'Invalid upload journal.')
             require(record.get('task'),'A previous upload has an uncertain outcome. Inspect Proxmox and abandon that upload record explicitly before starting a new unique upload.')
@@ -48,7 +48,7 @@ def upload(plan,kind,cache,storage,api,folder):
                     'ISO storage is unavailable, lacks ISO support or lacks capacity plus 1 GiB reserve.')
             filename='rdc-'+uuid.uuid4().hex+'.iso'
             record={'binding':binding(plan),'kind':kind,'phase':'upload-requested','storage':storage,
-                    'filename':filename,'sha256':medium['sha256'],'size':medium['size']}
+                    'filename':filename,'sha256':medium['sha256'],'size':medium['size'],'source_sha256':catalogue()[kind]['sha256']}
             write(path,record)
             with regular(cache/medium['filename']) as stream:
                 record['task']=api.upload(node,storage,filename,stream,medium['size'],medium['sha256'])

@@ -274,10 +274,12 @@ def dispatch(args) -> ActionResult:
     if args.command=='start':
         if getattr(args,'platform','ubuntu')=='proxmox':
             from portable_wizard import wizard
+            if args.resume and args.resume.name!='site.json':raise ValueError('Resume using the saved portable site.json file.')
             folder=args.resume.parent if args.resume else args.output_dir
+            if not args.resume and folder==ROOT/'inventories/lab/journey':folder=ROOT/'inventories/lab/portable'
             outcome=wizard(folder)
             print(json.dumps(outcome,indent=2))
-            return result_for_state('cancelled' if outcome['state']=='cancelled' else 'prepared')
+            return result_for_state('cancelled' if outcome['state']=='cancelled' else 'checks-passed')
         from product_journey import wizard
         outcome=wizard(args.output_dir,resume=args.resume,input_fn=input)
         print(json.dumps(outcome,indent=2));return result_for_state(outcome['state'])

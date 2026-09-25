@@ -220,3 +220,11 @@ The test exposed a mismatch between the installed daemon path and backup verific
 Source `e10133b` passed [Matrix run 36165160998](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36165160998) and [Nextcloud run 36165160885](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36165160885). Separate-port routing proofs established that ordinary LAN and spoofed overlay-source packets could reach the host, while private HTTPS rejected both. Intended interface access and restart passed, alongside the full application/browser/TLS/encrypted recovery exercises. Both upgrade paths passed [run 36165161228](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36165161228); actual regional exchange also passed. The small packet fixture names a synthetic interface tailscale0, while separate workflows exercise actual VPN clients.
 
 The runtime creates only its own narrowly scoped nftables table and refuses unexpected existing rules. Backed-up application configuration and other firewall tables are unchanged. Author review checked atomic creation, exact rule validation, frozen dependency closure and recovery compatibility. This is not independent security review.
+
+## Portable Proxmox guest-installation wizard (0.4.0-dev.1)
+
+The development wizard now covers site planning, stopped-shell allocation, repository-pinned OS media preparation, checksum-verified upload, isolated console installation and explicit operator login attestation. The final local suite passed 702 tests, plus all local Ansible syntax/read-only task checks. No guest or server software was executed on the preparation Mac.
+
+Simulated API and filesystem tests cover uncertain mutations, ownership/drift refusal, disconnected NICs, private journals, corrupted or stale media, decompression bounds, multipart upload and wizard resume. Review was performed by the author. It is not independent review or proof of actual Proxmox compatibility.
+
+Live Proxmox upload/configuration/boot and the OPNsense/Ubuntu console installation exercise remain NOT RUN. The guest-installation phase is implemented as a guided workflow, not unattended installation; a running VM is reported separately from operator-confirmed OS/login evidence. Local networking/services and physical crisis acceptance are later gates.
