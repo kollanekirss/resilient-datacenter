@@ -75,8 +75,8 @@ def main(role,phase):
         else:
             code,raw=request(host,path,headers=headers);assert code==200 and raw==proof
         if phase=='create':
-            code,raw=request(host,'/status.php?rdc_ci_ip=1',headers=headers)
-            assert code==200 and json.loads(raw)['client']=='10.76.20.100'
+            code,raw=request(host,'/status.php',headers=headers)
+            assert code==200 and json.loads(raw)['rdc_ci_client']=='10.76.20.100'
     state_path.write_text(json.dumps(state));state_path.chmod(0o600)
 
 

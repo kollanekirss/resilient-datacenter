@@ -121,3 +121,9 @@ def test_frontend_accepts_actual_ubuntu_nft_json_dump(monkeypatch):
     observed=json.loads((ROOT/'tests/fixtures/portable/frontend-nft.json').read_text())
     monkeypatch.setattr(runtime,'nft',lambda *args,**kwargs:{'nftables':observed['nftables']})
     runtime.ingress(observed['configuration'])
+
+
+def test_frontend_render_is_independent_of_json_object_key_order():
+    c=api().configuration(*fixture())
+    reordered=dict(c,services=dict(reversed(list(c['services'].items()))))
+    assert api().nginx(reordered)==api().nginx(c)

@@ -78,7 +78,7 @@ http {
     proxy_set_header Connection "";
 '''
     text+='    proxy_bind '+address+';\n    server {\n        listen '+address+':443 ssl default_server;\n        ssl_reject_handshake on;\n        return 444;\n    }\n'
-    for role,item in c['services'].items():
+    for role,item in sorted(c['services'].items()):
         host=item['hostname']
         text+='    server {\n        listen '+address+':443 ssl;\n        server_name '+host+';\n'
         text+='        if ($ssl_server_name != $host) { return 421; }\n'

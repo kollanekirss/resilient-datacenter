@@ -52,11 +52,13 @@ def certificates(plan,role):
     names=[plan['domains'][role]]+([plan['domains']['element']] if role=='chat' else [])
     for suffix,raw in zip(('crt','key'),pair(names)):
         path=prepared/(role+'.'+suffix);path.write_bytes(raw);path.chmod(0o600)
-    tls=BASE/'tls';tls.mkdir(mode=0o700)
-    for name,hostname in plan['domains'].items():
-        for suffix,raw in zip(('crt','key'),pair([hostname])):
-            path=tls/(name+'.'+suffix);path.write_bytes(raw);path.chmod(0o600)
-    (tls/'backend-ca.crt').write_bytes(ca)
+    tls=BASE/'tls'
+    for folder in (tls,BASE/'renewed-tls'):
+        folder.mkdir(mode=0o700)
+        for name,hostname in plan['domains'].items():
+            for suffix,raw in zip(('crt','key'),pair([hostname])):
+                path=folder/(name+'.'+suffix);path.write_bytes(raw);path.chmod(0o600)
+        (folder/'backend-ca.crt').write_bytes(ca)
     # Prove the production preparer rejects expired TLS before installation.
     from portable_application_install import coverage
     expired=pair([plan['domains'][role]],days=-1)
@@ -91,6 +93,8 @@ def child_frontend():
     installer.frontend_unit=lambda:original()+'\n[Service]\nNetworkNamespacePath=/run/netns/rdc-front\n'
     assert installer.frontend(plan,settings,BASE/'tls')['state']=='local-frontend-tls-verified'
     assert installer.frontend(plan,settings,BASE/'tls')['state']=='local-frontend-tls-verified'
+    for attempt in range(2):
+        assert installer.frontend(plan,settings,BASE/'renewed-tls',renew=True)['state']=='local-frontend-tls-verified'
 
 
 def client(role,phase,namespace='rdc-staff'):
@@ -139,9 +143,13 @@ def main(role):
         import nextcloud_runtime as runtime
         # Test Nextcloud's real request-address interpretation, not an echo proxy.
         status_path=runtime.APP/'status.php';original_status=status_path.read_bytes()
-        status_path.write_bytes(b'<?php if (isset($_GET["rdc_ci_ip"])) { require_once __DIR__."/lib/base.php"; header("Content-Type: application/json"); echo json_encode(["client"=>\\OC::$server->getRequest()->getRemoteAddress()]); exit; } ?>'+original_status)
+        needle=b'echo json_encode($values);'
+        assert original_status.count(needle)==1
+        status_path.write_bytes(original_status.replace(needle,b"$values['rdc_ci_client']=\\OC::$server->getRequest()->getRemoteAddress(); "+needle))
+        runtime.podman('exec',runtime.UNITS['nextcloud'],'php','-l','/var/www/html/status.php')
         # Clear PHP's cached status.php bytecode after the CI-only probe edit.
         run(['systemctl','restart','rdc-nextcloud.target'],timeout=240)
+        run(['systemctl','is-active','rdc-nextcloud.service','rdc-nextcloud-proxy.service'])
     run(['ip','netns','exec','rdc-front',sys.executable,__file__,'frontend'],timeout=360)
     assert not Path('/etc/systemd/system/tailscaled.service').exists()
     assert subprocess.run(['ip','link','show','tailscale0'],capture_output=True).returncode!=0
@@ -157,6 +165,7 @@ def main(role):
     else:
         status_path.write_bytes(original_status)
         run(['systemctl','restart','rdc-nextcloud.target'],timeout=240)
+        run(['systemctl','is-active','rdc-nextcloud.service','rdc-nextcloud-proxy.service'])
     # Replace only the fixture's backend CA, keeping frontend trust unchanged.
     trust=Path('/etc/rdc-frontend/tls/active/backend-ca.crt');saved=trust.read_bytes()
     try:
