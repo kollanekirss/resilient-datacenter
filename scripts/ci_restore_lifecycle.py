@@ -22,17 +22,43 @@ def exercise(role):
     Path('/etc/systemd/system/rdc-certificate-renew.timer').write_text('[Timer]\nOnCalendar=daily\n[Install]\nWantedBy=timers.target\n')
     install_guards(owner)
     subprocess.run(['systemctl','start','rdc-certificate-renew.timer'],check=True)
+    def command(*args): return subprocess.run(list(args),check=True,capture_output=True,text=True)
+    command('ip','netns','add','rdc-recovery-ci')
+    command('ip','link','add','rdc-host','type','veth','peer','name','rdc-guest')
+    command('ip','link','set','rdc-guest','netns','rdc-recovery-ci')
+    command('ip','address','add','10.231.252.1/30','dev','rdc-host')
+    command('ip','link','set','rdc-host','up')
+    command('ip','netns','exec','rdc-recovery-ci','ip','address','add','10.231.252.2/30','dev','rdc-guest')
+    command('ip','netns','exec','rdc-recovery-ci','ip','link','set','rdc-guest','up')
+    def reachable():
+        return subprocess.run(['ip','netns','exec','rdc-recovery-ci','/usr/bin/python3','-c',
+            "import socket; socket.create_connection(('10.231.252.1',443),timeout=1).close()"],capture_output=True).returncode==0
+    assert reachable(), 'Real service ingress must work before testing isolation'
+    class Observed(Runtime):
+        def isolate(self,owner):
+            super().isolate(owner)
+            assert not reachable(), 'Recovery isolation did not block real non-loopback ingress'
     cert=Path('/etc/rdc-tls/active/tls.crt').read_bytes()
+    def users(*args):
+        return subprocess.run(['/usr/bin/headscale','--config','/etc/headscale/config.yaml','users',*args,'--output','json'],check=True,capture_output=True,text=True).stdout
+    if role=='controller': users('create','ci-before')
     marker=state/'recovery-ci-proof';marker.write_text('snapshot contents')
     with tempfile.TemporaryDirectory(prefix='rdc-restore-ci-') as directory:
         stage=Path(directory)/'snapshot';capture(Path('/'),stage,owner)
         marker.write_text('replacement contents')
-        result=apply(stage,owner)
+        if role=='controller':
+            users('create','ci-after')
+            assert 'ci-after' in users('list')
+        result=apply(stage,owner,runtime=Observed(owner))
         assert result['state']=='restored-service-verified'
         assert marker.read_text()=='snapshot contents'
+        if role=='controller':
+            restored=users('list')
+            assert 'ci-before' in restored and 'ci-after' not in restored
         assert Path('/etc/rdc-tls/active/tls.crt').read_bytes()==cert
         assert not Path('/etc/rdc-restore-pending.json').exists()
         assert Runtime(owner).table() is None
+        assert reachable(), 'Ingress must resume only after successful recovery'
         marker.write_text('data before failure')
         class FailOnce(Runtime):
             def __init__(self,owner): super().__init__(owner);self.once=True
@@ -60,4 +86,6 @@ def exercise(role):
         assert marker.read_text()=='data before failure'
         assert Runtime(owner).table() is None
         assert subprocess.run(['systemctl','is-active','rdc-certificate-renew.timer'],capture_output=True).returncode==0
+    command('ip','link','delete','rdc-host')
+    command('ip','netns','delete','rdc-recovery-ci')
     print(role+': actual service backup/promotion, failed-validation rollback and interrupted recovery PASS; old-instance fencing is an operator prerequisite.')

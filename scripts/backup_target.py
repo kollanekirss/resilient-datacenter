@@ -132,9 +132,13 @@ WantedBy=multi-user.target tailscaled.service
 def authorize(key_path):
     require_platform();owner=root_json(Path('/etc/server-connectivity-profile.json'));state=root_json(BASE/'ownership.json')
     if state.get('schema_version')!=1 or state.get('ownership')!=owner: raise ValueError('Backup storage ownership mismatch')
+    import fcntl
     key=public_key(Path(key_path).read_text())
-    existing=BASE/'authorized_keys';info=existing.lstat()
-    if info.st_uid!=0 or info.st_mode & 0o022 or existing.is_symlink(): raise ValueError('Unsafe backup authorization file')
-    if existing.read_text(): raise ValueError('One writer is already authorized; replacement or additional access needs explicit review')
-    new=BASE/'authorized_keys.new';private_write(new,'restrict '+key+'\n');new.chmod(0o644);os.replace(new,existing)
+    fd=os.open(BASE/'authorization.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
+    with os.fdopen(fd,'a') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        existing=BASE/'authorized_keys';info=existing.lstat()
+        if info.st_uid!=0 or info.st_mode & 0o022 or existing.is_symlink(): raise ValueError('Unsafe backup authorization file')
+        if existing.read_text(): raise ValueError('One writer is already authorized; replacement or additional access needs explicit review')
+        new=BASE/'authorized_keys.new';private_write(new,'restrict '+key+'\n');new.chmod(0o644);os.replace(new,existing)
     return {'state':'writer-authorized','scope':'SFTP files in the dedicated encrypted-backup storage only'}

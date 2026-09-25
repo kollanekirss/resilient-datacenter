@@ -168,3 +168,7 @@ class Runtime(Services):
                 cert=certs[0];hostname=cert.stem
             fingerprint=x509.load_pem_x509_certificate(cert.read_bytes()).fingerprint(hashes.SHA256()).hex()
             TLSRuntime().verify(hostname,fingerprint)
+            if owner['role']=='controller':
+                import sqlite3
+                with sqlite3.connect('file:/var/lib/headscale/db.sqlite?mode=ro',uri=True,timeout=5) as db:
+                    if db.execute('PRAGMA quick_check').fetchall()!=[('ok',)]: raise ValueError('Restored controller database integrity check failed')

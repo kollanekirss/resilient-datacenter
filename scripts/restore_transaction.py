@@ -33,6 +33,29 @@ def atomic_json(path,data):
         if os.path.exists(name): os.unlink(name)
 
 
+def sync_directory(path):
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+    try: os.fsync(fd)
+    finally: os.close(fd)
+
+
+def sync_tree(path):
+    entries=[path,*path.rglob('*')]
+    for entry in entries:
+        if entry.is_file() and not entry.is_symlink():
+            fd=os.open(entry,os.O_RDONLY|os.O_NOFOLLOW)
+            try: os.fsync(fd)
+            finally: os.close(fd)
+    for entry in reversed(entries):
+        if entry.is_dir() and not entry.is_symlink(): sync_directory(entry)
+
+
+def durable_rename(source,destination):
+    os.replace(source,destination)
+    sync_directory(source.parent)
+    if destination.parent!=source.parent: sync_directory(destination.parent)
+
+
 def restoration_paths(owner):
     # Keep this replacement's verified certificate/account and current network
     # configuration; recover persistent identities, data and authorization policy.
@@ -135,7 +158,7 @@ def rollback(root,journal,runtime):
         if temporary.is_symlink(): raise ValueError('Unsafe restore workspace')
         old=temporary/'old';target=root/name
         if old.exists():
-            remove(target);os.replace(old,target)
+            remove(target);durable_rename(old,target)
     if component_hashes(root,journal['ownership'])!=journal['binary_sha256']:
         raise ValueError('Components changed during restoration; previous data is retained but service restart is blocked')
     runtime.allow_validation()
@@ -171,12 +194,13 @@ def apply(stage,owner,*,root=Path('/'),runtime=None,permissions=set_permissions)
             copy_resource(stage/'data'/name,temporary/'new')
             retain_current_settings(root,name,temporary/'new',owner)
             permissions(temporary/'new',name,owner)
+            sync_tree(temporary)
         for service in services:
             runtime.stop(service)
             if runtime.is_active(service): raise ValueError('Service did not stop before restoration')
         for index,name in enumerate(journal['paths']):
             temporary=workspace(root,name,journal['id'],index)
-            os.replace(root/name,temporary/'old');os.replace(temporary/'new',root/name)
+            durable_rename(root/name,temporary/'old');durable_rename(temporary/'new',root/name)
         journal['phase']='validating';save(root,journal)
         if component_hashes(root,owner)!=journal['binary_sha256']: raise ValueError('Components changed during restoration')
         runtime.allow_validation()
