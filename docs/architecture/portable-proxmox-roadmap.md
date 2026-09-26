@@ -61,6 +61,13 @@ Exit: disconnected local cold-start chat/files acceptance passes. Existing overl
 
 ## 5. Offline bundle and recovery
 
+The [public role-software bundle](../offline-software-bundle.md) has fresh
+WAN-blocked Ubuntu chat/files bootstrap and native restoration evidence. The
+[private material package](../private-recovery-package.md) is the next increment:
+local encrypted transport with exact-byte staging verification. Neither implements
+complete-site reconstruction or validates real private credentials. See the
+[current pipeline](../delivery-pipeline.md) for the ordered remaining work.
+
 - Build a manifest of every required guest image, package, application image, configuration schema and instruction; verify provenance/checksums and redistribution permissions.
 - Package public software separately from encrypted private site configuration and backups. Keep recovery credentials independently accessible.
 - Add a readiness report covering missing artifacts, backup age, certificate coverage and last successful recovery exercise.

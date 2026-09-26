@@ -305,3 +305,17 @@ chrony, and stages verified archives privately. Independent review found no new
 blocking findings in those fixes. The bundle covers role software only; OS/hypervisor media, institution secrets/configuration, complete
 site reconstruction and physical relocation remain NOT RUN. See
 [operator instructions](offline-software-bundle.md).
+
+## Private recovery material transport
+
+Local verification on 2026-09-26 passes 877 tests, with 23 new private-material
+contract and operation tests. Independent review reproduced and corrected silent
+omission of unreadable directories and plaintext response capture outside private
+work storage. Root-only seal/check/open enforces consistent restoration ownership.
+A follow-up independent review found no remaining blockers in those fixes.
+
+Real offline Restic seal/check/open acceptance is pending. Category presence and
+byte integrity do not establish credential usability, backup freshness,
+certificate coverage or complete-site restoration. See
+[private recovery instructions](private-recovery-package.md) and the
+[current pipeline](delivery-pipeline.md).

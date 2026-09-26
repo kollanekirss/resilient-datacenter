@@ -1,0 +1,41 @@
+name: Disposable private recovery package
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/private_recovery*.py'
+      - 'scripts/ci_private_recovery.py'
+      - 'scripts/backup_operations.py'
+      - 'scripts/backup_contracts.py'
+      - 'tests/test_private_recovery.py'
+      - '.github/workflows/private-recovery.yml'
+permissions:
+  contents: read
+jobs:
+  offline-private-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Prepare disposable Python and pinned public recovery artifact
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+          .venv/bin/python - <<'PY'
+          import sys, urllib.request
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          from backup_contracts import RESTIC_VERSION
+          from backup_operations import restic_bytes
+          artifact=Path('/tmp/rdc-private-restic.bz2')
+          with urllib.request.urlopen(f'https://github.com/restic/restic/releases/download/v{RESTIC_VERSION}/restic_{RESTIC_VERSION}_linux_amd64.bz2',timeout=120) as response:
+              artifact.write_bytes(response.read(64*1024**2+1))
+          restic_bytes(artifact)
+          PY
+      - name: Prove encrypted recovery material round trip without network
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT unshare --net .venv/bin/python scripts/ci_private_recovery.py /tmp/rdc-private-restic.bz2

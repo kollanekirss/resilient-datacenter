@@ -176,3 +176,5 @@ Keep stable domain names, trusted certificates, independent administration acces
 Consult [validation status](docs/validation-status.md) for exact runs and their limits. Historical results do not certify later source changes. The [product design](docs/superpowers/specs/2026-09-25-resilient-services-product-design.md) and [completion ledger](docs/superpowers/plans/2026-09-25-product-completion.md) record the earlier release scope and remaining work. The portable crisis requirements above extend that scope and are not completed by the existing release evidence.
 
 [Contribute](CONTRIBUTING.md), [report a vulnerability privately](SECURITY.md), or consult the [legacy four-VPS pilot](docs/legacy-pilot.md). Project code uses the [MIT license](LICENSE); upstream components retain their own licenses and notices.
+
+The current [delivery pipeline](docs/delivery-pipeline.md) separates implemented components from planned complete-kit acceptance. The [private recovery package](docs/private-recovery-package.md) adds encrypted transport and verified staging of explicitly prepared private material.
