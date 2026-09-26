@@ -1,0 +1,37 @@
+name: Disposable combined disconnected recovery
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/ci_site_*.py'
+      - 'tests/test_combined_recovery.py'
+      - '.github/workflows/combined-recovery.yml'
+permissions:
+  contents: read
+jobs:
+  combined-linux-recovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Prepare disposable acquisition and KVM host
+        run: |
+          test -c /dev/kvm
+          sudo apt-get update -qq
+          sudo apt-get install -y skopeo qemu-system-x86 qemu-utils cloud-image-utils nginx unbound chrony nftables iproute2 iptables
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+      - name: Rebuild disconnected services from carried bundles
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT .venv/bin/python scripts/ci_site_recovery.py
+      - name: Bounded disposable diagnostics
+        if: failure()
+        run: |
+          sudo find /var/lib/rdc-site-recovery-ci -name console.log -exec tail -n 25 {} \;
+          sudo find /var/lib/rdc-site-recovery-ci -name qemu.log -exec tail -n 15 {} \;
+          sudo tail -n 30 /var/lib/rdc-site-recovery-ci/dns.log /var/lib/rdc-site-recovery-ci/time.log || true
+          sudo systemctl status rdc-frontend.service --no-pager || true
