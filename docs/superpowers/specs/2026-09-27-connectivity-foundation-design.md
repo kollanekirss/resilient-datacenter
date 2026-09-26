@@ -4,7 +4,7 @@ Status: proposed architecture for user review; no replacement installer is imple
 
 ## Product goal
 
-An institution starts with a clean, supported Proxmox installation and an administrator's computer. One resumable wizard builds its connectivity foundation in logical stages. At every stage it explains what changed, what was tested, what remains unavailable and the next step. Applications come after connectivity; application deployment, backups and restoration are outside this milestone.
+An institution starts with a clean, supported Proxmox installation and an administrator's computer. A dedicated, resumable connectivity installer builds its network foundation in logical stages. A separate services installer handles applications; these are separate workflows, not consecutive sections of one installer. At every stage it explains what changed, what was tested, what remains unavailable and the next step. Applications come after connectivity; application deployment, backups and restoration are outside this milestone.
 
 The foundation serves two separate purposes:
 
@@ -19,7 +19,7 @@ A single-node demonstration is a valid installation result, but is not a claim o
 
 Build on branch `redesign/connectivity-foundation`, starting from main revision `fbbae78e`. Keep previous branches and evidence intact. Do not delete working modules to make the repository appear new.
 
-The new connectivity journey replaces the product's application-first progression when it is ready. Until then, preserve the old command behavior. Implement the new journey through a clearly named experimental entry point; do not silently reinterpret existing `site.json` or `journey.json` records. A subsequent reviewed release makes the new journey the default.
+The new connectivity journey replaces the product's application-first progression when it is ready. Until then, preserve the old command behavior. Implement the new journey through a clearly named experimental entry point; do not silently reinterpret existing `site.json` or `journey.json` records. A subsequent reviewed release promotes the dedicated connectivity entry point. A generic launcher, if retained, asks the user to choose connectivity or services before starting either workflow.
 
 Reuse code only where it fits this design: bounded TLS-verified Proxmox transport, ownership checks, verified artifacts, private state records, Headscale/DERP deployment, explicit partner approvals, and appropriate tests. Port the confirmed Proxmox feedback fixes from PR #28 when integrating the relevant adapters. The fixed six-VM application layout and mandatory recovery questions must not determine the new plan.
 
@@ -83,6 +83,27 @@ Before a crisis, prepare:
 - Correct time and a measured certificate/key validity window. Display the actual expiry boundary; public certificates cannot promise indefinite disconnected operation.
 
 Record each dependency's role, operator, location, reachability before VPN, and failure effect. Reachability/location declarations are operator input until tested; the wizard must not infer physical independence from different hostnames.
+
+## Separate installers and opening screen
+
+The proposed user-facing entry points are `./rdc connectivity install` and, in a later services milestone, `./rdc services install`. These are design targets, not commands available in the current checkout. Both can share libraries, but must have separate plans, progress records, execution scopes and completion reports.
+
+Starting the connectivity installer first displays a plain-language scope screen, before collecting credentials, downloading artifacts, contacting deployment targets or changing any machine. Read-only local version/platform detection is allowed. The screen explains:
+
+- **Purpose:** prepare this institution's local network, field-user access and separate inter-institution connectivity.
+- **Included:** OPNsense, local DNS/time, selected Headscale/DERP roles, and the partner gateway. Clearly distinguish roles to be created here, deployed elsewhere or connected as existing infrastructure after placement is chosen.
+- **Excluded:** Element/Matrix, Nextcloud, SharePoint, SSO application deployment and backups. They are not installed or selected in this workflow. Existing infrastructure authentication dependencies are still disclosed.
+- **Prerequisites:** a clean supported Proxmox host, independent administrator/console access, suitable networking, prepared domain/certificate arrangements and any selected external servers.
+- **Process:** plan first, review changes, explicitly execute each logical stage, inspect its results, then continue or save and exit.
+- **Current effect:** nothing has been deployed by launching the installer; the first action is creating a plan.
+
+Offer `Start planning`, `Resume connectivity installation`, and `Exit`. Before the first remote change, present the actual selected hosts, VMs, networks, public exposure, certificate dependencies and expected connectivity interruption. An opening acknowledgement is not blanket consent to all subsequent changes.
+
+Each stage displays its name and position, its purpose, the target machine and whether it is preparing, changing or checking that target. On resume show completed work, outstanding work and evidence that requires rechecking before offering the next operation. Do not drop the user into an unexplained list of low-level commands.
+
+When connectivity work ends, produce its report and exit. It may explain that services can be installed separately, but must not launch a services wizard, allocate application VMs, download application packages or ask application setup questions. A successful completed run says the connectivity installation is complete for the tested conditions; a partial run says it was saved or blocked, with remaining steps. Neither says the entire datacenter is finished.
+
+The later services installer reads a versioned connectivity handoff containing site identity, approved network attachment points, naming/time endpoints and per-check verification references. It must check current prerequisites and cannot treat a saved report as live health or authority to change network policy. Any additional exposure or partner access needs an explicit connectivity change with review. Services must not overwrite the connectivity installer's state.
 
 ## Wizard contract
 
@@ -163,7 +184,7 @@ Test and report separately:
 
 Show per-scenario results, measured interruption and remaining limitations. Do not equate simulated fixtures with physical-site acceptance. Do not mark controller-independent access ready when it failed, even if other stages passed.
 
-Only after these checkpoints does the product offer application modules. Application installation is outside this design's first implementation sequence.
+The connectivity installer ends here with its own report and exits. Application modules belong to the separately initiated services installer; they are not a next stage within this wizard.
 
 ## Future static WireGuard option
 
@@ -177,7 +198,7 @@ The future fallback must define separate tunnel address ranges/keys, how routes 
 
 ## Delivery order
 
-1. New private connectivity plan and checkpoint engine, with two distinct network identities, modular placement and dependency reporting. This is preparation only until adapters exist.
+1. Dedicated connectivity entry point, opening scope screen, private plan and checkpoint engine, with two distinct network identities, modular placement and dependency reporting. This is preparation only until adapters exist.
 2. Clean-Proxmox provisioning and the verified local OPNsense/bootstrap network adapter.
 3. Integrated Headscale/DERP placement and enrollment workflows.
 4. OPNsense field-access integration and real-device acceptance.
