@@ -1,5 +1,7 @@
 # Validation status — 2026-09-26
 
+The [current delivery priorities](delivery-pipeline.md) reflect the clarified two-network goal: institutional headquarters/field access plus separate inter-institution service connectivity. Existing recovery tests are supplementary; national/regional isolation and production public-certificate device acceptance remain unproven.
+
 ## Current scope and evidence boundaries
 
 | Capability | Current evidence |

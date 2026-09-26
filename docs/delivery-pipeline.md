@@ -1,42 +1,61 @@
-# Portable crisis kit: delivery pipeline
+# Institutional crisis networks: delivery priorities
 
-Updated 26 September 2026. The objective is an institution-owned kit that keeps
-local crisis tools usable at temporary headquarters without external sign-in,
-package servers, public DNS or a working regional controller. Federation resumes
-only where an approved communication path is available.
+Updated 26 September 2026 from the user's explicit scope clarification. This
+priority order supersedes the earlier recovery-first order and the ordering in
+older component roadmaps. Recovery is useful later work, not the primary product.
 
-| Order | Work | Current state | Acceptance still required |
+## Required operating model
+
+Each institution has two separate network roles:
+
+1. **Institution user access:** its headquarters users and field operators reach
+   its own services through a resilient institutional network. A national/regional
+   loss of outside connectivity must not by itself stop access where domestic or
+   local communication paths still exist. Headquarters LAN-only success is
+   insufficient evidence for this requirement.
+2. **Inter-institution service connectivity:** a separate network carries approved
+   service-to-service exchange, such as police and rescue Matrix homeservers.
+   Each node retains its own service data and operates independently when isolated.
+   Partners communicate when a path exists; no automatic full-database replication
+   or restoration is required for the first milestone. Shared application content
+   can be held by participating services according to their federation semantics.
+
+The current gateway implementation attaches each institution to a regional
+service network; it does not federate Headscale controllers or join field users
+to the partner network. These logical roles do not create physical connectivity
+where every usable carrier/radio/cable path is absent.
+
+The kit and users are prepared **before a crisis**: software, accounts, stable
+service names and publicly trusted certificates. Staff must not need a private
+CA installation, a certificate warning bypass, new public issuance or external
+sign-in during the crisis. Public trust on the supported device fleet and
+remaining certificate validity need actual acceptance, not test-CA evidence.
+
+## Current evidence and next work
+
+| Priority | Work | Current state | Acceptance still required |
 |---|---|---|---|
-| Foundation | Headscale/private relays, restricted regional gateways, Matrix/Element, Nextcloud, consistent encrypted backups | Existing Ubuntu implementation with disposable acceptance; regional application federation already tested | Institution deployment and operational ownership |
-| Portable platform | Site planning, guarded Proxmox API adapter, media wizard, edge instructions, local DNS/time, NGINX and local application access | Implemented development components with separate evidence boundaries | Real combined Proxmox/OPNsense deployment, boot and network enforcement |
-| 1 | Explicit offline application installation and public role-software bundle | Draft PRs #22/#23; fresh disconnected chat/files bootstrap and native restoration passed | Integration review; OS/hypervisor media remain separate |
-| 2 | Encrypted private recovery package | Draft PR #24: local encryption and verified staging; offline synthetic round trip and independent review passed | Integration review and real private-material usability |
-| 3 | Recovery readiness report | Draft PR #25: read-only assessment; 38 tests passed with networking disabled | Missing material, actual backup age, certificate coverage for the planned offline period, usable recovery credentials and last successful exercise |
-| 4 | Complete disconnected site reconstruction | Draft PR #26: [combined Linux rehearsal](combined-recovery.md) passed (440.34-second synthetic recovery); actual OPNsense/Proxmox still unproven | Recover edge, addressing, DNS, time, frontend and application state together from independently held material; fence original identities; measure recovery time/data loss |
-| 5 | Relocation and controlled reconnection | Planned | Keep the internal LAN stable while changing uplink; local use first; portable-profile partner integration, revocation/expiry and partitions; no simultaneous writable clones |
-| 6 | Guided operator release | Partial wizard exists; full handover planned | Clear wiring guide, printable offline runbook, client trust/device preparation and an unfamiliar colleague completing the exercise |
-| 7 | Physical pilot | Waiting for a suitable disposable hardware environment | Cold boot, abrupt power loss, UPS runtime, capacity, actual relocation and restoration measurements |
+| 1 | Resilient institutional access for headquarters and field users | Actual Headscale/Tailscale/DERP, multiple relays and user-to-service operations tested on disposable Ubuntu | National/regional external disconnection with domestic connectivity retained; fresh/restarted sessions, changed uplinks, domestic DNS/bootstrap, authority reachability, relay admission and expiry/revocation behaviour |
+| 2 | Separate inter-institution service network | Independent internal/regional networks and actual approved Matrix/Nextcloud exchange tested; partner denial/revocation tested | Multiple physically independent institutions, partner partitions/reconnection, regional authority/gateway outage and portable-profile integration |
+| 3 | Public certificate preparation and supported-device access | Supplied-certificate and managed issuance/renewal paths exist; lifecycle tests use a private fixture CA | Real public issuance before the exercise; supported devices accept chains without private trust installation; operation with external DNS/CA/identity dependencies unreachable |
+| 4 | Prepared portable headquarters kit | Site planning, Proxmox API adapter/media guidance, local DNS/time/frontend and applications implemented in development | Actual Proxmox/OPNsense boot and enforcement; moving to another uplink while preserving service identity; field and partner access after movement |
+| 5 | Institution-facing operator handover and physical pilot | Partial wizard and instructions exist | Ordinary operator follows prepared instructions; device enrollment in advance; wiring, power, independent carriers and actual field operations |
+| Later | Data backup, restoration and empty-machine reconstruction | Draft PRs #24–#26 include encrypted material, readiness and a passing combined Linux recovery exercise | Deferred behind network continuity; actual OPNsense/Proxmox/physical recovery remains unproven |
 
-The ordering expresses dependencies, not completion dates. Development can continue
-with disposable Linux testing before physical hardware exists. Component success
-must never be presented as a completed institutional deployment.
+Offline software preparation in draft PRs #22/#23 remains relevant to advance
+preparation. Recovery-specific development is deferred, and its existing work is retained. Draft PRs #22–#26 remain unmerged at
+this update. No institutional production deployment is claimed.
 
-## Subsequent or separate work
+## Critical evidence limits
 
-- Optional SSO/local identity integration, preserving a tested local emergency
-  login route. External SSO must not become the sole crisis access method.
-- Authenticated domestic controller/bootstrap-address recovery; more DERP relays
-  alone do not solve controller availability, and Headscale controllers do not
-  federate.
-- Additional institution-approved federated services after their access, backup,
-  restore and partition behaviour are defined. SharePoint is not currently deployed
-  by this kit.
-- Application-specific conflict and partition handling. No automatic promise of
-  uninterrupted service while moving a powered-off kit, synchronous multi-site
-  writes or lossless merging of independently writable replicas.
-- Production hardening and external security review before institutional adoption.
+Multiple DERPs do not remove controller dependence. Existing evidence establishes
+surviving-relay traffic and brief continuation of established sessions during a
+controller outage. It does not establish unrestricted new sessions/admissions or
+cold starts during a national isolation event. The current regional gateway is
+also a single failure point. These are first-stage continuity gaps.
 
-The older September 24 connectivity pilot plan is historical context, not the
-current completion record. Use [validation status](validation-status.md), the
-[portable roadmap](architecture/portable-proxmox-roadmap.md) and individual PR/test
-records to distinguish implementation, acceptance and remaining work.
+The recent [combined recovery rehearsal](combined-recovery.md) is supplementary
+Linux recovery evidence; it is not field-access or regional-isolation acceptance.
+Historical test records remain in [validation status](validation-status.md).
+Do not use a test count or recovery time as a measure of completion of the two
+required networks.
