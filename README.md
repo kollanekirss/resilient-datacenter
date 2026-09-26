@@ -1,10 +1,22 @@
 # Resilient Datacenter — toward portable crisis infrastructure
 
-Run your own private network, chat and files, keep an encrypted recovery copy elsewhere, and optionally exchange approved services with other organisations. This project provides a guided command-line installer and checked operating procedures for **fresh Ubuntu 24.04 amd64 machines with systemd**. Use existing VMs, physical machines or VPSs; no custom ISO or Proxmox requirement.
+Build institution-controlled connectivity for field operators and approved exchange between datacenters. The new Proxmox-oriented connectivity installer is separate from applications; its first increment provides planning and checkpoints only. Existing deployment tools for **fresh Ubuntu 24.04 amd64 machines with systemd**, applications and recovery remain available as separate workflows.
 
 **Experimental, not a supported production release.** Real applications, separate networks, federation, encrypted recovery and selected upgrades have disposable Ubuntu acceptance evidence. Fresh Ubuntu guest installation and recovery behind simulated home NAT also pass; [see the measured boundaries](docs/home-nat-recovery.md). Physical sites, public certificate-provider issuance and an unfamiliar colleague's complete installation/recovery exercise still need acceptance. There is no automatic failover or promise of uninterrupted relocation.
 
-Current development iteration: [0.4.0-dev.3 — portable local applications](docs/release-notes/0.4.0-dev.3.md).
+Previous application iteration: [0.4.0-dev.3 — portable local applications](docs/release-notes/0.4.0-dev.3.md).
+
+## New direction: connectivity first, services separately
+
+The rebuild starts with a dedicated connectivity workflow, separate from the existing service/recovery tools:
+
+```sh
+./rdc connectivity install --output-dir /absolute/private/path/my-connectivity
+```
+
+**This first increment explains scope, collects topology choices and saves/resumes a private plan. It does not yet deploy or contact servers.** Its opening screen says exactly what is available. The target is a clean-Proxmox workflow for OPNsense field access, modular Headscale/DERP placement and a separate partner network, with a verified checkpoint after each stage. Applications and backups are outside that installer.
+
+See [what works now and how to resume](docs/connectivity-installation.md) and the [rebuild design](docs/superpowers/specs/2026-09-27-connectivity-foundation-design.md). The older deployment paths described below remain available; they are not automatically invoked by this command and do not consume its new record.
 
 ## The purpose: take essential services with you
 
@@ -73,18 +85,11 @@ Reserve space for backup history and simultaneous original/restored data during 
 6. **Add partners deliberately.** Start with one partner and the [regional gateway procedure](docs/regional-gateway.md). Approve only the required application traffic. Test revocation and a lost regional connection. Keep local administration and accounts independent of the partnership.
 7. **Validate the complete portable kit before relying on it.** Follow the [local application exercise](docs/portable-local-applications.md), then the full disconnected exercise below with disposable data and a colleague following the instructions. Offline empty-host recovery and portable partner reconnection remain separate development stages.
 
-## Next milestone: prove a portable crisis box
+## Next milestone: connectivity deployment adapters
 
-The portable application implementation adds the local HTTPS path. The next engineering priorities are **complete offline reconstruction and domestic reconnection**, alongside real Proxmox/OPNsense and physical-kit acceptance. Additional applications should come after this foundation.
+Build the new installer in this order: host inspection and safe provisioning, OPNsense/local DNS and time, coordinator/relay deployment, field-device access, the separate partner gateway, then domestic outage exercises. Each stage must show what was configured, what was tested and what remains unavailable. Static WireGuard alternatives and controller/gateway continuity remain explicit later work. Applications use a separately initiated installer; backups are outside this milestone.
 
-- Validate the implemented LAN HTTPS path on the complete kit with stable names, prepared trust and enforced source restrictions.
-- Validate the implemented local DNS/time module together with client addressing and certificate lifecycle planning. Preserve authoritative local records and recovery instructions independently.
-- Make local application accounts, emergency administration and prepared client trust usable without external identity providers. Define enrollment, expiry and revocation behaviour during a partition.
-- Package verified OS/application dependencies, configuration, certificates, encrypted backups and instructions for recovery without GitHub, container registries or a public certificate issuer. Handle secrets separately from public release artifacts.
-- Define controller recovery and authenticated bootstrap-address updates across independent domestic sites. Do not advertise active-active Headscale or transparent controller federation without a supported, tested design.
-- Specify how each application handles disconnected work and reconnection. Two isolated writable copies of the same service are not a safe default; document authority, conflict handling and recovery ownership.
-
-**Acceptance exercise:** prepare two sites; block external DNS and internet; power off and cold-start the portable kit; log in from prepared local devices; send a new message and upload/download a file; move the kit to a different LAN/uplink; reconnect over a surviving domestic path; exchange an approved message/file with a partner; finally restore a lost box from the offline kit with WAN still blocked. Also test expired credentials/certificates, a lost relay/controller and unavailable backup storage. Record which actions work, which require an operator, interruption length and lost changes. Until that passes, describe the release as an experimental foundation, not a ready crisis-response datacenter.
+Existing component tests are reusable evidence, not proof that the new connectivity installer deploys a complete system. See the [delivery order and acceptance gates](docs/superpowers/specs/2026-09-27-connectivity-foundation-design.md).
 
 ## Choose your use
 
