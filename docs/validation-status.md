@@ -1,6 +1,6 @@
 # Validation status — 2026-09-26
 
-The [current delivery priorities](delivery-pipeline.md) reflect the clarified two-network goal: institutional headquarters/field access plus separate inter-institution service connectivity. Existing recovery tests are supplementary; national/regional isolation and production public-certificate device acceptance remain unproven.
+The [current delivery priorities](delivery-pipeline.md) reflect the clarified two-network goal: institutional headquarters/field access plus separate inter-institution service connectivity. Existing recovery tests are supplementary. Simulated domestic isolation now has the bounded evidence below; real geographic isolation and public-certificate device acceptance remain unproven.
 
 ## Current scope and evidence boundaries
 
@@ -363,3 +363,30 @@ This uses Linux routing and infrastructure namespaces, preinstalled Ubuntu guest
 images, and an independently connected CI controller. OPNsense, Proxmox, DHCP,
 physical movement/power loss, independent UTC accuracy and institution devices
 remain untested. See [full exercise and exclusions](combined-recovery.md).
+
+
+## Institutional field access and service federation under simulated isolation
+
+Implementation `c133333` passed
+[run 36238695962](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36238695962)
+on 26 September 2026. Three isolated authorities, six production private relay
+processes, domestic Unbound DNS and real Matrix operations exercised the two
+network roles. Outside-canary positive/negative checks covered every controller,
+relay, resolver and client. Prepared field clients retained enrolled identities
+and performed fresh local login after daemon restart and underlay-address change.
+Active-relay loss recovered authenticated operations in 8.91 seconds in each institution with
+direct peer paths blocked. Partner partition preserved private local operations;
+reconnection restored new two-way federated messages.
+
+**Open product gap:** established north access survived a short north-controller
+outage, but a restarted north field daemon could not perform the authenticated
+application operation across 80 attempts over 90.44 seconds. South remained usable. Restarting the original controller
+with its existing state returned north access and federation; no backup restore
+was involved. This is not HA, geographic/carrier diversity, real mobile handover
+or public-certificate trust proof. Test TLS was prepared before isolation.
+
+All **932 local tests** and playbook checks passed for this implementation.
+Independent review corrected authenticated outage evidence and full relay
+readiness. Hosted debugging corrected fixture firewall syntax and distinguished
+fresh logins from continuing sessions without relaxing production rate limits.
+See [the exercise and precise limits](national-isolation.md).

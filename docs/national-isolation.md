@@ -58,9 +58,43 @@ This is a synthetic national boundary, not a real route to Estonia's Internet.
 
 ## Evidence and remaining gates
 
-Hosted result: **pending**. Local contract tests verify underlay deny rules,
-endpoint validation, identity-preserving restart arguments and honest evidence
-requirements. Only a passing hosted run proves the combined runtime checks.
+Hosted result: **PASS**, implementation head `c133333`,
+[run 36238695962](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36238695962),
+26 September 2026. All required combined phases passed. All **932 local tests**
+and playbook checks passed on GitHub for that implementation revision. Existing
+regional-network, gateway and infrastructure checks also passed; unrelated longer
+application regressions were still running when this evidence was recorded.
+
+| Observed case | Result |
+|---|---|
+| Simulated outside-region cut across all participants | Outside canary blocked; domestic field login/chat and approved federation worked |
+| Prepared field client restart in each institution | Same enrolled identity; fresh local login and message write/read worked |
+| Simulated field address change in each institution | Fresh login and useful chat worked |
+| Active relay loss, direct peer path blocked | Useful authenticated operations through the survivor; 8.91 seconds in each institution |
+| Partner path blocked | Both institutions retained authenticated private chat |
+| Partner path reconnected | New messages exchanged in both directions |
+| North authority stopped, established field session | Authenticated chat write/read remained available in the short observation |
+| North authority stopped, field daemon restarted | **Unavailable** in the bounded observation |
+| North authority stopped, south institution | Authenticated private chat remained available |
+| Same north authority restarted with its existing state | Fresh north login/chat and two-way federation returned |
+
+The restarted-client observation made **80 attempts over 90.44 seconds** with
+the field daemon confirmed alive. No attempt completed the authenticated user
+operation until the authority was restarted. This is still a bounded observation,
+not a measurement of an unlimited outage. Relay
+timings include the successful user operations and are observations, not SLAs.
+The controller-loss limitation is an open product gap. A passing lab run does not
+mean the complete institutional resilience requirement is met.
+
+The first run found a fixture firewall syntax error; native nftables check mode
+now validates generated isolation rules before setup. The second run hit the
+application's login rate limit from excessive repeated test logins. Existing
+sessions are now retained for relay/partner outages; fresh login remains required
+for baseline, outside cut, field restart, address change and authority return.
+Production rate limits were not relaxed. Independent review verified the evidence
+boundaries and the fixes. Local contract tests cover endpoint rejection,
+identity-preserving restart arguments, authenticated observations and mandatory
+phase completion. A documentation-only follow-up records these results.
 
 Still required: real public certificate issuance and preparation, supported
 phone/laptop trust checks without private CA installation, independent domestic
@@ -72,3 +106,16 @@ cannot establish indefinite operation through certificate or node-key expiry.
 The test result records observed controller-loss behaviour separately from the
 required domestic-connectivity phases. Recovery time from earlier restoration
 exercises is not used as evidence for this milestone.
+
+
+## Next continuity milestone
+
+Prioritize making the institutional authority reachable through a domestic
+failure before expanding restoration work. Define and test continuity of the
+same authority identity, stable DNS/TLS endpoint, node keys and policy during
+loss of its active location. Keep relay admission checks enforced. A second
+independent Headscale installation is not automatically a replacement authority.
+The acceptance must repeat prepared-client restart and endpoint change while the
+original authority is unavailable, including denial/revocation and expiry cases.
+Domestic DNS redundancy and service-network gateway redundancy remain separate
+gates. No implementation of controller failover is claimed here.
