@@ -16,7 +16,7 @@ def main():
         if any(Path(name).exists() for name in ('/etc/rdc-restore-pending.json','/etc/rdc-upgrade-pending.json')):raise ValueError('Maintenance pending')
         settings=read_settings();record=inspect_container('nextcloud',settings)
         if record is None or not record.get('State',{}).get('Running'):raise ValueError('File service unavailable')
-        result=subprocess.run(['/usr/bin/podman','exec','--user','33:33',UNITS['nextcloud'],'php','-f','/var/www/html/cron.php'],capture_output=True,timeout=240)
+        result=subprocess.run(['/usr/bin/podman','--remote=false','exec','--user','33:33',UNITS['nextcloud'],'php','-f','/var/www/html/cron.php'],capture_output=True,timeout=240)
         if result.returncode:raise ValueError('Application background job failed')
     return 0
 

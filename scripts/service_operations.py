@@ -102,15 +102,16 @@ def preflight(profile):
     return {'ownership':owner,'address':address,'existing':False}
 
 
-def pull_images(pins=None):
+def pull_images(pins=None,*,offline=False):
     pins=image_pins() if pins is None else pins
     with tempfile.TemporaryDirectory(prefix='rdc-image-auth-') as directory:
         auth=Path(directory)/'auth.json';auth.write_text('{"auths":{}}');auth.chmod(0o600)
         for item in pins.values():
-            cached=subprocess.run(['/usr/bin/podman','image','exists',item['image']],capture_output=True,timeout=15)
+            cached=subprocess.run(['/usr/bin/podman','--remote=false','image','exists',item['image']],capture_output=True,timeout=15)
             if cached.returncode==0: continue
             if cached.returncode!=1: raise ValueError('Cannot inspect local service image cache')
-            subprocess.run(['/usr/bin/podman','pull','--authfile',str(auth),'--arch','amd64','--os','linux',item['image']],
+            if offline:raise ValueError('Offline software is missing a pinned image; no download was attempted')
+            subprocess.run(['/usr/bin/podman','--remote=false','pull','--authfile',str(auth),'--arch','amd64','--os','linux',item['image']],
                            check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=600)
     return pins
 
@@ -136,18 +137,23 @@ def write(path,content,*,mode=0o600,uid=0,gid=0):
     os.chown(path,uid,gid);path.chmod(mode)
 
 
-def install_or_resume(profile,network,address):
+def install_or_resume(profile,network,address,*,offline=False):
     # The public apply path runs preflight first. Disposable CI may call this
     # lower-level helper with its synthetic owned node and local test network.
-    require_platform();owner=ownership(profile,network);cert,key=tls_inputs(profile)
+    require_platform()
+    if offline:
+        from offline_applications import require
+        require('chat')
+    owner=ownership(profile,network);cert,key=tls_inputs(profile)
     marker=runtime.BASE/'ownership.json'
     if marker.exists() or marker.is_symlink():
         if not same_installation(profile,network,root_json(marker)):raise ValueError('Cannot resume another application identity')
     elif any(p.exists() or p.is_symlink() for p in reserved_paths()):raise ValueError('Application target must be fresh or owned by this exact installation')
     if any(not Path(path).exists() for path in ('/usr/bin/podman','/usr/bin/runc','/usr/sbin/nft')):
+        if offline:raise ValueError('Offline software changed: required local packages are missing')
         subprocess.run(['/usr/bin/apt-get','update','-qq'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=300)
         subprocess.run(['/usr/bin/apt-get','install','-y','podman','runc','nftables'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=600)
-    pins=pull_images()
+    pins=pull_images(offline=True) if offline else pull_images()
     settings={'schema_version':1,'ownership':owner,'bind_address':address,'components':pins}
     for name in pins:runtime.verify_image(name,settings)
     directory(runtime.BASE)

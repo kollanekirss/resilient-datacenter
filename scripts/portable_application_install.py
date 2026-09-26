@@ -158,9 +158,12 @@ def frontend(plan,settings,tls_dir,*,renew=False):
     return {'state':'local-frontend-tls-verified','login_test':'not-run','offline_recovery':'not-run'}
 
 
-def backend(plan,role):
+def backend(plan,role,*,offline=False):
     require_platform()
     if role not in ('chat','files'):raise ValueError('Choose chat or files')
+    if offline:
+        from offline_applications import require
+        require(role)
     profile=profiles(plan)[role];network=portable_owner(profile)
     verify_local_address(network)
     cert=material(profile['tls_certificate']);key=material(profile['tls_private_key'],private=True)
@@ -185,5 +188,6 @@ def backend(plan,role):
             if root_json(marker)!=network:raise ValueError('This VM has another network identity; no migration was attempted')
         else:write(marker,json.dumps(network,sort_keys=True)+'\n')
         review=ops.preflight(profile)
-        if role=='chat':return ops.install_or_resume(profile,network,review['address'])
-        return ops.install_or_resume(profile,network,review['address'],username,password)
+        options={'offline':True} if offline else {}
+        if role=='chat':return ops.install_or_resume(profile,network,review['address'],**options)
+        return ops.install_or_resume(profile,network,review['address'],username,password,**options)

@@ -42,7 +42,7 @@ def read_settings():
 
 def inspect_container(name,settings):
     if name not in UNITS:raise ValueError('Unknown file-service component')
-    found=subprocess.run(['/usr/bin/podman','container','exists',UNITS[name]],capture_output=True,timeout=15)
+    found=subprocess.run(['/usr/bin/podman','--remote=false','container','exists',UNITS[name]],capture_output=True,timeout=15)
     if found.returncode==1:return None
     if found.returncode!=0:raise ValueError('Cannot inspect file-service container')
     records=json.loads(podman('container','inspect',UNITS[name]))
@@ -52,7 +52,7 @@ def inspect_container(name,settings):
 
 
 def common(settings):
-    return ['/usr/bin/podman','--runtime=/usr/bin/runc','run','--network=host','--pull=never','--read-only',
+    return ['/usr/bin/podman','--remote=false','--runtime=/usr/bin/runc','run','--network=host','--pull=never','--read-only',
             '--cap-drop=ALL','--security-opt=no-new-privileges','--pids-limit=512',
             '--tmpfs','/tmp:rw,nosuid,nodev,size=128m,mode=1777']
 
@@ -119,7 +119,7 @@ def maintenance_command(settings,action):
         code=prefix+'putenv("OC_PASS=".$d["password"]);$argv=["occ","user:add","--password-from-env","--no-interaction",$d["username"]];'
     else:raise ValueError('Unsupported private file-service maintenance operation')
     code+='$_SERVER["argv"]=$argv;require "/var/www/html/occ";'
-    if action=='account':return ['/usr/bin/podman','exec','--interactive','--user','33:33',UNITS['nextcloud'],'php','-r',code]
+    if action=='account':return ['/usr/bin/podman','--remote=false','exec','--interactive','--user','33:33',UNITS['nextcloud'],'php','-r',code]
     return common(settings)+['--rm','--interactive','--user=33:33','--entrypoint=php',
                              '--volume',str(APP)+':/var/www/html:rw','--volume',str(STATE/'files')+':/var/www/data:rw',
                              settings['components']['nextcloud']['image'],'-r',code]
@@ -181,7 +181,7 @@ def main():
         if name=='proxy':
             phase='private-ingress';application_ingress(settings,create=True)
         if existing is not None:
-            if existing.get('State',{}).get('Running'):return subprocess.run(['/usr/bin/podman','attach',UNITS[name]]).returncode
+            if existing.get('State',{}).get('Running'):return subprocess.run(['/usr/bin/podman','--remote=false','attach',UNITS[name]]).returncode
             phase='remove';podman('rm',UNITS[name])
         if name=='nextcloud':
             phase='regional-controls';synchronize_regional(settings)
