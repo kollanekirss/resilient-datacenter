@@ -10,6 +10,8 @@ NAME='connectivity.json'
 def load(path):
     path=Path(path).absolute()
     require(path.name==NAME,'Resume using the saved connectivity.json file.')
+    require(path.parent.exists(),'Connectivity workspace does not exist; nothing was created.')
+    directory(path.parent)
     return validate(read(path))
 
 

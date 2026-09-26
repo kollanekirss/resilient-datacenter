@@ -171,3 +171,21 @@ def test_cli_scope_and_eof_do_not_install_or_create_outputs(tmp_path):
     assert 'Services are installed separately' in result.stdout
     assert 'No servers' in result.stdout
     assert not (tmp_path/'site').exists()
+
+
+@pytest.mark.parametrize('fault',['public-directory','symlink-directory'])
+def test_resume_rejects_unsupported_workspace_before_reading(tmp_path,fault):
+    m=importlib.import_module('connectivity_plan');s=importlib.import_module('connectivity_state')
+    folder=tmp_path/'site';path=s.save(folder,m.record({'institution':'north'}))
+    if fault=='public-directory':folder.chmod(0o777)
+    else:
+        link=tmp_path/'linked';link.symlink_to(folder,target_is_directory=True)
+        path=link/'connectivity.json'
+    with pytest.raises(ValueError):s.load(path)
+
+
+def test_resume_of_missing_workspace_creates_nothing(tmp_path):
+    s=importlib.import_module('connectivity_state')
+    folder=tmp_path/'missing'
+    with pytest.raises(ValueError):s.load(folder/'connectivity.json')
+    assert not folder.exists()
