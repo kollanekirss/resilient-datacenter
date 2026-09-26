@@ -112,13 +112,26 @@ def private_write(path,content):
     with os.fdopen(fd,'w') as stream: stream.write(content)
 
 
-def install_binary(path):
-    url=f'https://github.com/restic/restic/releases/download/v{RESTIC_VERSION}/restic_{RESTIC_VERSION}_linux_amd64.bz2'
-    with urllib.request.urlopen(url,timeout=60) as source: compressed=source.read(64*1024*1024+1)
+def restic_bytes(artifact=None):
+    if artifact is None:
+        url=f'https://github.com/restic/restic/releases/download/v{RESTIC_VERSION}/restic_{RESTIC_VERSION}_linux_amd64.bz2'
+        with urllib.request.urlopen(url,timeout=60) as source:compressed=source.read(64*1024*1024+1)
+    else:
+        path=Path(artifact)
+        if not path.is_absolute():raise ValueError('Use an absolute local Restic artifact path')
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        with os.fdopen(fd,'rb') as source:
+            if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):raise ValueError('Restic artifact must be a regular file')
+            compressed=source.read(64*1024*1024+1)
     if len(compressed)>64*1024*1024 or hashlib.sha256(compressed).hexdigest()!=RESTIC_SHA256:
         raise ValueError('Restic artifact failed pinned checksum verification')
     binary=bz2.decompress(compressed)
     if len(binary)>256*1024*1024 or binary[:4]!=b'\x7fELF' or binary[18:20]!=b'\x3e\x00': raise ValueError('Unexpected Restic target executable')
+    return binary
+
+
+def install_binary(path,*,artifact=None):
+    binary=restic_bytes(artifact)
     fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o755)
     try:
         with os.fdopen(fd,'wb') as stream: stream.write(binary)
@@ -144,12 +157,13 @@ def recovery_material(password_file,ssh_key_file):
     return password,paths[1].read_text(),public+'\n'
 
 
-def configure(profile,*,password_file=None,ssh_key_file=None):
+def configure(profile,*,password_file=None,ssh_key_file=None,restic_artifact=None):
     require_platform()
     owner=root_json(Path('/etc/server-connectivity-profile.json'));match_owner(profile,owner)
     if BASE.exists() or BASE.is_symlink() or BINARY.exists() or BINARY.is_symlink():
         raise ValueError('Existing backup installation requires review; configuration does not replace identities or secrets')
     recovered=recovery_material(password_file,ssh_key_file)
+    if restic_artifact is not None:restic_bytes(restic_artifact)
     BASE.mkdir(mode=0o700)
     installed=False
     try:
@@ -161,7 +175,8 @@ def configure(profile,*,password_file=None,ssh_key_file=None):
             (BASE/'ssh_key').chmod(0o600)
         transport=Restic(profile)
         private_write(BASE/'known_hosts',transport.known_hosts())
-        digest=install_binary(BINARY);installed=True
+        digest=install_binary(BINARY,artifact=restic_artifact) if restic_artifact is not None else install_binary(BINARY)
+        installed=True
         from restore_runtime import install_guards
         install_guards(owner)
         private_write(BASE/'configuration.json',json.dumps({'schema_version':1,'profile':profile,'ownership':owner,'restic_version':RESTIC_VERSION,'binary_sha256':digest},indent=2)+'\n')
@@ -244,7 +259,8 @@ def action(args):
     upgrade=Path('/etc/rdc-upgrade-pending.json')
     if upgrade.exists() or upgrade.is_symlink():raise ValueError('Run upgrade recover before ordinary backup operations')
     if args.action=='configure':
-        return configure(load_profile(str(args.profile)),password_file=args.recovery_password_file,ssh_key_file=args.recovery_ssh_key_file)
+        options={'restic_artifact':args.restic_artifact} if getattr(args,'restic_artifact',None) is not None else {}
+        return configure(load_profile(str(args.profile)),password_file=args.recovery_password_file,ssh_key_file=args.recovery_ssh_key_file,**options)
     data,transport=configured(recovery=True) if args.action=='restore-recover' else configured()
     if args.action=='status' or (args.action=='schedule' and args.schedule_action=='status'):
         from backup_schedule import status as schedule_status

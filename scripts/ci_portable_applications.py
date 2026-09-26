@@ -134,7 +134,8 @@ def main(role):
     from offline_applications import check
     # Acquire the reviewed image set while connected. Installation below must
     # work from that cache with external paths actually blocked, not simulated.
-    pull_images(current('matrix' if role=='chat' else 'nextcloud'))
+    pull_images(current('matrix' if role=='chat' else 'nextcloud'),
+                offline=os.environ.get('RDC_OFFLINE_BUNDLE_ACCEPTANCE')=='1')
     assert check(role)['state']=='application-software-prepared'
     offline()
     if role=='chat':
