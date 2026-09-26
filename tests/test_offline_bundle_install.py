@@ -103,3 +103,18 @@ def test_failed_bootstrap_command_reports_bounded_cause(monkeypatch):
         m.run(['/usr/bin/unshare','--net','--','apt-get'])
     assert 'dependency conflict' in str(error.value)
     assert len(str(error.value))<9000
+
+
+def test_package_plan_allows_only_default_time_service_replacement():
+    m=api()
+    assert m.check_package_plan('Inst chrony (4.5 Ubuntu)\nRemv systemd-timesyncd [255.4]\nConf chrony (4.5 Ubuntu)\n') == {'systemd-timesyncd'}
+    for unsafe in ('Remv ubuntu-server [1]\n', 'Remv openssh-server [1]\n', 'Inst libc6 [2.39] (2.40 Ubuntu)\n', 'Remv\n'):
+        with pytest.raises(ValueError):m.check_package_plan(unsafe)
+
+
+def test_package_command_preserves_installed_dependencies(tmp_path):
+    args=api().package_command(tmp_path,[tmp_path/'one.deb'])
+    assert '--no-upgrade' in args
+    assert '--no-remove' in args
+    args=api().package_command(tmp_path,[tmp_path/'one.deb'],allow_time_replacement=True)
+    assert '--no-upgrade' in args and '--no-remove' not in args

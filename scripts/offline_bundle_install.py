@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import stat
 import subprocess
@@ -89,11 +90,37 @@ def no_autostart(path=Path('/usr/sbin/policy-rc.d')):
         path.unlink()
 
 
-def package_command(folder,debs):
+def package_command(folder,debs,*,allow_time_replacement=False):
     return ['/usr/bin/unshare','--net','--','/usr/bin/apt-get','-o','Dir::Etc::main=-','-o','Dir::Etc::parts=-',
             '-o','Dir::Etc::sourcelist=/dev/null','-o','Dir::Etc::sourceparts=-',
             '-o','Dir::State::lists='+str(folder/'empty-lists'),'-o','APT::Install-Recommends=false',
-            '-o','Dpkg::Options::=--force-confold','--no-download','--no-remove','--yes','install',*map(str,debs)]
+            '-o','Dpkg::Options::=--force-confold','--no-download','--no-upgrade',*([] if allow_time_replacement else ['--no-remove']),
+            '--yes','install',*map(str,debs)]
+
+
+def check_package_plan(output):
+    removed=set()
+    for line in output.splitlines():
+        if line.startswith('Remv'):
+            match=re.fullmatch(r'Remv ([a-z0-9+.-]+)(?::amd64)?(?: .*|)',line)
+            require(match is not None,'Unrecognised package removal plan')
+            removed.add(match[1])
+        elif line.startswith('Inst '):
+            require(re.match(r'Inst [^ ]+ \[',line) is None,'Bootstrap must not upgrade or downgrade installed OS packages')
+    require(removed<={'systemd-timesyncd'},'Package plan would remove unrelated OS components')
+    return removed
+
+
+def install_packages(folder,debs):
+    # Simulate the same local-only transaction before allowing Ubuntu's default
+    # time client to be replaced by the kit's chrony service. No other removal
+    # or installed-package upgrade is accepted on this fresh guest.
+    command=package_command(folder,debs,allow_time_replacement=True)
+    status=Path('/var/lib/dpkg/status').read_bytes()
+    planned=run([*command[:4],'--simulate',*command[4:]])
+    removed=check_package_plan(planned)
+    require(Path('/var/lib/dpkg/status').read_bytes()==status,'Package state changed during bootstrap planning')
+    run(package_command(folder,debs,allow_time_replacement=bool(removed)))
 
 
 def import_images(folder,images):
@@ -172,7 +199,7 @@ def bootstrap(root,trusted):
         from offline_bundle_build import PACKAGES
         require(json.loads((frozen/'provenance/apt/requested.json').read_text())==list(PACKAGES),'Unreviewed package request set')
         (BASE/'empty-lists').mkdir(exist_ok=True)
-        with no_autostart():run(package_command(BASE,sorted((frozen/'packages').glob('*.deb'))))
+        with no_autostart():install_packages(BASE,sorted((frozen/'packages').glob('*.deb')))
         source=INSTALL/'source';venv=source/'.venv'
         run(['/usr/bin/python3','-m','venv',venv])
         run([venv/'bin/python','-m','pip','--isolated','install','--no-index','--only-binary=:all:',

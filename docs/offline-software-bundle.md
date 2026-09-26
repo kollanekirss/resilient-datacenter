@@ -87,7 +87,10 @@ sudo python3 /trusted/rdc/scripts/offline_bundle.py bootstrap /media/crisis-soft
 
 All bytes are verified and copied into protected local staging before installation.
 APT uses only the local packages, with downloads disabled and a separate network
-namespace. Package service autostart is suppressed; a foreign existing autostart
+namespace. Installed OS packages are preserved rather than upgraded. A simulated
+transaction rejects any removal except replacing `systemd-timesyncd` with chrony;
+a base OS whose installed versions cannot satisfy the bundled software must be
+prepared separately. Run no other package operations during bootstrap. Package service autostart is suppressed; a foreign existing autostart
 policy requires review rather than replacement. Python uses only bundled wheels;
 container import uses local storage and preserves exact pinned identities.
 
