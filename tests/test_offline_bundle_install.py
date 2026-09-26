@@ -118,3 +118,13 @@ def test_package_command_preserves_installed_dependencies(tmp_path):
     assert '--no-remove' in args
     args=api().package_command(tmp_path,[tmp_path/'one.deb'],allow_time_replacement=True)
     assert '--no-upgrade' in args and '--no-remove' not in args
+
+
+def test_local_packages_are_staged_in_private_apt_cache(monkeypatch,tmp_path):
+    m=api();source=tmp_path/'source';source.mkdir()
+    package=source/'example_1%3a2_amd64.deb';package.write_bytes(b'verified deb bytes')
+    cache=tmp_path/'cache'
+    m.package_cache(cache,[package])
+    assert (cache/package.name).read_bytes()==package.read_bytes()
+    assert (cache/'partial').is_dir()
+    assert 'Dir::Cache::archives='+str(tmp_path/'apt-archives') in m.package_command(tmp_path,[package])

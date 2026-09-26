@@ -93,7 +93,8 @@ def no_autostart(path=Path('/usr/sbin/policy-rc.d')):
 def package_command(folder,debs,*,allow_time_replacement=False):
     return ['/usr/bin/unshare','--net','--','/usr/bin/apt-get','-o','Dir::Etc::main=-','-o','Dir::Etc::parts=-',
             '-o','Dir::Etc::sourcelist=/dev/null','-o','Dir::Etc::sourceparts=-',
-            '-o','Dir::State::lists='+str(folder/'empty-lists'),'-o','APT::Install-Recommends=false',
+            '-o','Dir::State::lists='+str(folder/'empty-lists'),
+            '-o','Dir::Cache::archives='+str(folder/'apt-archives'),'-o','APT::Install-Recommends=false',
             '-o','Dpkg::Options::=--force-confold','--no-download','--no-upgrade',*([] if allow_time_replacement else ['--no-remove']),
             '--yes','install',*map(str,debs)]
 
@@ -111,10 +112,27 @@ def check_package_plan(output):
     return removed
 
 
+def package_cache(cache,debs):
+    private(cache);(cache/'partial').mkdir(mode=0o700,exist_ok=True)
+    for source in debs:
+        expected=digest(source.parent,source.name)
+        temporary=None
+        try:
+            with tempfile.NamedTemporaryFile(dir=cache,delete=False) as output:
+                temporary=Path(output.name)
+                with open_file(source.parent,source.name) as stream:shutil.copyfileobj(stream,output)
+                output.flush();os.fsync(output.fileno())
+            require(digest(cache,temporary.name)==expected,'Local package changed during cache staging')
+            os.replace(temporary,cache/source.name)
+        finally:
+            if temporary is not None:temporary.unlink(missing_ok=True)
+
+
 def install_packages(folder,debs):
     # Simulate the same local-only transaction before allowing Ubuntu's default
     # time client to be replaced by the kit's chrony service. No other removal
     # or installed-package upgrade is accepted on this fresh guest.
+    package_cache(folder/'apt-archives',debs)
     command=package_command(folder,debs,allow_time_replacement=True)
     status=Path('/var/lib/dpkg/status').read_bytes()
     planned=run([*command[:4],'--simulate',*command[4:]])
