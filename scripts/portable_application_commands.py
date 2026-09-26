@@ -4,6 +4,9 @@ from portable_plan import require,load
 
 def action(args,plan):
     verb=args.portable_action
+    if verb=='applications-check':
+        from offline_applications import check
+        return check(args.role)
     if verb in ('applications-prepare','applications-verify'):
         require(args.settings is not None and args.output_dir is not None,'Supply --settings and --output-dir for the private application kit.')
         from portable_application_bundle import prepare,verify
@@ -19,7 +22,7 @@ def action(args,plan):
         phrase='INSTALL PORTABLE '+args.role+' '+plan['site']
         print('Install '+args.role+' on this VM, with the saved local LAN identity and no Headscale enrollment.')
         if input('Type '+phrase+' to proceed: ').strip()!=phrase:return {'state':'cancelled'}
-        return backend(plan,args.role)
+        return backend(plan,args.role,offline=True) if getattr(args,'offline',False) else backend(plan,args.role)
     require(verb in ('frontend-apply','frontend-renew'),'Unsupported application action.')
     require(args.settings is not None and args.tls_dir is not None,'Supply --settings and --tls-dir on the intended NGINX VM.')
     phrase=('RENEW' if verb=='frontend-renew' else 'INSTALL')+' FRONTEND '+plan['site']

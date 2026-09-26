@@ -129,8 +129,17 @@ def main(role):
     password=secrets.token_urlsafe(24)
     (BASE/'client.json').write_text(json.dumps({'host':plan['domains'][role],'backend':plan['vms'][role]['address'],'password':password}));(BASE/'client.json').chmod(0o600)
     from portable_application_install import backend
+    from service_operations import pull_images
+    from application_catalogue import current
+    from offline_applications import check
+    # Acquire the reviewed image set while connected. Installation below must
+    # work from that cache with external paths actually blocked, not simulated.
+    pull_images(current('matrix' if role=='chat' else 'nextcloud'))
+    assert check(role)['state']=='application-software-prepared'
+    offline()
     if role=='chat':
-        backend(plan,role)
+        try:backend(plan,role,offline=True)
+        finally:subprocess.run(['nft','delete','table','inet','rdc_ci_offline'],check=False)
         import service_runtime as runtime
         from service_accounts import create
         create('cialice',password,admin=True)
@@ -138,8 +147,10 @@ def main(role):
         import builtins,getpass
         saved_input,saved_getpass=builtins.input,getpass.getpass
         builtins.input=lambda *args:'cialice';getpass.getpass=lambda *args:password
-        try:backend(plan,role)
-        finally:builtins.input=saved_input;getpass.getpass=saved_getpass
+        try:backend(plan,role,offline=True)
+        finally:
+            builtins.input=saved_input;getpass.getpass=saved_getpass
+            subprocess.run(['nft','delete','table','inet','rdc_ci_offline'],check=False)
         import nextcloud_runtime as runtime
         # Test Nextcloud's real request-address interpretation, not an echo proxy.
         status_path=runtime.APP/'status.php';original_status=status_path.read_bytes()

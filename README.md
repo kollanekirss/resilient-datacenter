@@ -6,6 +6,11 @@ Run your own private network, chat and files, keep an encrypted recovery copy el
 
 Current development iteration: [0.4.0-dev.3 — portable local applications](docs/release-notes/0.4.0-dev.3.md).
 
+Development follow-up: [offline application checks and installation](docs/offline-applications.md)
+let prepared chat/files guests refuse all package and image downloads during
+installation. Complete offline software packaging and whole-kit reconstruction
+remain unfinished.
+
 ## The purpose: take essential services with you
 
 An institution should be able to operate essential chat, files and recovery tools away from its main datacenter, including at a temporary crisis headquarters. The intended destination is a small, transportable system that works on its own local network, reaches other domestic sites when a route exists, and exchanges approved services with partners when connected. Moving a service box should not require a fixed public IP at its new location.

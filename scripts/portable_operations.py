@@ -6,6 +6,8 @@ from proxmox_api import Client,credentials
 
 def action(args):
     plan=validate(load(args.plan));verb=args.portable_action
+    if getattr(args,'offline',False) and verb!='applications-apply':
+        raise ValueError('--offline is supported only for portable applications-apply; applications-check is always read-only and local.')
     if verb=='preview':return preview(plan)
     if verb.startswith(('applications-','frontend-')):
         from portable_application_commands import action as applications_action

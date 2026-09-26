@@ -159,16 +159,22 @@ def cron_unit():
 def cron_timer():return '[Unit]\nDescription=RDC Nextcloud background-job schedule\n[Timer]\nOnBootSec=5m\nOnUnitActiveSec=5m\n[Install]\nWantedBy=timers.target\n'
 
 
-def install_or_resume(profile,network,address,admin_user,admin_password):
-    require_platform();owner=ownership(profile,network);cert,key=inputs(profile)
+def install_or_resume(profile,network,address,admin_user,admin_password,*,offline=False):
+    require_platform()
+    if offline:
+        from offline_applications import require
+        require('files')
+    owner=ownership(profile,network);cert,key=inputs(profile)
     marker=runtime.BASE/'ownership.json'
     if marker.exists() or marker.is_symlink():
         if root_json(marker)!=owner:raise ValueError('Cannot resume another file-service installation')
     elif any(p.exists() or p.is_symlink() for p in reserved_paths()):raise ValueError('File-service paths must be fresh or exactly owned')
     if any(not Path(path).exists() for path in ('/usr/bin/podman','/usr/bin/runc','/usr/sbin/nft')):
+        if offline:raise ValueError('Offline software changed: required local packages are missing')
         subprocess.run(['/usr/bin/apt-get','update','-qq'],check=True,capture_output=True,timeout=300)
         subprocess.run(['/usr/bin/apt-get','install','-y','podman','runc','nftables'],check=True,capture_output=True,timeout=600)
-    pins=pull_images(image_pins());settings={'schema_version':1,'ownership':owner,'bind_address':address,'components':pins}
+    pins=pull_images(image_pins(),offline=True) if offline else pull_images(image_pins())
+    settings={'schema_version':1,'ownership':owner,'bind_address':address,'components':pins}
     for name in pins:runtime.verify_image(name,settings)
     directory(runtime.BASE);write(marker,json.dumps(owner))
     for path in (runtime.STATE,runtime.INSTALLED,TLSBASE):directory(path)

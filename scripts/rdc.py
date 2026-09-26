@@ -41,9 +41,10 @@ def parser():
     result=Parser(prog='rdc',description=__doc__)
     commands=result.add_subparsers(dest='command',required=True)
     portable=commands.add_parser('portable',help='Preview/check a portable site or explicitly allocate stopped VM shells')
-    portable.add_argument('portable_action',choices=('preview','check','allocate-shells','media-fetch','media-upload','upload-abandon','guest-attach','guest-start','guest-finish','guest-boot','guest-status','guest-confirm-login','network-prepare','network-verify','network-check','applications-prepare','applications-verify','applications-apply','frontend-apply','frontend-renew'))
+    portable.add_argument('portable_action',choices=('preview','check','allocate-shells','media-fetch','media-upload','upload-abandon','guest-attach','guest-start','guest-finish','guest-boot','guest-status','guest-confirm-login','network-prepare','network-verify','network-check','applications-check','applications-prepare','applications-verify','applications-apply','frontend-apply','frontend-renew'))
     portable.add_argument('plan',type=Path)
     portable.add_argument('--json',action='store_true')
+    portable.add_argument('--offline',action='store_true',help='Require prepared local software; never download during application installation')
     portable.add_argument('--settings',type=Path)
     portable.add_argument('--tls-dir',type=Path)
     portable.add_argument('--output-dir',type=Path)
@@ -260,7 +261,7 @@ def dispatch(args) -> ActionResult:
         except ValueError as error:
             print('Portable operation needs attention: '+str(error));return result_for_state('blocked')
         print(json.dumps(outcome,indent=2) if args.json or args.portable_action!='preview' else render(outcome))
-        return result_for_state('blocked' if outcome.get('state')=='network-check-failed' else 'checks-passed')
+        return result_for_state('blocked' if outcome.get('state') in ('network-check-failed','application-software-blocked') else 'checks-passed')
     if args.command=='upgrade':
         from upgrade_runtime import action
         try:outcome=action(args,input_fn=input)
