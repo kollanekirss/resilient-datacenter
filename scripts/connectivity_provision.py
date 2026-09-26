@@ -138,7 +138,8 @@ def validate_journal(plan,config,data):
     require(set(data['vms'])<=ids,'Unexpected VM in provisioning journal.')
     for entry in data['vms'].values():
         require(type(entry) is dict and set(entry)=={'state','upid'} and entry['state'] in ('intent','task','verified'), 'Invalid provisioning task record.')
-        require(entry['upid'] is None if entry['state']!='task' else
+        require(entry['upid'] is None if entry['state']=='intent' else
+                (entry['state']=='verified' and entry['upid'] is None) or
                 type(entry['upid']) is str and 5<len(entry['upid'])<=512 and entry['upid'].startswith('UPID:')
                 and not any(c.isspace() for c in entry['upid']), 'Invalid provisioning task identifier.')
     last=data['last']
@@ -164,7 +165,7 @@ def allocate(plan,config,api,data,persist):
     for wanted in payloads(plan,config):
         key=str(wanted['vmid'])
         if wanted['vmid'] in readiness['existing_vm_ids']:
-            data['vms'][key]={'state':'verified','upid':None};persist(data);continue
+            data['vms'][key]={'state':'verified','upid':data['vms'].get(key,{}).get('upid')};persist(data);continue
         require(key not in data['vms'],'A previous allocation is unresolved or its shell disappeared. Inspect Proxmox tasks and storage; no request was replayed.')
         data['vms'][key]={'state':'intent','upid':None};persist(data)
         upid=api.request('POST',base+'/qemu',wanted)
@@ -173,7 +174,8 @@ def allocate(plan,config,api,data,persist):
         data['vms'][key]={'state':'task','upid':upid};persist(data)
         wait_task(api,a['node'],upid)
         observe(api,base,wanted,a['storage'])
-        data['vms'][key]={'state':'verified','upid':None};persist(data)
+        data['vms'][key]={'state':'verified','upid':upid};persist(data)
     result=check(plan,config,api)
+    require(not result['missing_vm_ids'],'A planned shell is missing at final inspection. Inspect Proxmox resources; allocation is incomplete.')
     result['state']='shells-allocated'
     return result

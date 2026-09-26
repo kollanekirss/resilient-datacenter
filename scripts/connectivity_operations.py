@@ -48,7 +48,7 @@ def run(folder,plan,config,verb,api):
             result=provision.check(plan,config,api) if verb=='check' else provision.allocate(plan,config,api,data,persist)
             if verb=='check':
                 for vmid in result['existing_vm_ids']:
-                    data['vms'][str(vmid)]={'state':'verified','upid':None}
+                    data['vms'][str(vmid)]={'state':'verified','upid':data['vms'].get(str(vmid),{}).get('upid')}
         except (ValueError,OSError):
             data['last']={'operation':verb,'outcome':'failed','at':datetime.now(timezone.utc).isoformat()}
             persist(data)

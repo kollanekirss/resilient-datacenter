@@ -252,3 +252,25 @@ def test_missing_or_symlinked_journal_cannot_reset_allocation_history(tmp_path,f
     api.configs={};api.calls=[]
     with pytest.raises(ValueError):ops.run(folder,p,c,'allocate',api)
     assert api.calls==[]
+
+
+def test_allocation_cannot_succeed_when_final_inspection_loses_a_shell():
+    m,p,c=setup();api=API();request=api.request;reads=0
+    def disappearing(method,path,data=None):
+        nonlocal reads
+        if path=='/cluster/resources?type=vm':
+            reads+=1
+            if reads==2:api.configs.pop(300)
+        return request(method,path,data)
+    api.request=disappearing
+    with pytest.raises(ValueError,match='missing'):
+        m.allocate(p,c,api,m.journal(p,c),lambda _:None)
+
+
+def test_completed_task_ids_survive_allocate_resume_and_read_only_check(tmp_path):
+    m,p,c=setup();api=API();state=importlib.import_module('connectivity_state')
+    ops=importlib.import_module('connectivity_operations');folder=tmp_path/'site';state.save(folder,p)
+    for verb in ('allocate','allocate','check'):
+        ops.run(folder,p,c,verb,api)
+        data=json.loads((folder/'provisioning/journal.json').read_text())
+        assert all(entry=={'state':'verified','upid':'UPID:pve:example'} for entry in data['vms'].values())
