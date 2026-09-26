@@ -1,6 +1,6 @@
 # Resilient Datacenter — toward portable crisis infrastructure
 
-Build institution-controlled connectivity for field operators and approved exchange between datacenters. The new Proxmox-oriented connectivity installer is separate from applications; its current increment provides planning, host inspection and stopped VM shell allocation. Existing deployment tools for **fresh Ubuntu 24.04 amd64 machines with systemd**, applications and recovery remain available as separate workflows.
+Build institution-controlled connectivity for field operators and approved exchange between datacenters. The new Proxmox-oriented connectivity installer is separate from applications; its current increment provides planning, host inspection, stopped VM shell allocation and guided isolated OPNsense installation. Existing deployment tools for **fresh Ubuntu 24.04 amd64 machines with systemd**, applications and recovery remain available as separate workflows.
 
 **Experimental, not a supported production release.** Real applications, separate networks, federation, encrypted recovery and selected upgrades have disposable Ubuntu acceptance evidence. Fresh Ubuntu guest installation and recovery behind simulated home NAT also pass; [see the measured boundaries](docs/home-nat-recovery.md). Physical sites, public certificate-provider issuance and an unfamiliar colleague's complete installation/recovery exercise still need acceptance. There is no automatic failover or promise of uninterrupted relocation.
 
@@ -14,7 +14,7 @@ The rebuild starts with a dedicated connectivity workflow, separate from the exi
 ./rdc connectivity install --output-dir /absolute/private/path/my-connectivity
 ```
 
-**This increment explains scope, saves/resumes a private plan, and offers explicitly confirmed Proxmox host inspection and stopped VM shell allocation. It does not yet install guest operating systems or activate the network.** Its opening screen says exactly what is available. The target is a clean-Proxmox workflow for OPNsense field access, modular Headscale/DERP placement and a separate partner network, with a verified checkpoint after each stage. Applications and backups are outside that installer.
+**This increment explains scope, saves/resumes a private plan, and offers explicitly confirmed Proxmox host inspection and stopped VM shell allocation. It now also guides OPNsense console installation with disconnected interfaces. Linux guest installation and network activation remain outstanding.** Its opening screen says exactly what is available. The target is a clean-Proxmox workflow for OPNsense field access, modular Headscale/DERP placement and a separate partner network, with a verified checkpoint after each stage. Applications and backups are outside that installer.
 
 See [what works now and how to resume](docs/connectivity-installation.md) and the [rebuild design](docs/superpowers/specs/2026-09-27-connectivity-foundation-design.md). The older deployment paths described below remain available; they are not automatically invoked by this command and do not consume its new record.
 

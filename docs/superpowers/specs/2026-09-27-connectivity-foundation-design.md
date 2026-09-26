@@ -1,6 +1,6 @@
 # Connectivity-first resilient datacenter
 
-Status: architecture approved for the connectivity-first rebuild. The implementation provides scope-first planning, private checkpoints, host inspection and stopped connectivity VM shell allocation. Guest installation and network activation remain outstanding. See [current command and limits](../../connectivity-installation.md).
+Status: architecture approved for the connectivity-first rebuild. The implementation provides scope-first planning, private checkpoints, host inspection and stopped connectivity VM shell allocation. Guided isolated OPNsense installation is now implemented; Linux guest installation and network activation remain outstanding. See [current command and limits](../../connectivity-installation.md).
 
 ## Product goal
 

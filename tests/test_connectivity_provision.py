@@ -158,7 +158,7 @@ def test_menu_explicit_allocation_records_checkpoint_without_tokens(tmp_path):
     j=json.loads((tmp_path/'site/provisioning/journal.json').read_text())
     assert j['last']['outcome']=='shells-allocated'
     assert 'SECRET' not in json.dumps(j)+'\n'.join(out)
-    assert any('Guest OS installation' in line for line in out)
+    assert any('Choose opnsense' in line for line in out)
     assert state.load(tmp_path/'site/connectivity.json')==p
 
 

@@ -131,9 +131,10 @@ def journal(plan,config):
 
 def validate_journal(plan,config,data):
     reference=journal(plan,config)
-    require(type(data) is dict and set(data)==set(reference) and data['kind']==reference['kind']
+    require(type(data) is dict and set(reference)<=set(data)<=set(reference)|{'edge_installation'} and data['kind']==reference['kind']
             and type(data['schema_version']) is int and data['schema_version']==1 and data['revision']==reference['revision']
             and type(data['vms']) is dict,'Provisioning journal does not match this plan/settings.')
+    require('edge_installation' not in data or data['edge_installation'] is True,'Invalid guest installation binding.')
     ids={str(vm['id']) for vm in config['vms']}
     require(set(data['vms'])<=ids,'Unexpected VM in provisioning journal.')
     for entry in data['vms'].values():
