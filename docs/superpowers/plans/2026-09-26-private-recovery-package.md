@@ -28,8 +28,9 @@ and require private owned output parents. Distinguish inventory from readiness.
   seal/check/open CLI, verified artifact and atomic output publication.
 - [x] Add disposable real offline Restic acceptance, operator instructions and
   updated delivery pipeline. Test synthetic materials and adverse cases.
-- [ ] Run local checks, independent review and hosted acceptance; publish draft
+- [x] Run local checks, independent review and hosted acceptance; publish draft
   stacked PR with exact evidence and remaining limitations.
 
 Local evidence: 877 tests and all local configuration checks passed. Independent
-review fixes have RED/GREEN regression coverage. Hosted proof pending.
+review fixes have RED/GREEN regression coverage. Hosted offline synthetic proof passed at `4d60624`, run 36232826268.
+Draft PR: https://github.com/kollanekirss/resilient-datacenter/pull/24.

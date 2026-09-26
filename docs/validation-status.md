@@ -314,7 +314,10 @@ omission of unreadable directories and plaintext response capture outside privat
 work storage. Root-only seal/check/open enforces consistent restoration ownership.
 A follow-up independent review found no remaining blockers in those fixes.
 
-Real offline Restic seal/check/open acceptance is pending. Category presence and
+Real offline Restic seal/check/open acceptance passed at `4d60624` in
+[run 36232826268](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36232826268). The entire operation ran without an uplink;
+exact recovered contents passed, while wrong passwords, wrong manifest hashes
+and corrupted encrypted data were rejected without publishing a destination. Category presence and
 byte integrity do not establish credential usability, backup freshness,
 certificate coverage or complete-site restoration. See
 [private recovery instructions](private-recovery-package.md) and the

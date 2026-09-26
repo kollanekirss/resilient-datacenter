@@ -104,3 +104,6 @@ test runs all seal/check/open operations in a network namespace without an uplin
 and exercises wrong passwords, wrong trust hashes and corrupted repository data.
 A successful test proves encrypted material transport and exact recovery only;
 it does not validate actual institutional credentials or complete-site restoration.
+
+The offline synthetic acceptance passed at `4d60624` in
+[run 36232826268](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36232826268). Local verification passed 877 tests.
