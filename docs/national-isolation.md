@@ -43,7 +43,8 @@ This is a synthetic national boundary, not a real route to Estonia's Internet.
 - Repeat after changing its underlay address. This simulates endpoint change,
   not actual cellular/Wi-Fi handover, carrier NAT or a new physical route.
 - Identify and stop the active relay for each institutional field path. Require
-  useful application operations through the surviving relay with no direct path.
+  useful operations through the surviving relay with no direct path, retaining
+  the existing application session rather than repeatedly logging in.
 - Block the partner gateway path while both institutions continue private local
   operations, then reconnect and exchange new federated messages again. Queued
   cross-partition message backfill/conflict behaviour is not covered here.

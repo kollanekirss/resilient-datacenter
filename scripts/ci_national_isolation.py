@@ -45,12 +45,13 @@ def send(app,room,token,label):
     return matrix.api(app['user'],'PUT',app['hostname'],path,{'msgtype':'m.text','body':label},token)['event_id']
 
 
-def field_proof(app,credentials,label):
-    ready(app);token=login(app,credentials)
+def field_proof(app,credentials,label,*,token=None):
+    ready(app);mode='retained session' if token else 'fresh login'
+    if token is None:token=login(app,credentials)
     room=matrix.api(app['user'],'POST',app['hostname'],'/_matrix/client/v3/createRoom',{'preset':'private_chat','creation_content':{'m.federate':False}},token)['room_id']
     event=send(app,room,token,label)
     assert matrix.wait_event(app,room,event,token)['content']['body']==label
-    print('Prepared field login and private Matrix write/read '+app['user']+' '+label+' PASS.',flush=True)
+    print('Prepared field '+mode+' and private Matrix write/read '+app['user']+' '+label+' PASS.',flush=True)
     return token
 
 
@@ -145,7 +146,7 @@ def exercise():
     for name,app in apps.items():
         relay=domestic.peer_relay(app['user'],app['node']);item=domestic.RELAYS[relay]
         item['process'].terminate();item['process'].wait(timeout=15);started=time.monotonic()
-        tokens[name]=field_proof(app,credentials[name],'relay-lost')
+        tokens[name]=field_proof(app,credentials[name],'relay-lost',token=tokens[name])
         survivor=domestic.peer_relay(app['user'],app['node'])
         assert survivor!=relay and domestic.RELAYS[survivor]['process'].poll() is None
         relay_times[name]=round(time.monotonic()-started,2)
@@ -153,7 +154,7 @@ def exercise():
     boundary(apps);federation(apps,tokens,room,'after-relay-loss')
     partition(True)
     assert matrix.request('south-gateway','GET','https://'+apps['north']['hostname']+'/_matrix/federation/v1/version',timeout=3)['status']==0
-    for name,app in apps.items():tokens[name]=field_proof(app,credentials[name],'partner-unreachable')
+    for name,app in apps.items():tokens[name]=field_proof(app,credentials[name],'partner-unreachable',token=tokens[name])
     phases['partner_partition']=True
     partition(False);federation(apps,tokens,room,'partner-returned');boundary(apps);phases['partner_reconnection']=True
     # Availability during authority loss is an observation, not a requirement
@@ -165,7 +166,7 @@ def exercise():
     time.sleep(5)
     observations['north_restarted_client']='available' if authenticated_available(app,tokens['north'],'authority-down-restarted') else 'unavailable'
     # Other institution and service-network authority remain independently live.
-    tokens['south']=field_proof(apps['south'],credentials['south'],'other-authority-down')
+    tokens['south']=field_proof(apps['south'],credentials['south'],'other-authority-down',token=tokens['south'])
     domestic.start_controller(control)
     tokens['north']=field_proof(app,credentials['north'],'authority-returned')
     phases['authority_return']=True

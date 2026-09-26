@@ -58,3 +58,14 @@ def test_partner_cut_accepts_only_overlay_peer_addresses():
     for address in ('1.1.1.1','172.29.10.2','100.64.0.1; accept'):
         with pytest.raises(ValueError):contract().partner_rules(address)
     assert '100.64.0.2' in contract().partner_rules('100.64.0.2')
+
+
+def test_continuing_session_checks_do_not_reauthenticate(monkeypatch):
+    module=importlib.import_module('ci_national_isolation')
+    monkeypatch.setattr(module,'ready',lambda app:None)
+    def unexpected(*args):raise AssertionError('A continuing session must not trigger another login')
+    monkeypatch.setattr(module,'login',unexpected)
+    monkeypatch.setattr(module.matrix,'api',lambda *args:{'room_id':'!room:ci.test'})
+    monkeypatch.setattr(module,'send',lambda *args:'$event')
+    monkeypatch.setattr(module.matrix,'wait_event',lambda *args:{'content':{'body':'relay-loss'}})
+    assert module.field_proof({'user':'north-user','hostname':'matrix.north.ci.test'},{},'relay-loss',token='existing')=='existing'
