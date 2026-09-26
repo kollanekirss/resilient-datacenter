@@ -106,7 +106,7 @@ def validate(data):
 def render(data):
     data=validate(data);a=data['answers']
     lines=['Connectivity plan: '+data['state'],'Institution: '+a.get('institution','unselected')+'; site: '+a.get('site','unselected'),
-           'No servers have been changed by this workflow.','', 'Selected roles (placement is intent, not observed deployment):']
+           'This is planning intent only; it does not describe past or current server state.','', 'Selected roles (placement is intent, not observed deployment):']
     for role in data['roles']:
         lines.append('  '+role['role']+' | '+role['network']+' | '+role['placement']+
                      (' | '+role['endpoint']+' | '+role['location'] if 'endpoint' in role else ''))
@@ -115,13 +115,13 @@ def render(data):
             'Reserved network: '+a.get('private_network','unselected'),
             'Publicly trusted endpoint certificates must be prepared beforehand; no private CA installation on staff devices.',
             'Keep local accounts/device admission, DNS and time available without foreign services.',
-            '', 'Stage checkpoints:']
+            '', 'Planning snapshot (not runtime evidence; host inspection and shell allocation are separate operations):']
     lines.extend(f"  {i}. {stage['name']}: {stage['state']}" for i,stage in enumerate(data['stages'],1))
-    lines+=['','Built/configured: none. Only local planning state can be saved.',
+    lines+=['','Built/configured: not established by this plan alone. Review the separate operation checkpoints.',
             'Verified: input structure only; no host, network or certificate checks.',
-            'Not yet available: deployment adapters and live acceptance in this new workflow.',
+            'Available next: explicit host inspection and stopped VM shell allocation. Guest OS/network activation remain unavailable.',
             'Next step: finish planning.' if data['state']=='draft' else
-            'Next step: host inspection and edge provisioning adapter (not implemented in this workflow).',
+            'Next step: choose host inspection in the connectivity operation menu.',
             '', 'Limits and dependencies:']
     lines.extend('  - '+item for item in data['limitations'])
     return '\n'.join(lines)

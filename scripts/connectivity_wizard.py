@@ -1,4 +1,4 @@
-"""Scope-first connectivity planning. No deployment adapters are invoked."""
+"""Scope-first planning and explicitly selected Proxmox shell operations."""
 from pathlib import Path
 from connectivity_plan import questions, record, render, valid_field
 from connectivity_state import load, save, NAME
@@ -11,8 +11,8 @@ Services are installed separately. This workflow does not install chat, files, S
 Prerequisites: supported clean Proxmox, independent console/management access, networking,
 prepared domains/public certificates, and any selected external servers.
 Process: plan, review changes, execute a supported stage, verify, then continue or save and exit.
-Current version: planning and private save/resume only. Deployment stages are not implemented.
-No servers will be contacted or changed; no credentials or software downloads are requested.
+Current version: planning, read-only host checks and stopped VM shell allocation. Guest OS installation and network activation are not implemented.
+No servers are contacted or changed by launching this wizard. API credentials are requested only for a selected host operation; no software is downloaded.
 Choose Start planning, Resume connectivity installation, or Exit.'''
 
 
@@ -32,6 +32,9 @@ def wizard(folder,*,resume=None,input_fn=input,output_fn=print):
             path=Path(resume).absolute() if resume else folder/NAME
             original=load(path);folder=path.parent;answers=dict(original['answers'])
             output_fn('Saved planning intent, not a live health check:\n'+render(original))
+            if original['state']=='prepared':
+                from connectivity_operations import menu
+                return menu(folder,original,input_fn=input_fn,output_fn=output_fn)
         output_fn('Placement choices: local = create here, external = deploy on another server, existing = connect to an existing service.')
         output_fn('This is a domestic-site profile. Use :back to correct, :save to save a draft, or :cancel to leave unchanged.')
         fields=questions();index=0
@@ -39,6 +42,9 @@ def wizard(folder,*,resume=None,input_fn=input,output_fn=print):
             data=record(answers);path=save(folder,data,expected=original)
             output_fn('Private connectivity plan saved: '+str(path))
             output_fn(render(data))
+            if data['state']=='prepared':
+                from connectivity_operations import menu
+                return menu(folder,data,input_fn=input_fn,output_fn=output_fn)
             output_fn('Connectivity planning ended. No services installer will be started.')
             return {'state':data['state'],'configuration_file':str(path),'deployment':'not-performed'}
         while index<len(fields):
@@ -67,5 +73,5 @@ def wizard(folder,*,resume=None,input_fn=input,output_fn=print):
             return {'state':'cancelled'}
         return persist()
     except (KeyboardInterrupt,EOFError):
-        output_fn('Stopped. Previously saved planning state is unchanged; no servers were changed.')
+        output_fn('Stopped during planning. Previously saved planning state is unchanged; planning did not change servers.')
         return {'state':'cancelled'}
