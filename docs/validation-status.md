@@ -322,3 +322,19 @@ byte integrity do not establish credential usability, backup freshness,
 certificate coverage or complete-site restoration. See
 [private recovery instructions](private-recovery-package.md) and the
 [current pipeline](delivery-pipeline.md).
+
+## Offline recovery readiness assessment
+
+Local verification on 2026-09-26 passed 915 tests and all local playbook/configuration
+checks. Thirty-eight new tests cover actual certificate chain/key/name/window
+validation, site-bound native backup metadata and age, exercise bindings,
+manifest changes, missing evidence, privacy and read-only behaviour. Independent
+review found unsupported key-algorithm and deeply nested JSON error-handling
+gaps; regression tests reproduce both and now report invalid evidence without
+aborting other checks. Follow-up review found no remaining blockers in the fixes.
+
+A separate Ubuntu workflow runs the assessment suite in a network namespace
+without an uplink; all 38 assessment tests passed at `abba83e` in
+[run 36234059897](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36234059897). This is an evidence report, not a live
+credential, client-login or complete-site recovery exercise. See
+[readiness instructions](recovery-readiness.md).

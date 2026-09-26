@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "max_backup_age_hours": 24,
+  "max_exercise_age_days": 30,
+  "certificates": {
+    "frontend-chat": {
+      "certificate": "tls/frontend-chat.crt",
+      "private_key": "tls/frontend-chat.key",
+      "ca": "trust/frontend-chat.crt"
+    },
+    "frontend-element": {
+      "certificate": "tls/frontend-element.crt",
+      "private_key": "tls/frontend-element.key",
+      "ca": "trust/frontend-element.crt"
+    },
+    "frontend-files": {
+      "certificate": "tls/frontend-files.crt",
+      "private_key": "tls/frontend-files.key",
+      "ca": "trust/frontend-files.crt"
+    },
+    "backend-chat": {
+      "certificate": "tls/backend-chat.crt",
+      "private_key": "tls/backend-chat.key",
+      "ca": "trust/backend-chat.crt"
+    },
+    "backend-files": {
+      "certificate": "tls/backend-files.crt",
+      "private_key": "tls/backend-files.key",
+      "ca": "trust/backend-files.crt"
+    }
+  },
+  "backups": {
+    "chat": {
+      "metadata": "application-backups/chat/snapshot.json",
+      "repository": "application-backups/chat/repository"
+    },
+    "files": {
+      "metadata": "application-backups/files/snapshot.json",
+      "repository": "application-backups/files/repository"
+    }
+  },
+  "access": {
+    "router-export": "edge/router-export.txt",
+    "recovery-credentials": "backup-access/recovery-credentials.txt",
+    "emergency-login": "operator/emergency-login.txt",
+    "recovery-runbook": "operator/recovery-runbook.txt"
+  },
+  "exercises": {
+    "chat": null,
+    "files": null,
+    "site": null
+  }
+}
