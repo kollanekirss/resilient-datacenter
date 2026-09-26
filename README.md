@@ -178,3 +178,5 @@ Consult [validation status](docs/validation-status.md) for exact runs and their 
 [Contribute](CONTRIBUTING.md), [report a vulnerability privately](SECURITY.md), or consult the [legacy four-VPS pilot](docs/legacy-pilot.md). Project code uses the [MIT license](LICENSE); upstream components retain their own licenses and notices.
 
 The current [delivery pipeline](docs/delivery-pipeline.md) separates implemented components from planned complete-kit acceptance. The [private recovery package](docs/private-recovery-package.md) adds encrypted transport and verified staging of explicitly prepared private material.
+
+The [offline recovery readiness report](docs/recovery-readiness.md) checks carried bytes, certificate coverage and saved backup/exercise evidence without treating presence as proof of complete-site readiness.
