@@ -18,9 +18,13 @@ def load(path):
 def save(folder,data,*,expected=None):
     folder=Path(folder).absolute();data=validate(data)
     folder=directory(folder)
-    require(set(p.name for p in folder.iterdir()) <= {NAME,'.lock'},
+    require(set(p.name for p in folder.iterdir()) <= {NAME,'.lock','provisioning'},
             'Choose a dedicated connectivity workspace; unrelated files will not be adopted.')
     with lock(folder):
+        if (folder/'provisioning').exists() or (folder/'provisioning').is_symlink():
+            directory(folder/'provisioning')
+            require(expected is not None and data==expected,
+                    'This plan is bound to provisioning records. Use a separately reviewed migration or a new workspace; existing resources were not changed.')
         path=folder/NAME
         if path.exists() or path.is_symlink():
             current=load(path)

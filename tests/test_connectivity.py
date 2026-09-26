@@ -143,11 +143,11 @@ def test_wizard_saves_draft_resumes_and_stops_at_unavailable_deployment(tmp_path
     assert result['state']=='draft'
     path=folder/'connectivity.json';assert s.load(path)['answers']=={'institution':'north'}
     # Resume revisits saved answers so the operator can review or correct them.
-    reply=iter(['resume']+list(answers().values())+['SAVE']);output=[]
+    reply=iter(['resume']+list(answers().values())+['SAVE','exit']);output=[]
     result=m.wizard(folder,resume=path,input_fn=lambda _:next(reply),output_fn=output.append)
     assert result['state']=='prepared'
     assert s.load(path)['deployment']=='not-performed'
-    assert 'Built/configured: none' in '\n'.join(output)
+    assert 'Built/configured: not established by this plan alone' in '\n'.join(output)
     assert 'Next step:' in '\n'.join(output)
     assert 'unsupported' in '\n'.join(output)
 

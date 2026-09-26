@@ -40,9 +40,9 @@ class Parser(argparse.ArgumentParser):
 def parser():
     result=Parser(prog='rdc',description=__doc__)
     commands=result.add_subparsers(dest='command',required=True)
-    connectivity=commands.add_parser('connectivity',help='Separate connectivity foundation; experimental planning only')
+    connectivity=commands.add_parser('connectivity',help='Separate connectivity foundation: plan, inspect and allocate stopped shells')
     connection_actions=connectivity.add_subparsers(dest='connectivity_action',required=True)
-    connection_install=connection_actions.add_parser('install',help='Explain scope and plan connectivity; deployment not implemented yet')
+    connection_install=connection_actions.add_parser('install',help='Explain scope, plan connectivity and explicitly provision stopped VM shells')
     connection_install.add_argument('--output-dir',type=Path,default=ROOT/'inventories/lab/connectivity')
     connection_install.add_argument('--resume',type=Path)
     portable=commands.add_parser('portable',help='Preview/check a portable site or explicitly allocate stopped VM shells')
