@@ -143,3 +143,75 @@ def test_cli_requires_private_credentials_before_network():
         result=subprocess.run([str(ROOT/'rdc'),'portable',action,str(ROOT/'examples/portable-site.json')],capture_output=True,text=True)
         assert result.returncode != 0
         assert 'token-file' in result.stdout
+
+
+def test_hidden_bridge_explains_visibility_before_host_reconfiguration():
+    m = importlib.import_module('proxmox_provision'); api = Fake()
+    api.bridges = [{'iface':'eth0', 'type':'eth', 'active':1}]
+    with pytest.raises(ValueError) as error:
+        m.allocate(plan(), api)
+    message = str(error.value)
+    assert 'not visible' in message and 'SDN.Use' in message
+    assert '/sdn/zones/localnetwork' in message
+    assert not any(call[0] == 'POST' for call in api.calls)
+
+
+def test_visible_inactive_bridge_is_distinguished_from_missing_permission():
+    m = importlib.import_module('proxmox_provision'); api = Fake()
+    api.bridges[2]['active'] = 0
+    with pytest.raises(ValueError, match='not an active Linux bridge'):
+        m.check(plan(), api)
+
+
+@pytest.mark.parametrize('operation', ['request', 'upload'])
+@pytest.mark.parametrize('reason,body,privilege', [
+    ('Permission check failed (/vms/299, VM.Config.Options)', b'', 'VM.Config.Options'),
+    ('Forbidden', b'{"message":"Permission check failed (/vms/299, VM.Config.Memory)","data":null}', 'VM.Config.Memory'),
+    ('Permission check failed', b'', None),
+    ('SECRET', b'{"message":"SECRET","errors":{"password":"SECRET"}}', None),
+    ('Forbidden', b'<html>SECRET</html>', None),
+    ('Forbidden', b'[' * 2000, None),
+    ('Forbidden', b' ' * 5000 + b'SECRET', None),
+    ('Permission check failed (/vms/299, SECRET)', b'', None),
+], ids=['reason-privilege','body-privilege','bare-denial','private-json','html','deep-json','oversized','unknown-privilege'])
+def test_http_permission_errors_are_actionable_bounded_and_private(monkeypatch, operation, reason, body, privilege):
+    import io
+    import urllib.error
+    m = importlib.import_module('proxmox_api')
+    stream = io.BytesIO(body)
+    failure = urllib.error.HTTPError('https://SECRET/', 403, reason, {}, stream)
+    class Denied:
+        calls = 0
+        def open(self, *args, **kwargs):
+            self.calls += 1
+            raise failure
+    denied = Denied()
+    monkeypatch.setattr(m.urllib.request, 'build_opener', lambda *args: denied)
+    api = m.Client('https://pve.example.org:8006', {'token_id':'user@pve!rdc', 'token_secret':'SECRET'})
+    with pytest.raises(ValueError) as error:
+        if operation == 'request':
+            api.request('POST', '/nodes/pve/qemu', {'vmid':299})
+        else:
+            api.upload('pve', 'local', 'rdc-' + 'a'*64 + '.iso', io.BytesIO(b'x'), 1, 'a'*64)
+    message = str(error.value)
+    assert '403' in message and 'permission' in message.lower()
+    assert 'SECRET' not in message and len(message) < 700
+    if privilege: assert privilege in message
+    assert 'no automatic retry' in message.lower()
+    assert denied.calls == 1
+    assert stream.closed
+
+
+@pytest.mark.parametrize('code,reason', [(401, 'authentication'), (500, 'task state'), (302, 'task state')])
+def test_other_http_failures_show_status_without_raw_response(monkeypatch, code, reason):
+    import io
+    import urllib.error
+    m = importlib.import_module('proxmox_api')
+    class Failed:
+        def open(self, *args, **kwargs):
+            raise urllib.error.HTTPError('https://SECRET/', code, 'SECRET', {}, io.BytesIO(b'SECRET'))
+    monkeypatch.setattr(m.urllib.request, 'build_opener', lambda *args: Failed())
+    api = m.Client('https://pve.example.org', {'token_id':'user@pve!rdc','token_secret':'SECRET'})
+    with pytest.raises(ValueError) as error: api.request('GET', '/version')
+    assert str(code) in str(error.value) and reason in str(error.value).lower()
+    assert 'SECRET' not in str(error.value)

@@ -1,4 +1,4 @@
-"""Bounded, TLS-verified Proxmox API transport. Never log credentials or responses."""
+"""Bounded, TLS-verified Proxmox API transport. Never log credentials or raw responses."""
 import json
 import http.client
 import os
@@ -34,6 +34,41 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def http_failure(error):
+    """Expose status and recognized privilege names, never arbitrary server text."""
+    privileges = {'Sys.Audit', 'Datastore.Audit', 'Datastore.AllocateSpace',
+                  'Datastore.AllocateTemplate', 'VM.Audit', 'VM.Allocate',
+                  'VM.Config.Disk', 'VM.Config.CPU', 'VM.Config.Memory',
+                  'VM.Config.Network', 'VM.Config.Options', 'VM.Config.HWType',
+                  'VM.Config.CDROM', 'VM.PowerMgmt', 'SDN.Use'}
+    messages = [error.reason] if isinstance(error.reason, str) else []
+    try:
+        raw = error.read(4097)
+        if len(raw) <= 4096:
+            record = json.loads(raw)
+            if type(record) is dict and type(record.get('message')) is str:
+                messages.append(record['message'])
+    except (OSError, ValueError, http.client.HTTPException, RecursionError):
+        pass
+    finally:
+        error.close()
+    message = f'Proxmox HTTP {error.code}.'
+    if error.code == 401:
+        message += ' API authentication failed. Check the private token file and token validity.'
+    elif error.code == 403:
+        message += ' API permission denied.'
+        for candidate in messages:
+            if len(candidate) > 1024:
+                continue
+            match = re.fullmatch(r'Permission check failed \(/[^,\s()]{1,256}, ([A-Za-z.]{1,64})\)\.?', candidate.strip())
+            if match and match[1] in privileges:
+                message += ' Required privilege: ' + match[1] + '.'
+                break
+        message += ' Review user and privilege-separated token grants; see docs/proxmox-provisioning.md.'
+    message += ' Inspect task state before retrying; a submitted operation may have taken effect. No automatic retry was made.'
+    return message
+
+
 class Client:
     def __init__(self, endpoint, auth, ca_file=None):
         try:
@@ -57,6 +92,8 @@ class Client:
             record = json.loads(raw)
             require(type(record) is dict and 'data' in record and not record.get('errors'), 'Unexpected Proxmox response.')
             return record['data']
+        except urllib.error.HTTPError as error:
+            raise ValueError(http_failure(error)) from None
         except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException, RecursionError):
             # A failed POST may already have reached the server. Never automatically repeat it.
             raise ValueError('Proxmox request failed. Check TLS, permissions and task state before retrying; no automatic retry was made.') from None
@@ -91,5 +128,7 @@ class Client:
             require(type(record) is dict and type(record.get('data')) is str and record['data'].startswith('UPID:') and not record.get('errors'),
                     'Upload task could not be identified.')
             return record['data']
+        except urllib.error.HTTPError as error:
+            raise ValueError(http_failure(error)) from None
         except (OSError,ValueError,urllib.error.URLError,http.client.HTTPException,RecursionError):
             raise ValueError('Upload outcome is uncertain. Inspect Proxmox tasks; this request will not be automatically repeated.') from None

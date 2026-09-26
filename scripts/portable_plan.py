@@ -54,7 +54,7 @@ def validate(plan):
                        and not endpoint.query and not endpoint.fragment)
     except (ValueError, TypeError, AttributeError):
         endpoint_ok = False
-    require(endpoint_ok, 'Use a credential-free HTTPS Proxmox hostname, optionally on port 8006.')
+    require(endpoint_ok, 'Use a credential-free HTTPS URL with a dotted DNS hostname, e.g. https://pve.example.org:8006. IP addresses and short hostnames are not supported; ports 443 and 8006 are allowed.')
     require(all(name(p[k]) for k in ('node', 'storage', 'wan_bridge')), 'Invalid Proxmox resource identifier.')
     fields(plan['networks'], ' '.join(ZONES))
     nets, bridges = {}, {p['wan_bridge']}
@@ -127,7 +127,10 @@ def render(result):
     lines += ['', 'Startup: ' + ' -> '.join(' + '.join(group) for group in result['startup_groups']),
               '', 'Network paths: staff -> OPNsense -> NGINX -> chat/files',
               'Partner path: connector -> OPNsense -> existing WAN -> domestic/partner network',
-              '', 'Local DNS:']
+              '', 'Existing host bridges:',
+              '  WAN -> ' + result['proxmox']['wan_bridge']]
+    lines.extend(f"  {zone} -> {net['bridge']} ({net['cidr']})" for zone, net in result['networks'].items())
+    lines += ['', 'Local DNS:']
     lines.extend(f'  {host} -> {address}' for host, address in result['dns_records'].items())
     lines += ['', 'Firewall intent:'] + ['  ' + s for s in result['firewall_intent']]
     lines += ['', 'Still unverified:'] + ['  ' + s for s in result['unverified']]

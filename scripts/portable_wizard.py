@@ -28,6 +28,8 @@ def prepare(folder,*,input_fn=input,output_fn=print):
     plan['recovery_site']=ask('Independent recovery site',plan['recovery_site'],input_fn=input_fn)
     for field,label in [('endpoint','Proxmox HTTPS URL'),('node','Proxmox node'),('storage','VM disk storage'),('wan_bridge','Existing dedicated WAN bridge')]:
         plan['proxmox'][field]=ask(label,plan['proxmox'][field],input_fn=input_fn)
+    for zone,net in plan['networks'].items():
+        net['bridge']=ask('Existing '+zone+' Linux bridge',net['bridge'],input_fn=input_fn)
     base=ipaddress.ip_network(ask('Reserved private /16 network; verify no uplink/site overlap','10.76.0.0/16',input_fn=input_fn),strict=True)
     require(base.version==4 and base.prefixlen==16,'The guided network layout requires an IPv4 /16. Advanced layouts can use the documented JSON schema.')
     first=int(ask('First free VM ID',201,input_fn=input_fn))
@@ -41,7 +43,7 @@ def prepare(folder,*,input_fn=input,output_fn=print):
         plan['vms'][role]['address']=str(ipaddress.ip_network(plan['networks'][zone]['cidr']).network_address+offset)
     plan['domains']={role:role+'.'+domain for role in ('chat','element','files')}
     validate(plan);output_fn(render(preview(plan)))
-    output_fn('Default resources and bridge names are shown above. Edit site.json before any allocation if your host differs. No existing bridge will be created or reconfigured.')
+    output_fn('Resources and selected bridges are shown above. Verify them before saving; edit site.json before any allocation if other settings need adjustment. No existing bridge will be created or reconfigured.')
     if ask('Type SAVE to save this private plan, or :cancel',input_fn=input_fn)!='SAVE':raise Cancel()
     folder=directory(folder);write(folder/'site.json',plan)
     return plan
