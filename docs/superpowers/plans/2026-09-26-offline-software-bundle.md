@@ -53,6 +53,8 @@ file availability as physical-site or full empty-hardware recovery acceptance.
    no package installation by cloud-init. Run current tests, Linux acceptance,
    separate code review, then publish exact evidence in a draft PR.
 
-Local execution evidence: 850 tests and 21 playbook checks passed. Independent
-review fixes have regression coverage. Hosted fresh disconnected VM proof is
-pending; the draft change must not be described as complete site recovery.
+Local execution evidence: 854 tests and 21 playbook checks passed. Independent
+review fixes have regression coverage. Hosted fresh disconnected VM proof passed for both chat and files at
+`284db4d`, run 36231822767. Bootstrap/retry, pinned imports, local Restic and native
+application restoration passed with guest internet blocked before first boot.
+The draft change must not be described as complete private site recovery.

@@ -144,6 +144,9 @@ guests with the virtual uplink blocked before first boot, installs dependencies
 without cloud-init downloads or warm application caches, imports exact images,
 and runs both portable application access/restart/native-restore fixtures. Check
 the exact source run before treating this workflow as passing evidence.
+Both roles passed at `284db4d` in
+[run 36231822767](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36231822767),
+including repeated bootstrap and local installation of the recovery executable.
 
 The pinned guest base is prepared separately from this role bundle. Its download
 and QEMU-host provisioning are outside the disconnected guest boundary. Test TLS
