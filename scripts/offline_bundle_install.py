@@ -20,8 +20,12 @@ POLICY=b'#!/bin/sh\n# RDC offline bootstrap: suppress package service autostart\
 def run(argv,**kwargs):
     env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','HOME':'/root','LANG':'C.UTF-8','LC_ALL':'C.UTF-8',
          'DEBIAN_FRONTEND':'noninteractive','PIP_CONFIG_FILE':'/dev/null','PYTHONNOUSERSITE':'1'}
-    return subprocess.run([str(x) for x in argv],check=True,capture_output=True,text=True,
-                          timeout=kwargs.pop('timeout',1800),env=env,**kwargs).stdout
+    try:
+        return subprocess.run([str(x) for x in argv],check=True,capture_output=True,text=True,
+                              timeout=kwargs.pop('timeout',1800),env=env,**kwargs).stdout
+    except subprocess.CalledProcessError as error:
+        raise ValueError('Offline software command failed: '+str(argv[0])+'; '+
+                         (error.stdout or '')[-4000:]+'\n'+(error.stderr or '')[-4000:]) from error
 
 
 def supported():

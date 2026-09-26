@@ -92,3 +92,14 @@ def test_interrupted_source_copy_can_resume_without_partial_final_file(monkeypat
     monkeypatch.setattr(m.shutil,'copyfileobj',original)
     m.source_copy(source,data)
     assert (installed/'source/rdc').read_bytes()==b'complete source'
+
+
+def test_failed_bootstrap_command_reports_bounded_cause(monkeypatch):
+    m=api()
+    def fail(*args,**kwargs):
+        raise m.subprocess.CalledProcessError(100,args[0],output='x'*10000+' dependency conflict',stderr='E: package installation refused')
+    monkeypatch.setattr(m.subprocess,'run',fail)
+    with pytest.raises(ValueError,match='package installation refused') as error:
+        m.run(['/usr/bin/unshare','--net','--','apt-get'])
+    assert 'dependency conflict' in str(error.value)
+    assert len(str(error.value))<9000
