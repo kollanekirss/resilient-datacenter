@@ -65,9 +65,11 @@ def prepare_binaries():
             (ROOT/name).chmod(0o755)
 
 
-def controller(name,index):
+def controller(name,index,*,namespace_name=None):
     folder=ROOT/name;folder.mkdir(mode=0o700);hostname=name+'.control.ci.test';address='172.29.10.'+str(index+1)
-    run('ip','address','add',address+'/24','dev','rdc-wan')
+    if namespace_name:
+        run('ip','netns','exec',namespace_name,'ip','address','add',address+'/24','dev','wan0')
+    else:run('ip','address','add',address+'/24','dev','rdc-wan')
     issue(hostname,folder)
     template=Environment(loader=FileSystemLoader(SOURCE/'roles'),undefined=StrictUndefined).get_template('controller/templates/config.yaml.j2')
     config=yaml.safe_load(template.render(headscale_hostname=hostname))
@@ -84,14 +86,15 @@ def controller(name,index):
     (folder/'policy.json').write_text(json.dumps({'grants':[{'src':['*'],'dst':['*'],'ip':['tcp:443']}]}))
     binary=str(ROOT/'headscale-package/usr/bin/headscale');command=[binary,'--config',str(folder/'config.yaml')]
     run(*command,'configtest')
-    process=spawn('controller-'+name,[*command,'serve'])
+    prefix=['ip','netns','exec',namespace_name] if namespace_name else []
+    process=spawn('controller-'+name,[*prefix,*command,'serve'])
     for _ in range(60):
         if (folder/'control.sock').exists():break
         if process.poll() is not None:raise ValueError('Controller failed to start: '+name)
         time.sleep(.5)
     else:raise ValueError('Controller socket did not appear')
     user=json.loads(run(*command,'users','create','ci-operator','--output','json'))
-    result={'folder':folder,'hostname':hostname,'address':address,'command':command,'process':process,'user_id':str(user['id'])}
+    result={'folder':folder,'hostname':hostname,'address':address,'command':command,'process':process,'user_id':str(user['id']),'namespace':namespace_name}
     CONTROLLERS[name]=result;return result
 
 
