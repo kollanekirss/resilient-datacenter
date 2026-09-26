@@ -1,0 +1,43 @@
+name: Disposable national isolation connectivity
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/ci_national*.py'
+      - 'scripts/ci_regional_network.py'
+      - 'scripts/ci_regional_matrix.py'
+      - 'tests/test_national_isolation.py'
+      - '.github/workflows/national-isolation.yml'
+permissions:
+  contents: read
+jobs:
+  domestic-field-and-service-networks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Prepare disposable Linux runner
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y podman nftables iptables unbound curl
+      - name: Exercise prepared field access and institution federation under isolation
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT .venv/bin/python scripts/ci_national_isolation.py
+      - name: Bounded disposable diagnostics
+        if: failure()
+        run: |
+          sudo .venv/bin/python - <<'PY'
+          from pathlib import Path
+          for path in Path('/var/lib/rdc-regional-network-ci').glob('*.log'):
+              print(path.name)
+              for line in path.read_text(errors='replace').splitlines()[-25:]:
+                  if not any(term in line.lower() for term in ('auth','token','key=','key:','register')):
+                      print(line[:500])
+          PY
+          sudo podman ps --all --format '{{.Names}} {{.Status}}'
