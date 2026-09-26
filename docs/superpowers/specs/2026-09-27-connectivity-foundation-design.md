@@ -1,6 +1,6 @@
 # Connectivity-first resilient datacenter
 
-Status: proposed architecture for user review; no replacement installer is implemented by this document.
+Status: architecture approved for the connectivity-first rebuild. The first implementation provides scope-first planning and private checkpoints only; deployment adapters remain outstanding. See [current command and limits](../../connectivity-installation.md).
 
 ## Product goal
 
@@ -86,7 +86,7 @@ Record each dependency's role, operator, location, reachability before VPN, and 
 
 ## Separate installers and opening screen
 
-The proposed user-facing entry points are `./rdc connectivity install` and, in a later services milestone, `./rdc services install`. These are design targets, not commands available in the current checkout. Both can share libraries, but must have separate plans, progress records, execution scopes and completion reports.
+The proposed user-facing entry points are `./rdc connectivity install` and, in a later services milestone, `./rdc services install`. `./rdc connectivity install` now provides planning only; `./rdc services install` remains a future command. Both can share libraries, but must have separate plans, progress records, execution scopes and completion reports.
 
 Starting the connectivity installer first displays a plain-language scope screen, before collecting credentials, downloading artifacts, contacting deployment targets or changing any machine. Read-only local version/platform detection is allowed. The screen explains:
 

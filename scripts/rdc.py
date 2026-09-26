@@ -40,6 +40,11 @@ class Parser(argparse.ArgumentParser):
 def parser():
     result=Parser(prog='rdc',description=__doc__)
     commands=result.add_subparsers(dest='command',required=True)
+    connectivity=commands.add_parser('connectivity',help='Separate connectivity foundation; experimental planning only')
+    connection_actions=connectivity.add_subparsers(dest='connectivity_action',required=True)
+    connection_install=connection_actions.add_parser('install',help='Explain scope and plan connectivity; deployment not implemented yet')
+    connection_install.add_argument('--output-dir',type=Path,default=ROOT/'inventories/lab/connectivity')
+    connection_install.add_argument('--resume',type=Path)
     portable=commands.add_parser('portable',help='Preview/check a portable site or explicitly allocate stopped VM shells')
     portable.add_argument('portable_action',choices=('preview','check','allocate-shells','media-fetch','media-upload','upload-abandon','guest-attach','guest-start','guest-finish','guest-boot','guest-status','guest-confirm-login','network-prepare','network-verify','network-check','applications-prepare','applications-verify','applications-apply','frontend-apply','frontend-renew'))
     portable.add_argument('plan',type=Path)
@@ -253,6 +258,12 @@ def backup_action(args):
 
 
 def dispatch(args) -> ActionResult:
+    if args.command=='connectivity':
+        from connectivity_wizard import wizard
+        try:outcome=wizard(args.output_dir,resume=args.resume,input_fn=input)
+        except ValueError as error:
+            print('Connectivity planning needs attention: '+str(error));return result_for_state('blocked')
+        return result_for_state(outcome['state'])
     if args.command=='portable':
         from portable_operations import action
         from portable_plan import render
@@ -386,6 +397,7 @@ def main(argv=None) -> int:
         args=command.parse_args(argv)
         result=dispatch(args)
         if args.command in ('status','portable') and args.json:return int(result.exit_code)
+        if args.command=='connectivity':return int(result.exit_code)
         show_checks(result.checks)
         text={
             'prepared':'Configuration prepared. No servers were changed.',
