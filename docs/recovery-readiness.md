@@ -134,3 +134,6 @@ metadata, manifest tampering, privacy, missing evidence and stale/future times.
 The report is also run with socket/subprocess calls forbidden and checked for
 unchanged input bytes. No real institutional data or live service is inspected.
 Complete-site restoration and physical relocation remain later milestones.
+
+All 38 assessment tests passed on disposable Ubuntu with networking disabled at
+`abba83e` in [run 36234059897](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36234059897). The complete local suite passed 915 tests.

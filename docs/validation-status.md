@@ -334,6 +334,7 @@ gaps; regression tests reproduce both and now report invalid evidence without
 aborting other checks. Follow-up review found no remaining blockers in the fixes.
 
 A separate Ubuntu workflow runs the assessment suite in a network namespace
-without an uplink; its result is pending. This is an evidence report, not a live
+without an uplink; all 38 assessment tests passed at `abba83e` in
+[run 36234059897](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36234059897). This is an evidence report, not a live
 credential, client-login or complete-site recovery exercise. See
 [readiness instructions](recovery-readiness.md).
