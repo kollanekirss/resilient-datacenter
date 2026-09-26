@@ -48,3 +48,12 @@ def evidence(phases,controller_loss):
             'physical_carrier_diversity':'not-tested','mobile_device_clients':'not-tested',
             'dns':'one-isolated-domestic-resolver','field_uplink_change':'simulated-underlay-address-change',
             'notice':'Two institutions on one disposable runner; synthetic outside-region boundary, not geographic independence.'}
+
+
+def partner_rules(value):
+    address=ipaddress.ip_address(value)
+    if address not in ipaddress.ip_network('100.64.0.0/10'):raise ValueError('Use a declared overlay partner')
+    return '\n'.join(('table inet rdc_partner_cut {',
+        'chain output { type filter hook output priority -90; policy accept;',
+        'oifname "tailscale0" ip daddr '+str(address)+' counter drop',
+        '}', '}', ''))

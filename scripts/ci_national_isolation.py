@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 import ci_regional_network as network
 import ci_regional_matrix as matrix
 import ci_national_network as domestic
-from ci_national_contract import evidence
+from ci_national_contract import evidence,cut_rules,partner_rules
 import gateway_contracts
 import regional_agreements as agreements
 import service_contracts
@@ -95,13 +95,16 @@ def partition(enabled):
         node=own+'-gateway'
         if enabled:
             address=network.NODES[other+'-gateway']['address']
-            rules='table inet rdc_partner_cut { chain output { type filter hook output priority -90; policy accept; oifname "tailscale0" ip daddr '+address+' counter drop; } }'
+            rules=partner_rules(address)
             network.run('ip','netns','exec',node,'nft','-f','-',input=rules)
         else:network.run('ip','netns','exec',node,'nft','delete','table','inet','rdc_partner_cut')
 
 
 def exercise():
-    network.require_ci();nodes=domestic.prepare();phases={};observations={}
+    network.require_ci()
+    for rules in (cut_rules(['172.29.10.2']),partner_rules('100.64.0.2')):
+        network.run('nft','--check','--file','-',input=rules)
+    nodes=domestic.prepare();phases={};observations={}
     images=service_contracts.image_pins()
     for image in {images[key]['image'] for key in ('postgres','synapse','proxy')}|{gateway_contracts.image_pins()['gateway']['image']}:network.run('podman','pull',image,timeout=600)
     keys={};identities={}

@@ -52,3 +52,9 @@ def test_controller_observation_requires_authenticated_saved_message(monkeypatch
     module=importlib.import_module('ci_national_isolation');results=iter(responses)
     monkeypatch.setattr(module.matrix,'request',lambda *args,**kwargs:next(results))
     assert module.authenticated_available({'user':'north-user','hostname':'matrix.north.ci.test'},'fixture-token','proof') is expected
+
+
+def test_partner_cut_accepts_only_overlay_peer_addresses():
+    for address in ('1.1.1.1','172.29.10.2','100.64.0.1; accept'):
+        with pytest.raises(ValueError):contract().partner_rules(address)
+    assert '100.64.0.2' in contract().partner_rules('100.64.0.2')
