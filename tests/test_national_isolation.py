@@ -69,3 +69,15 @@ def test_continuing_session_checks_do_not_reauthenticate(monkeypatch):
     monkeypatch.setattr(module,'send',lambda *args:'$event')
     monkeypatch.setattr(module.matrix,'wait_event',lambda *args:{'content':{'body':'relay-loss'}})
     assert module.field_proof({'user':'north-user','hostname':'matrix.north.ci.test'},{},'relay-loss',token='existing')=='existing'
+
+
+def test_outage_observation_allows_late_reconnect_and_bounds_failure():
+    api=contract();ticks=[0];attempts=[]
+    def clock():return ticks[0]
+    def pause(seconds):ticks[0]+=seconds
+    def late():attempts.append(1);return len(attempts)==3
+    result=api.observe(late,5,clock=clock,pause=pause)
+    assert result['available'] is True and result['observed_seconds']==2
+    ticks[0]=0
+    result=api.observe(lambda:False,5,clock=clock,pause=pause)
+    assert result['available'] is False and result['observed_seconds']==5

@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 import ci_regional_network as network
 import ci_regional_matrix as matrix
 import ci_national_network as domestic
-from ci_national_contract import evidence,cut_rules,partner_rules
+from ci_national_contract import evidence,cut_rules,partner_rules,observe
 import gateway_contracts
 import regional_agreements as agreements
 import service_contracts
@@ -163,8 +163,12 @@ def exercise():
     app=apps['north']
     observations['north_existing_session']='available' if authenticated_available(app,tokens['north'],'authority-down-existing') else 'unavailable'
     domestic.restart(app['user'],require_running=False)
-    time.sleep(5)
-    observations['north_restarted_client']='available' if authenticated_available(app,tokens['north'],'authority-down-restarted') else 'unavailable'
+    def restarted_operation():
+        if nodes[app['user']]['process'].poll() is not None:raise ValueError('Field daemon exited during the authority-loss observation')
+        return authenticated_available(app,tokens['north'],'authority-down-restarted')
+    restarted=observe(restarted_operation,90)
+    observations['north_restarted_client']='available' if restarted['available'] else 'unavailable'
+    print('Controller-down restarted-client observation: '+json.dumps(restarted),flush=True)
     # Other institution and service-network authority remain independently live.
     tokens['south']=field_proof(apps['south'],credentials['south'],'other-authority-down',token=tokens['south'])
     domestic.start_controller(control)
@@ -175,6 +179,7 @@ def exercise():
         if domestic.canary(name):raise ValueError('Outside route reopened during exercise')
     assert domestic.canary()
     result=evidence(phases,observations);result['relay_failover_observed_seconds']=relay_times
+    result['controller_restart_probe']={'window_seconds':90,**restarted}
     (network.ROOT/'national-isolation-evidence.json').write_text(json.dumps(result,indent=2))
     print(json.dumps(result,indent=2),flush=True)
 

@@ -2,6 +2,7 @@
 import ipaddress
 from pathlib import Path
 import re
+import time
 
 REQUIRED=('baseline','outside_cut','field_restart','field_address_change','relay_loss',
           'federation_after_cut','partner_partition','partner_reconnection','authority_return')
@@ -57,3 +58,13 @@ def partner_rules(value):
         'chain output { type filter hook output priority -90; policy accept;',
         'oifname "tailscale0" ip daddr '+str(address)+' counter drop',
         '}', '}', ''))
+
+
+def observe(check,seconds,*,clock=time.monotonic,pause=time.sleep):
+    if seconds<=0:raise ValueError('Use a positive observation window')
+    started=clock();attempts=0
+    while clock()-started<seconds:
+        attempts+=1
+        if check():return {'available':True,'observed_seconds':round(clock()-started,2),'attempts':attempts}
+        pause(1)
+    return {'available':False,'observed_seconds':round(clock()-started,2),'attempts':attempts}
