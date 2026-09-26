@@ -1,5 +1,7 @@
 # Validation status — 2026-09-26
 
+The [current delivery priorities](delivery-pipeline.md) reflect the clarified two-network goal: institutional headquarters/field access plus separate inter-institution service connectivity. Existing recovery tests are supplementary; national/regional isolation and production public-certificate device acceptance remain unproven.
+
 ## Current scope and evidence boundaries
 
 | Capability | Current evidence |
@@ -338,3 +340,26 @@ without an uplink; all 38 assessment tests passed at `abba83e` in
 [run 36234059897](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36234059897). This is an evidence report, not a live
 credential, client-login or complete-site recovery exercise. See
 [readiness instructions](recovery-readiness.md).
+
+
+## Combined disconnected Linux recovery
+
+Implementation head `b689448` passed
+[run 36234854664](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36234854664)
+on 26 September 2026. Routing, Unbound DNS, chrony and a shared frontend were
+reconstructed with two fresh Ubuntu application guests from the verified public
+software bundle and encrypted private recovery package. Original guests were
+confirmed stopped and their disks removed before replacement creation. Restored
+staff access used local DNS names, TLS validation and local login; saved chat/file
+data survived and one later message/file version did not.
+
+Measured routing-failure-to-restored-access time was **440.34 seconds**. Chat/files
+snapshot ages at failure were **80.87/21.39 seconds**. These are synthetic measured
+observations, not guaranteed RTO/RPO. All **922 tests**, local checks and **22 GitHub
+checks** passed on that implementation revision. Independent review fixed guest
+DNS setup and failure timestamp placement before the hosted run.
+
+This uses Linux routing and infrastructure namespaces, preinstalled Ubuntu guest
+images, and an independently connected CI controller. OPNsense, Proxmox, DHCP,
+physical movement/power loss, independent UTC accuracy and institution devices
+remain untested. See [full exercise and exclusions](combined-recovery.md).

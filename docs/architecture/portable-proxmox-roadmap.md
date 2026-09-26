@@ -1,6 +1,8 @@
 # Portable Proxmox profile: delivery roadmap
 
-Status: staged engineering roadmap with implementation and acceptance boundaries. Implements the [reference architecture](portable-proxmox.md). Work proceeds in the listed order; each deliverable retains its own evidence and does not imply the later gates passed.
+Priority correction, 26 September 2026: the [current delivery priorities](../delivery-pipeline.md) supersede the order below. Resilient institutional field access and separate inter-institution service connectivity come first; public certificates are prepared before a crisis. Backup/reconstruction is deferred.
+
+Status: component engineering roadmap with implementation and acceptance boundaries. Implements the [reference architecture](portable-proxmox.md). Work proceeds in the listed order; each deliverable retains its own evidence and does not imply the later gates passed.
 
 ## 1. Site plan and preview
 
@@ -93,6 +95,6 @@ Exit: changed-uplink, lost-relay/controller and partner-partition exercises pass
 
 ## First implementation boundary
 
-Stages 1–4 have initial implementations with their evidence boundaries above. Stage 5, the offline software/recovery bundle, is the next implementation boundary. Later stages require their own detailed implementation plans because they modify different operational trust and recovery boundaries. Do not combine host provisioning, firewall changes and application migration into one opaque installer action.
+Stages 1–4 have initial implementations with their evidence boundaries above. Stage 5 contains supplementary software/recovery work; it is no longer the next project priority. Follow the current delivery priorities. Later stages require their own detailed implementation plans because they modify different operational trust and recovery boundaries. Do not combine host provisioning, firewall changes and application migration into one opaque installer action.
 
 No server software is to be executed on the preparation Mac. Linux deployment acceptance runs on disposable Ubuntu infrastructure; Proxmox/OPNsense acceptance needs a dedicated disposable virtualization environment. Unit tests and plan generation may run on the preparation computer.
