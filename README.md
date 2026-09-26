@@ -11,6 +11,11 @@ let prepared chat/files guests refuse all package and image downloads during
 installation. Complete offline software packaging and whole-kit reconstruction
 remain unfinished.
 
+The new [offline role-software bundle](docs/offline-software-bundle.md) collects
+Ubuntu dependencies, Python wheels, pinned images and the recovery tool for
+explicit local bootstrap. Private whole-site reconstruction remains a separate
+gate.
+
 ## The purpose: take essential services with you
 
 An institution should be able to operate essential chat, files and recovery tools away from its main datacenter, including at a temporary crisis headquarters. The intended destination is a small, transportable system that works on its own local network, reaches other domestic sites when a route exists, and exchanges approved services with partners when connected. Moving a service box should not require a fixed public IP at its new location.

@@ -273,10 +273,24 @@ checks, plus invalid-example rejection and read-only host/task listings.
 Twenty-six new tests cover missing local software, image identity/inspection
 failures, unsupported/remote image stores, no-download guards and CLI exit status.
 The hosted fixture now blocks WAN before production application installation
-from prepared caches. Its new Linux result is pending, not implied by local
-tests. This increment does not implement a complete offline software bundle or
+from prepared caches. Both chat and files passed at `4bb1e70` in [run 36230305110](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36230305110); all 21 PR checks passed. This increment does not implement a complete offline software bundle or
 whole-site reconstruction. See [usage](offline-applications.md).
 
 A separate code review identified configuration-driven remote Podman mode.
 The regression failed before the fix and passes with explicit local execution
 for managed application inspection, acquisition, containers and maintenance.
+
+
+## Offline role-software bundle
+
+Local verification on 2026-09-26 passed 850 tests and all 21 playbook syntax
+checks, invalid-example rejection and read-only host/task listings. Forty new
+tests cover manifest trust, exact file membership, unsafe paths, package
+acquisition isolation, bootstrap retries, atomic source installation and local
+Restic verification. Independent review caught verifier bytecode mutation and
+interrupted source-copy issues; regression tests now cover both fixes.
+
+Fresh disconnected Ubuntu VM acceptance is pending. The bundle covers role
+software only; OS/hypervisor media, institution secrets/configuration, complete
+site reconstruction and physical relocation remain NOT RUN. See
+[operator instructions](offline-software-bundle.md).

@@ -20,13 +20,13 @@ def guard():
         raise ValueError('The disposable Ubuntu runner must provide KVM; no workstation or emulation fallback')
 
 
-def qemu_command(folder,port):
+def qemu_command(folder,port,*,offline=False):
     if type(port) is not int or port not in (22222,22223):raise ValueError('Use the fixed private console ports')
     folder=Path(folder)
     return ['qemu-system-x86_64','-enable-kvm','-cpu','host','-smp','2','-m','4096','-display','none','-no-reboot',
         '-drive','file='+str(folder/'disk.qcow2')+',format=qcow2,if=virtio',
         '-drive','file='+str(folder/'seed.img')+',format=raw,if=virtio,readonly=on',
-        '-netdev','user,id=home,hostfwd=tcp:127.0.0.1:'+str(port)+'-:22','-device','virtio-net-pci,netdev=home',
+        '-netdev','user,id=home,'+('restrict=on,' if offline else '')+'hostfwd=tcp:127.0.0.1:'+str(port)+'-:22','-device','virtio-net-pci,netdev=home',
         '-serial','file:'+str(folder/'console.log'),'-monitor','none']
 
 
@@ -48,7 +48,7 @@ def image(path):
 
 
 class VM:
-    def __init__(self,folder,base,*,port,ca,controller_address,controller_hostname):
+    def __init__(self,folder,base,*,port,ca,controller_address,controller_hostname,offline=False):
         guard();self.folder=Path(folder);self.port=port;self.process=None
         self.folder.mkdir(mode=0o700)
         for name in ('console-key','host-key'):
@@ -64,12 +64,17 @@ class VM:
                            {'path':'/etc/hosts','append':True,'content':'\n'+controller_address+' '+controller_hostname+'\n'}],
             'packages':['python3-venv','python3-pip','nftables'],
             'runcmd':[['touch','/var/lib/rdc-ci-ready']]}
+        if offline:
+            config.pop('packages')
+            config['package_update']=False
+            config['package_upgrade']=False
+            if not ca:config.pop('ca_certs')
         user=self.folder/'user-data';user.write_text('#cloud-config\n'+yaml.safe_dump(config));user.chmod(0o600)
         meta=self.folder/'meta-data';meta.write_text('instance-id: '+self.folder.name+'\nlocal-hostname: '+self.folder.name+'\n')
         run(['cloud-localds',str(self.folder/'seed.img'),str(user),str(meta)])
         (self.folder/'seed.img').chmod(0o600)
         run(['qemu-img','create','-f','qcow2','-F','qcow2','-b',str(base),str(self.folder/'disk.qcow2'),'32G'])
-        self.process=subprocess.Popen(qemu_command(self.folder,port),stdout=subprocess.DEVNULL,stderr=(self.folder/'qemu.log').open('wb'))
+        self.process=subprocess.Popen(qemu_command(self.folder,port,offline=offline),stdout=subprocess.DEVNULL,stderr=(self.folder/'qemu.log').open('wb'))
         for attempt in range(180):
             if self.process.poll() is not None:raise ValueError('Fresh guest exited before becoming ready')
             try:self.ssh(['test','-f','/var/lib/rdc-ci-ready'],timeout=8);break
@@ -81,11 +86,11 @@ class VM:
             '-o','StrictHostKeyChecking=yes','-o','UserKnownHostsFile='+str(self.folder/'known_hosts'),'-o','GlobalKnownHostsFile=/dev/null']
 
     def ssh(self,args,*,input=None,timeout=120):
-        return run(['ssh',*self.ssh_options(),'-p',str(self.port),'ciadmin@127.0.0.1',shlex.join(['sudo','--',*args])],input=input,timeout=timeout)
+        return run(['ssh',*self.ssh_options(),'-p',str(self.port),'ciadmin@127.0.0.1',shlex.join(['sudo','--',*map(str,args)])],input=input,timeout=timeout)
 
-    def put(self,source,destination):
+    def put(self,source,destination,*,timeout=180):
         # Fixed private console; transfer first to the unprivileged home.
-        run(['scp',*self.ssh_options(),'-P',str(self.port),str(source),'ciadmin@127.0.0.1:/home/ciadmin/rdc-transfer'],timeout=180)
+        run(['scp',*self.ssh_options(),'-P',str(self.port),str(source),'ciadmin@127.0.0.1:/home/ciadmin/rdc-transfer'],timeout=timeout)
         self.ssh(['install','-m','600','/home/ciadmin/rdc-transfer',destination]);self.ssh(['rm','/home/ciadmin/rdc-transfer'])
 
     def get(self,path):return self.ssh(['cat',path])

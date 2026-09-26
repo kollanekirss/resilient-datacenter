@@ -94,6 +94,7 @@ def parser():
     configure.add_argument('profile',type=Path)
     configure.add_argument('--recovery-password-file',type=Path)
     configure.add_argument('--recovery-ssh-key-file',type=Path)
+    configure.add_argument('--restic-artifact',type=Path,help='Use the exact pinned local Restic distribution without downloading')
     for action in ('initialize','run','status','restore-recover','include-services'): backup_commands.add_parser(action)
     backup_commands.add_parser('restore-stage',help='Decrypt a specific snapshot into private staging; never promote').add_argument('snapshot')
     bootstrap=backup_commands.add_parser('bootstrap-stage',help='Prepare original VPN identity from a full application snapshot on a fresh replacement')

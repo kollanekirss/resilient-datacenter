@@ -1,0 +1,40 @@
+name: Disposable offline software bundle
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/offline_bundle*.py'
+      - 'scripts/ci_offline_bundle.py'
+      - 'scripts/ci_home_vm.py'
+      - 'scripts/backup_operations.py'
+      - 'scripts/service_images.json'
+      - 'scripts/nextcloud_images.json'
+      - 'requirements.txt'
+      - '.github/workflows/offline-bundle.yml'
+permissions:
+  contents: read
+jobs:
+  fresh-offline-guests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Prepare disposable acquisition and VM host
+        run: |
+          test -c /dev/kvm
+          sudo apt-get update -qq
+          sudo apt-get install -y skopeo qemu-system-x86 qemu-utils cloud-image-utils
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+      - name: Build bundle and reconstruct fresh disconnected guests
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT .venv/bin/python scripts/ci_offline_bundle.py
+      - name: Bounded VM diagnostics
+        if: failure()
+        run: |
+          sudo find /var/lib/rdc-bundle-ci -name console.log -exec tail -n 25 {} \;
+          sudo find /var/lib/rdc-bundle-ci -name qemu.log -exec tail -n 15 {} \;
