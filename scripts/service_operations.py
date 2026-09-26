@@ -107,11 +107,11 @@ def pull_images(pins=None,*,offline=False):
     with tempfile.TemporaryDirectory(prefix='rdc-image-auth-') as directory:
         auth=Path(directory)/'auth.json';auth.write_text('{"auths":{}}');auth.chmod(0o600)
         for item in pins.values():
-            cached=subprocess.run(['/usr/bin/podman','image','exists',item['image']],capture_output=True,timeout=15)
+            cached=subprocess.run(['/usr/bin/podman','--remote=false','image','exists',item['image']],capture_output=True,timeout=15)
             if cached.returncode==0: continue
             if cached.returncode!=1: raise ValueError('Cannot inspect local service image cache')
             if offline:raise ValueError('Offline software is missing a pinned image; no download was attempted')
-            subprocess.run(['/usr/bin/podman','pull','--authfile',str(auth),'--arch','amd64','--os','linux',item['image']],
+            subprocess.run(['/usr/bin/podman','--remote=false','pull','--authfile',str(auth),'--arch','amd64','--os','linux',item['image']],
                            check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=600)
     return pins
 

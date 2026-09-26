@@ -63,7 +63,7 @@ def test_offline_image_acquisition_never_pulls(monkeypatch,code):
     calls=[]
     def run(argv,**kwargs):
         calls.append(argv)
-        assert argv[1:3]==['image','exists']
+        assert argv[1:4]==['--remote=false','image','exists']
         return SimpleNamespace(returncode=code)
     monkeypatch.setattr(m.subprocess,'run',run)
     with pytest.raises(ValueError):m.pull_images({'x':{'image':'pinned'}},offline=True)
@@ -126,3 +126,17 @@ def test_remote_podman_environment_cannot_pass(monkeypatch,variable):
     monkeypatch.setattr(m.Path,'is_dir',lambda self:True)
     monkeypatch.setattr(m.os,'geteuid',lambda:0)
     assert any('remote' in error.lower() for error in m.platform_errors())
+
+
+def test_remote_default_cannot_make_remote_images_look_locally_prepared(local,monkeypatch):
+    import service_runtime
+    from service_contracts import image_pins
+    pins=image_pins()
+    monkeypatch.setattr(local,'verify_image',service_runtime.verify_image)
+    def remote_default(argv,**kwargs):
+        # Simulate a containers.conf remote default with an empty local store.
+        if '--remote=false' in argv:raise subprocess.CalledProcessError(1,argv)
+        pin=next(p for p in pins.values() if p['image']==argv[-1])
+        return SimpleNamespace(stdout=json.dumps([{'Architecture':'amd64','Os':'linux','Id':pin['config_digest']}]))
+    monkeypatch.setattr(service_runtime.subprocess,'run',remote_default)
+    assert local.check('chat')['state']=='application-software-blocked'

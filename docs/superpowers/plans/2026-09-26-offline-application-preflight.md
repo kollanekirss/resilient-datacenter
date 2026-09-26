@@ -45,9 +45,13 @@ presented as end-user or whole-site recovery acceptance.
 
 ## Execution evidence
 
-2026-09-26: 25 new regressions failed before implementation and pass after it.
-The complete local run passed 809 tests and all 21 playbook syntax/read-only
+2026-09-26: 26 new regressions failed before implementation and pass after it.
+The complete local run passed 810 tests and all 21 playbook syntax/read-only
 checks. Inline review added refusal of remote Podman environment settings and
 real image-identity mismatch tests. No server binary ran on the preparation Mac.
 Hosted Linux acceptance is pending at publication; complete offline software
 bundling and whole-kit recovery remain future work.
+
+Separate review found that containers.conf could select a remote Podman store.
+A failing regression demonstrated the false-ready result; managed application
+commands now explicitly use --remote=false. The full suite passes after the fix.

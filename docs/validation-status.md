@@ -268,11 +268,15 @@ remain NOT RUN. See [operator instructions](portable-local-applications.md) and
 
 ## Explicit offline portable application installation
 
-Local verification on 2026-09-26 passed 809 tests and all 21 playbook syntax
+Local verification on 2026-09-26 passed 810 tests and all 21 playbook syntax
 checks, plus invalid-example rejection and read-only host/task listings.
-Twenty-five new tests cover missing local software, image identity/inspection
+Twenty-six new tests cover missing local software, image identity/inspection
 failures, unsupported/remote image stores, no-download guards and CLI exit status.
 The hosted fixture now blocks WAN before production application installation
 from prepared caches. Its new Linux result is pending, not implied by local
 tests. This increment does not implement a complete offline software bundle or
 whole-site reconstruction. See [usage](offline-applications.md).
+
+A separate code review identified configuration-driven remote Podman mode.
+The regression failed before the fix and passes with explicit local execution
+for managed application inspection, acquisition, containers and maintenance.

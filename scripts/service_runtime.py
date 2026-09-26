@@ -57,21 +57,21 @@ def validate_container(record,name,settings):
 
 
 def podman(*args,timeout=30):
-    result=subprocess.run(['/usr/bin/podman',*args],check=True,capture_output=True,text=True,timeout=timeout)
+    result=subprocess.run(['/usr/bin/podman','--remote=false',*args],check=True,capture_output=True,text=True,timeout=timeout)
     if len(result.stdout)>2*1024*1024: raise ValueError('Container response is oversized')
     return result.stdout
 
 
 def inspect_container(name,settings):
     if name not in UNITS: raise ValueError('Unsupported service component')
-    result=subprocess.run(['/usr/bin/podman','container','exists',UNITS[name]],capture_output=True,timeout=15)
+    result=subprocess.run(['/usr/bin/podman','--remote=false','container','exists',UNITS[name]],capture_output=True,timeout=15)
     if result.returncode==1:return None
     if result.returncode!=0: raise ValueError('Cannot inspect service container existence')
     try:records=json.loads(podman('container','inspect',UNITS[name]))
     except subprocess.CalledProcessError:
         # --rm cleanup can remove a stopped container between existence and
         # inspection. Only verified absence is benign; retain all other errors.
-        remaining=subprocess.run(['/usr/bin/podman','container','exists',UNITS[name]],capture_output=True,timeout=15)
+        remaining=subprocess.run(['/usr/bin/podman','--remote=false','container','exists',UNITS[name]],capture_output=True,timeout=15)
         if remaining.returncode==1:return None
         raise
     if not isinstance(records,list) or len(records)!=1: raise ValueError('Cannot identify one service container')
@@ -90,7 +90,7 @@ def verify_image(name,settings):
 
 def container_command(name,settings):
     if name not in UNITS: raise ValueError('Unsupported service component')
-    common=['/usr/bin/podman','--runtime=/usr/bin/runc','run','--name',UNITS[name],'--network=host','--pull=never','--read-only',
+    common=['/usr/bin/podman','--remote=false','--runtime=/usr/bin/runc','run','--name',UNITS[name],'--network=host','--pull=never','--read-only',
             '--cap-drop=ALL','--security-opt=no-new-privileges','--pids-limit=512',
             '--label','org.rdc.owner='+owner_digest(settings),'--label','org.rdc.component='+name,
             '--tmpfs','/tmp:rw,nosuid,nodev,size=64m,mode=1777']
@@ -241,7 +241,7 @@ def main():
             phase='private-ingress';application_ingress(settings,create=True)
         if existing is not None:
             if existing.get('State',{}).get('Running'):
-                return subprocess.run(['/usr/bin/podman','attach',UNITS[name]]).returncode
+                return subprocess.run(['/usr/bin/podman','--remote=false','attach',UNITS[name]]).returncode
             phase='remove-stopped-container';podman('rm',UNITS[name])  # Exact owned stopped container; persistent bind data stays.
         phase='prepare-regional-connector'
         if name in ('synapse','proxy'):

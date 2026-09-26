@@ -16,7 +16,8 @@ sudo ./rdc portable applications-check /private/site.json --role files --json
 Run only the command for that guest. This check is read-only: it examines the
 platform, required executable paths and actual root-managed Podman image
 identities. It never installs, pulls images, resolves service DNS, starts services
-or elevates itself. Use sudo deliberately to inspect the image store used by the
+or elevates itself. Managed application commands explicitly force local Podman
+execution, even if its configuration otherwise selects a remote server. Use sudo deliberately to inspect the image store used by the
 installer. A Mac reports blocked and does not execute server binaries.
 
 `application-software-prepared` means only that these prerequisites passed.
