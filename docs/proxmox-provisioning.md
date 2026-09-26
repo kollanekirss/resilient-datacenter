@@ -2,7 +2,7 @@
 
 This development feature is the infrastructure scaffold for the [portable reference architecture](architecture/portable-proxmox.md). It can inspect a Proxmox API and allocate six **stopped, disconnected VM shells with blank disks**. It does not install Proxmox, OPNsense, Ubuntu or any application. It does not download guest images, change bridges, configure IP addresses inside guests, enable networking, start VMs or provide a working crisis node.
 
-**Acceptance boundary:** unit tests simulate the API, including partial allocation and refusal paths. Upstream API definitions were reviewed. No live Proxmox host or guest boot has been verified for this feature. Proxmox VE 9.x is the candidate API family; this is not a tested compatibility claim. Start with a disposable lab and independent console access.
+**Acceptance boundary:** an operator reported successful preparation, preview, host checks and six stopped, disconnected shell allocations on nested Proxmox VE 9.2.20 against `fbbae78e`. This is a reported lab result, not independently reproduced here or a completed guest/service deployment. Unit tests simulate API success, partial allocation and refusal paths. These feedback fixes still need a repeat lab run. Proxmox VE 9.x remains the candidate family; one nested-host result does not establish compatibility across hosts. Use a disposable lab and independent console access.
 
 ## Prepare the host independently
 
@@ -14,9 +14,24 @@ Prepare and review your [site plan](portable-site-plan.md). Confirm the six VM I
 
 ## Credentials and trust
 
-Create a dedicated, privilege-separated API token through Proxmox administration. Consult the upstream [API permission definitions](https://pve.proxmox.com/pve-docs/api-viewer/) and [access management documentation](https://pve.proxmox.com/pve-docs/chapter-pveum.html) for the selected version. Do not grant host network modification, guest deletion or administrator-wide rights solely for this command.
+Create a dedicated, privilege-separated API token through Proxmox administration. Consult the upstream [API permission definitions](https://pve.proxmox.com/pve-docs/api-viewer/) and [access management documentation](https://pve.proxmox.com/pve-docs/chapter-pveum.html) for the selected version. Do not grant host network modification or administrator-wide rights solely for this command. `VM.Allocate` also permits VM removal in Proxmox, even though this tool never deletes guests; restrict it to the intended VM IDs and protect the token accordingly.
 
-The adapter reads `/version`, `/cluster/resources?type=vm`, node network/status, storage status, and existing QEMU configuration/status. Allocation additionally calls `POST /nodes/{node}/qemu` and reads creation task status. Typical applicable privileges include `Sys.Audit`, `Datastore.Audit`, `VM.Audit`, `VM.Allocate` and `Datastore.AllocateSpace`, with additional per-property permissions determined by the create endpoint. Scope grants to the intended node, storage and VM IDs wherever the API permits. The exact minimal privilege set still requires live acceptance; do not respond to permission failures by automatically escalating to root.
+The adapter reads `/version`, `/cluster/resources?type=vm`, node network/status, storage status, and existing QEMU configuration/status. Allocation additionally calls `POST /nodes/{node}/qemu` and reads creation task status.
+
+The following **working shell-allocation role was reported on VE 9.2.20**. It is not a proven minimal role: individual privilege removal was not tested. Review effective permissions for the deployed version and limit ACL scope rather than granting the role across `/`.
+
+| Scope to review | Privileges in the reported working role | Purpose |
+|---|---|---|
+| Intended node, e.g. `/nodes/pve` | `Sys.Audit` | Read node/network state and capacity |
+| VM disk storage, e.g. `/storage/local-lvm` | `Datastore.Audit`, `Datastore.AllocateSpace` | Read capacity and allocate the planned disks |
+| Each planned VM ID, e.g. `/vms/201` through `/vms/206` | `VM.Audit`, `VM.Allocate`, `VM.Config.Disk`, `VM.Config.CPU`, `VM.Config.Memory`, `VM.Config.Network`, `VM.Config.Options`, `VM.Config.HWType`, `VM.Config.CDROM` | Inspect and create shells with the specified properties |
+| Planned local bridges under `/sdn/zones/localnetwork` | `SDN.Use` | See and use the existing bridges |
+
+Proxmox supports bridge-specific ACL paths such as `/sdn/zones/localnetwork/vmbr0`; include all six selected bridges. The reported lab used the parent `/sdn/zones/localnetwork` grant with propagation. Bridge-specific scope still needs acceptance on your host. For a privilege-separated token, **both the backing user and the token must have effective grants**; a token grant cannot exceed the user's rights. Do not change the host bridges merely because a restricted API response omits them. First compare with independent administration and check these grants.
+
+Later wizard operations have additional requirements: ISO upload uses `Datastore.AllocateTemplate` on the selected ISO storage, ISO inspection needs storage visibility, and guest start uses `VM.PowerMgmt` on the intended VM IDs. Attaching/detaching media and changing boot settings use the corresponding VM configuration permissions. The shell-allocation result does not establish permissions or acceptance for these later steps. The tool neither grants privileges nor escalates to root.
+
+Use a credential-free endpoint with a **dotted DNS hostname**, for example `https://pve.example.org:8006` (ports 443 and 8006 are supported). IP literals and short names such as `pve` are not accepted by the site-plan schema. Prepare DNS resolution and a certificate matching that hostname before use; local DNS can resolve the name to a private management address. There is no need to expose Proxmox to the public internet. The Proxmox node identifier is a separate field and may still be a short name such as `pve`.
 
 Store credentials outside the repository in a regular file owned by your current user with mode `0600` (or stricter):
 
@@ -49,6 +64,8 @@ Omit `--ca-file` when the server chain is already trusted by the preparation com
 
 This action allocates disks and VM definitions. Each guest has autostart disabled and each virtual NIC has its link disconnected. Edge receives WAN plus the five planned zone interfaces in that order; each other guest receives its assigned zone interface. Addresses, DNS records and routing remain plan intent, not applied guest configuration.
 
+HTTP failures show the status and, when the server supplies a recognized permission error, the missing privilege. Raw response bodies, token values and arbitrary server error text are not printed. A bare 403 still requires reviewing effective user/token permissions; a successful read-only check cannot prove allocation rights.
+
 The command checks the entire plan before its first creation request, waits for each server task and checks the resulting shell. It never updates or deletes an existing guest. A description marker binds each shell to a hash of the complete plan and module identity. This is an ownership/retry guard, not protection against a malicious Proxmox administrator.
 
 Retrying the identical plan can skip matching stopped shells and allocate the remainder. A changed plan, unexpected NIC/disk, changed resources, locked VM, running VM or foreign ownership blocks the operation. After guest installation or intentional reconfiguration, this command is no longer an appropriate lifecycle manager; it refuses those differences rather than reverting them.
@@ -57,9 +74,9 @@ If a request or task fails, existing resources remain. A timed-out POST may have
 
 ## Next implementation and live acceptance
 
-The separate [guest-installation wizard](portable-installation-wizard.md) now adds pinned media preparation/upload and guided isolated console installation. Those operations are not delivered by empty-shell allocation itself. Complete offline recovery packaging and live Proxmox acceptance remain outstanding. Local networking and applications require their subsequent modules before links are enabled.
+The separate [guest-installation wizard](portable-installation-wizard.md) now adds pinned media preparation/upload and guided isolated console installation. Those operations are not delivered by empty-shell allocation itself. Guest installation and subsequent network/application acceptance remain outstanding; recovery packaging is a later milestone. Local networking and applications require their subsequent modules before links are enabled.
 
-On a disposable real Proxmox host, acceptance must verify:
+Continue acceptance on a disposable Proxmox host; do not treat the reported shell-allocation run as proof of all the following:
 
 1. TLS and least-privilege access, including rejection of untrusted certificates and redirects.
 2. Allocation of the six expected blank stopped guests, disks and disconnected NICs.
@@ -67,6 +84,6 @@ On a disposable real Proxmox host, acceptance must verify:
 4. Identical retry, partial allocation recovery, occupied IDs, permission denial and storage exhaustion.
 5. Actual guest OS installation/boot in the later artifact stage.
 
-Record the exact Proxmox version, storage backend, API permissions and evidence. Until these tests run, the implementation remains experimental API scaffolding.
+Record the exact Proxmox version, storage backend, API permissions and evidence. Until the full acceptance sequence is recorded, this remains experimental infrastructure scaffolding.
 
 Sources: [QEMU API implementation](https://github.com/proxmox/qemu-server/blob/master/src/PVE/API2/Qemu.pm), [storage status API implementation](https://github.com/proxmox/pve-storage/blob/master/src/PVE/API2/Storage/Status.pm), [Proxmox API viewer](https://pve.proxmox.com/pve-docs/api-viewer/).

@@ -58,3 +58,15 @@ def test_cancel_does_not_create_outputs(tmp_path):
     m=importlib.import_module('product_journey');output=tmp_path/'unused'
     assert m.wizard(output,input_fn=lambda _:':cancel',output_fn=lambda _:None)['state']=='cancelled'
     assert not output.exists()
+
+
+def test_cli_ubuntu_accepts_personal_at_purpose_and_name_prompts(tmp_path):
+    import subprocess
+    root=Path(__file__).resolve().parents[1]
+    folder=tmp_path/'journey'
+    result=subprocess.run([str(root/'rdc'),'start','--output-dir',str(folder)],
+                          input='personal\npersonal\n:cancel\n',capture_output=True,text=True)
+    assert result.returncode==4
+    assert result.stdout.index('Purpose:') < result.stdout.index('Short environment name') < result.stdout.index('Services:')
+    assert 'Use one of the stated choices' not in result.stdout
+    assert not folder.exists()

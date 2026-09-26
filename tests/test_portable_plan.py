@@ -81,3 +81,12 @@ def test_boolean_schema_and_duplicate_domains_rejected():
     with pytest.raises(ValueError): m.preview(p)
     p = sample(); p['domains']['files'] = p['domains']['chat']
     with pytest.raises(ValueError): m.preview(p)
+
+
+@pytest.mark.parametrize('endpoint', ['https://pve:8006', 'https://192.0.2.10:8006'])
+def test_endpoint_rejection_explains_dotted_dns_requirement(endpoint):
+    m = importlib.import_module('portable_plan'); p = sample()
+    p['proxmox']['endpoint'] = endpoint
+    with pytest.raises(ValueError) as error: m.validate(p)
+    assert 'dotted DNS' in str(error.value)
+    assert 'pve.example.org' in str(error.value)

@@ -6,7 +6,7 @@ The phase ends with operator-confirmed OS installation and console login on disk
 
 ## Before starting
 
-- Prepare an independently administered Proxmox VE 9.x lab host and the existing bridges/storage described in [provisioning prerequisites](proxmox-provisioning.md). Live compatibility is not yet accepted.
+- Prepare an independently administered Proxmox VE 9.x lab host and the existing bridges/storage described in [provisioning prerequisites](proxmox-provisioning.md). Shell allocation has an operator-reported nested VE 9.2.20 result; guest installation and full compatibility are not yet accepted.
 - Have console access to Proxmox that does not depend on the OPNsense VM.
 - Prepare the private API-token file and trusted Proxmox CA certificate. Never put token values in the site plan, command line or repository.
 - Have a separate ISO-capable storage location, usually `local`, with space for the ISO files and upload temporary copies. VM disks still use the site's `lvmthin` or `zfspool` storage.
@@ -19,13 +19,15 @@ Prepare dependencies using the repository's normal instructions, then start:
 ./rdc start --platform proxmox --output-dir /absolute/private/path/my-portable-site
 ```
 
-The directory must be new or empty. The wizard asks for the site/recovery names, Proxmox endpoint/node/storage, WAN bridge, reserved network range, first VM ID and service domain. It previews resource defaults and saves `site.json` privately after you choose SAVE. Verify resources and all existing bridge names before allocation; the guided defaults do not inspect or configure your hardware.
+The directory must be new or empty. The wizard asks for the site/recovery names, Proxmox endpoint/node/storage, WAN bridge, each of the five zone bridges (management, staff, frontend, applications and partner), reserved network range, first VM ID and service domain. It previews resources and the selected bridge/subnet mapping, then saves `site.json` privately after you choose SAVE. All six bridge names must be distinct. Defaults `vmbr1`–`vmbr5` are suggestions: select other independently prepared bridges if those names are already used for an unrelated network. Bridge existence and access are checked later with credentials. Verify resources and all existing bridge names before allocation; the guided defaults do not inspect or configure your hardware.
 
 Resume from the same record:
 
 ```sh
 ./rdc start --platform proxmox --resume /absolute/private/path/my-portable-site/site.json
 ```
+
+This workflow writes `site.json`, not `journey.json` or `START-HERE.md`. Resume using the command above; `rdc guide` belongs to the separate Ubuntu service-machine workflow.
 
 No secrets are saved by answering these planning questions. Credential *file paths* are requested only when choosing a remote operation and retained only for that wizard session. Guest administrator passwords are set inside the guest console.
 

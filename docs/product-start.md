@@ -1,10 +1,23 @@
 # Start with your intended use
 
-This development checkout has a guided route for personal use, institutional chat/files, and a regional partner gateway. It is experimental. The published 0.2.0-alpha.1 download predates this interface and the application packages. Use the source preparation instructions in the README.
+This development checkout has a guided route for personal use, institutional chat/files, and a regional partner gateway. It is experimental. Published prereleases may predate the selected workflow; use the source revision named in the relevant feature guide. Use the source preparation instructions in the README.
+
+## Choose the correct workflow
+
+There are two distinct planning formats. Use the commands for the platform you selected:
+
+| Platform | Start | Saved planning files | Continue |
+|---|---|---|---|
+| Ubuntu service machines (default) | `./rdc start` | Completed: `journey.json` and `START-HERE.md`; unfinished: `draft.yml` | `./rdc guide /absolute/path/journey.json` for a completed plan |
+| Portable Proxmox kit | `./rdc start --platform proxmox` | `site.json` after typing `SAVE` | `./rdc start --platform proxmox --resume /absolute/path/site.json` |
+
+For Proxmox, use the [portable installation wizard](portable-installation-wizard.md). Its default directory is `inventories/lab/portable`; use `--output-dir /absolute/private/path/my-site` to choose another new or empty directory. It opens the portable menu after saving. It does **not** generate `journey.json` or `START-HERE.md`, and `rdc guide` does not consume `site.json`.
+
+The numbered instructions below apply to the **Ubuntu service-machine workflow**, not the Proxmox menu.
 
 ## 1. Make a plan on your own computer
 
-Run `./rdc start`. Choose personal, institution or regional, the chat/file services you need, an institution identifier, a responsible operator, primary and recovery location labels, and a new or existing network. Institution defaults to both chat and files. Type `:back` to correct an answer, `:save` to save an unfinished draft, or `:cancel` to stop.
+Run `./rdc start`. The first prompt is purpose: `personal`, `institution` or `regional`. Next enter a short environment name, then the chat/file services you need, a responsible operator, primary and recovery location labels, and a new or existing network. `personal` is also valid as an environment name. A fresh purpose/name prompt has no blank default; when resuming, blank retains a displayed saved answer. Institution defaults to both chat and files. Type `:back` to correct an answer, `:save` to save an unfinished draft, or `:cancel` to stop.
 
 The wizard writes private `journey.json` and `START-HERE.md` files under `inventories/lab/journey` by default. Read the checklist before deploying. Different location labels are a planning aid; check that electricity, upstream connectivity and emergency access are actually independent. A replacement VM is recovery capacity, not a second writable copy of a database.
 

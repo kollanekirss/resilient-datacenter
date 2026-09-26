@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
 
 
 def test_prepare_wizard_saves_private_plan_without_servers(tmp_path):
-    m=importlib.import_module('portable_wizard');answers=iter(['']*9+['SAVE','q'])
+    m=importlib.import_module('portable_wizard');answers=iter(['']*14+['SAVE','q'])
     result=m.wizard(tmp_path/'journey',input_fn=lambda _:next(answers),output_fn=lambda _:None)
     assert result['state']=='saved'
     file=tmp_path/'journey/site.json'
@@ -61,3 +61,26 @@ def test_corrupt_progress_is_displayed_without_crashing(tmp_path):
     output=[]
     assert m.wizard(folder,input_fn=lambda _: 'q',output_fn=output.append)['state']=='saved'
     assert any('invalid' in s for s in output)
+
+
+def test_custom_bridge_choices_are_saved_and_used_for_shell_nics(tmp_path):
+    m=importlib.import_module('portable_wizard')
+    answers=iter(['']*6 + ['vmbr11','vmbr12','vmbr13','vmbr14','vmbr15'] + ['']*3 + ['SAVE','q'])
+    output=[]
+    result=m.wizard(tmp_path/'site',input_fn=lambda _:next(answers),output_fn=output.append)
+    assert result['state']=='saved'
+    plan=json.loads((tmp_path/'site/site.json').read_text())
+    payloads=importlib.import_module('proxmox_provision').payloads(plan)
+    assert payloads[0]['net1']=='virtio,bridge=vmbr11,link_down=1'
+    assert payloads[0]['net5']=='virtio,bridge=vmbr15,link_down=1'
+    assert payloads[1]['net0']=='virtio,bridge=vmbr13,link_down=1'
+    assert all(bridge in '\n'.join(output) for bridge in ('vmbr11','vmbr12','vmbr13','vmbr14','vmbr15'))
+
+
+@pytest.mark.parametrize('bridge', ['vmbr0','vmbr2'])
+def test_duplicate_bridge_answers_cannot_be_saved(tmp_path,bridge):
+    m=importlib.import_module('portable_wizard')
+    answers=iter(['']*6 + [bridge,'vmbr2','vmbr3','vmbr4','vmbr5'] + ['']*3 + ['SAVE'])
+    with pytest.raises(ValueError,match='distinct bridge'):
+        m.wizard(tmp_path/'site',input_fn=lambda _:next(answers),output_fn=lambda _:None)
+    assert not (tmp_path/'site/site.json').exists()

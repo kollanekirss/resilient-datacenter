@@ -63,8 +63,11 @@ def check(plan, api):
     require(type(bridges) is list, 'Cannot inspect Proxmox bridges.')
     by_name={b.get('iface'):b for b in bridges if type(b) is dict}
     for bridge in [plan['proxmox']['wan_bridge']]+[n['bridge'] for n in plan['networks'].values()]:
-        b=by_name.get(bridge,{})
-        require(b.get('type')=='bridge' and b.get('active') in (1,True), 'A required active Linux bridge is missing. Configure it independently first.')
+        require(bridge in by_name,
+                'A required bridge is missing or not visible to this API token. Check SDN.Use on /sdn/zones/localnetwork (or the planned bridge paths) for both user and token before changing host networking. See docs/proxmox-provisioning.md.')
+        b=by_name[bridge]
+        require(b.get('type')=='bridge' and b.get('active') in (1,True),
+                'A visible planned interface is not an active Linux bridge. Inspect its type and state through independent host administration before proceeding.')
     wan=by_name[plan['proxmox']['wan_bridge']]
     require(not any(wan.get(k) for k in ('address','address6','cidr','cidr6','gateway','gateway6')),
             'The WAN bridge has a host address or gateway. Refusing a topology that could expose host management.')
