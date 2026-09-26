@@ -45,12 +45,32 @@ The result reports measured recovery duration and each snapshot's age when the
 recovery timer started. These are synthetic observations, not an RTO/RPO promise.
 The timer includes decrypting the package, rebuilding infrastructure and fresh
 application installation/restoration. It excludes initial artifact acquisition,
-backup preparation. It includes detection of the simulated gateway failure.
+backup preparation. Native snapshot capture briefly stops the applications for
+consistency; that earlier planned interruption is outside this recovery measurement.
+The recovery timer includes detection of the simulated gateway failure.
 
 ## Evidence and boundaries
 
-Hosted result: **pending**. Local contract tests cover fencing, restricted guest
-networking, safe ownership-preserving snapshot extraction and evidence labels.
+Hosted result: **PASS**, 26 September 2026, implementation head `b689448`,
+[run 36234854664](https://github.com/kollanekirss/resilient-datacenter/actions/runs/36234854664).
+Both original applications were installed and exercised, both native snapshots
+captured, originals fenced/deleted, and fresh offline replacements installed and
+restored. The final staff DNS/time/TLS/chat/files check passed.
+
+| Observation | Measured result |
+|---|---|
+| Routing failure to verified restored staff access | 440.34 seconds (7 min 20 sec) |
+| Chat snapshot age at failure | 80.87 seconds |
+| Files snapshot age at failure | 21.39 seconds |
+| Saved chat message and saved file | Present after restore |
+| Later unbacked chat message and file version | Absent after restore |
+
+All 922 tests and local checks passed on GitHub. All 22 checks on the implementation
+revision passed, including this new exercise. Independent review caught and fixed
+guest DNS configuration and an understated outage start time before execution.
+Local contract tests cover fencing, restricted guest networking, safe
+ownership/permission-preserving extraction and evidence labels. A later
+documentation-only commit records this result; it is not a separate runtime proof.
 
 Infrastructure namespaces share the controller kernel and preinstalled packages;
 application VMs start from a pinned, preinstalled Ubuntu image. This does not

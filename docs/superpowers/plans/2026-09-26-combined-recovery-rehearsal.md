@@ -37,14 +37,14 @@ promotion is exposed as a new operator command.
 
 ## Tasks
 
-- [ ] Add failing tests for isolated guest command, safe snapshot archive handling,
+- [x] Add failing tests for isolated guest command, safe snapshot archive handling,
   fencing requirement and honest measurement/evidence boundaries.
-- [ ] Implement focused fixture network, guest-action and client modules. Preserve
+- [x] Implement focused fixture network, guest-action and client modules. Preserve
   existing standalone application/network test semantics.
-- [ ] Implement orchestration using existing public/private bundles and new guests.
+- [x] Implement orchestration using existing public/private bundles and new guests.
   Record monotonic recovery duration and UTC per-role backup age; distinguish
   known test writes from a general data-loss guarantee.
-- [ ] Add guarded disposable workflow, failure diagnostics and operator-facing
+- [x] Add guarded disposable workflow, failure diagnostics and operator-facing
   evidence document. Run local checks, independent review and hosted rehearsal.
 
 ## Constraints and review focus
@@ -56,3 +56,13 @@ Do not create a replacement while the original QEMU process remains alive.
 Service access must use local DNS, not hard-coded frontend addressing. The test
 must fail if a denied path unexpectedly works or saved data fails to restore.
 Use bounded waits and report precise infrastructure/OS installation exclusions.
+
+
+## Result
+
+Independent review fixed guest resolver configuration and started measurements
+before the injected routing failure. Local/hosted checks passed 922 tests.
+Implementation `b689448` passed combined recovery run `36234854664`: 440.34 seconds
+from failure to recovered staff access, backup ages chat 80.87 seconds/files 21.39
+seconds, saved data recovered and later writes absent. All 22 implementation
+checks passed. Physical and OPNsense/Proxmox gates remain separate.
