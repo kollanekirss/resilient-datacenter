@@ -14,7 +14,7 @@ def saved_settings(folder,plan):
         require(not folder.is_symlink(),'Provisioning directory cannot be a symlink.')
         return None
     directory(folder)
-    require(set(p.name for p in folder.iterdir())<={'settings.json','journal.json'},'Unrelated provisioning files will not be adopted.')
+    require(set(p.name for p in folder.iterdir())<={'settings.json','journal.json','edge.json','media'},'Unrelated provisioning files will not be adopted.')
     if not (folder/'settings.json').exists():
         require(not any(folder.iterdir()),'Incomplete provisioning settings; inspect local records.')
         return None
@@ -32,6 +32,7 @@ def run(folder,plan,config,verb,api):
         require(not path.is_symlink() and (existing is None or path.exists()),
                 'Provisioning journal is missing or symlinked; allocation history cannot be reset. Inspect private records and remote resources.')
         previous=provision.validate_journal(plan,existing,read(path)) if existing is not None and path.exists() else None
+        require(previous is None or not previous.get('edge_installation'),'OPNsense guest installation has started. Use the opnsense checkpoint; shell allocation cannot manage installed guests.')
         if existing is not None and existing!=config:
             require(previous is None or not previous['vms'],
                     'VM allocation or observed shells bind these settings. Do not change IDs or management settings; inspect the existing resources.')
@@ -64,15 +65,15 @@ def checkpoint(result,output_fn):
     else:
         output_fn('Built/configured by this check: none. Existing matching shells: '+str(result['existing_vm_ids']))
     output_fn('Verified now: visible bridges, management address, capacity and visible VM ownership/state. Independent console access is still an operator check.')
-    output_fn('Not yet available: installed guest OSs, active network policy, field access or partner connectivity from this workflow.')
-    output_fn('Next step: '+('Guest OS installation and local network activation adapters (not implemented yet).' if result['state']=='shells-allocated' else
+    output_fn('Not established by this shell checkpoint: installed guest OSs, active network policy, field access or partner connectivity.')
+    output_fn('Next step: '+('Choose opnsense for guided edge installation; Linux guest installation and network activation remain outstanding.' if result['state']=='shells-allocated' else
               'Review the allocation preview, then explicitly choose allocate; host-check success does not prove create permissions.'))
 
 
 def menu(folder,plan,*,input_fn=input,output_fn=print,api_factory=Client):
     folder=Path(folder)
     outcome={'state':'prepared','configuration_file':str(folder/NAME),'deployment':'not-established-by-plan'}
-    output_fn('Connectivity checkpoints: host inspection and VM shell allocation are available. Guest OS installation and network activation remain unavailable.')
+    output_fn('Connectivity checkpoints: host inspection and VM shell allocation are available. Guided OPNsense installation is available; Linux installation and network activation remain outstanding.')
     config=saved_settings(folder,plan)
     if config is not None:
         path=folder/'provisioning/journal.json'
@@ -84,9 +85,14 @@ def menu(folder,plan,*,input_fn=input,output_fn=print,api_factory=Client):
             if pending:output_fn('Pending/uncertain allocations: '+', '.join(pending)+'. Inspect tasks; missing uncertain shells are never automatically recreated.')
     try:
         while True:
-            choice=input_fn('Choose preview, settings, check (read only), allocate (stopped shells), or exit [exit]: ').strip().lower() or 'exit'
+            choice=input_fn('Choose preview, settings, check (read only), allocate (stopped shells), opnsense (guided installation), or exit [exit]: ').strip().lower() or 'exit'
             if choice in ('exit','q',':cancel'):
                 output_fn('Progress retained. No services installer was started.');return outcome
+            if choice=='opnsense':
+                from connectivity_edge_ui import menu as edge_menu
+                try:edge_menu(folder,plan,input_fn=input_fn,output_fn=output_fn,api_factory=api_factory)
+                except ValueError as error:output_fn('OPNsense checkpoint needs attention: '+str(error))
+                continue
             if choice not in ('preview','settings','check','allocate'):
                 output_fn('Choose one of the stated operations.');continue
             try:

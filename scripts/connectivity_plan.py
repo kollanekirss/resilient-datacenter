@@ -119,7 +119,7 @@ def render(data):
     lines.extend(f"  {i}. {stage['name']}: {stage['state']}" for i,stage in enumerate(data['stages'],1))
     lines+=['','Built/configured: not established by this plan alone. Review the separate operation checkpoints.',
             'Verified: input structure only; no host, network or certificate checks.',
-            'Available next: explicit host inspection and stopped VM shell allocation. Guest OS/network activation remain unavailable.',
+            'Available next: host inspection, stopped VM shell allocation and guided OPNsense installation. Linux installation and network activation remain outstanding.',
             'Next step: finish planning.' if data['state']=='draft' else
             'Next step: choose host inspection in the connectivity operation menu.',
             '', 'Limits and dependencies:']

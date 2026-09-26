@@ -6,9 +6,9 @@ From this development checkout:
 ./rdc connectivity install --output-dir /absolute/private/path/my-connectivity
 ```
 
-**Available now:** scope explanation, topology planning, private save/resume, read-only Proxmox inspection and explicitly confirmed allocation of stopped connectivity VM shells. **Not available yet:** guest OS installation, OPNsense network activation, field enrollment or partner-network activation through this new wizard. It does not produce a working datacenter yet.
+**Available now:** scope explanation, topology planning, private save/resume, read-only Proxmox inspection and explicitly confirmed allocation of stopped connectivity VM shells, followed by guided isolated OPNsense console installation. **Not available yet:** Linux guest installation, OPNsense network activation, field enrollment or partner-network activation through this new wizard. It does not produce a working datacenter yet.
 
-Prepare the repository Python environment first. The opening screen appears before credentials or remote access. Starting the wizard makes no remote connection. Planning can run on a preparation computer, including macOS; guest/server installation commands are never executed there by this workflow. No software is downloaded in this increment.
+Prepare the repository Python environment first. The opening screen appears before credentials or remote access. Starting the wizard makes no remote connection. Planning can run on a preparation computer, including macOS; guest/server installation commands are never executed there by this workflow. Only the explicitly confirmed OPNsense `prepare` checkpoint downloads installation media.
 
 ## Plan the network
 
@@ -42,6 +42,7 @@ The operation menu offers:
 | `settings` | Preview another first VM ID or management address; no API connection or immediate save |
 | `check` | After typing `CHECK`, read host/task state and save the result; no remote mutation |
 | `allocate` | After typing `ALLOCATE`, recheck prerequisites and create missing owned VM shells |
+| `opnsense` | Open the separate guided edge installation checkpoints; no action occurs just by opening it |
 | `exit` or blank | Retain private records and exit; no service installer follows |
 
 Initially select the first VM ID (default 300) and the existing independent Proxmox management IPv4 address. The exact VM preview appears before confirmation and credential prompts. Settings changes can be confirmed while there is no recorded creation intent or observed owned shell. Once allocation has begun or an owned shell was observed, settings are bound to those resources; the tool does not migrate, rename or delete them.
@@ -56,7 +57,35 @@ Initially select the first VM ID (default 300) and the existing independent Prox
 | Disposable connectivity test target | 1 | 512 MiB | 8 GiB | Services bridge |
 | Each coordinator/relay selected as local | 1 | 1 GiB | 16 GiB | Services bridge |
 
-This gives four to eight VM shells, rather than the older six application VMs. All guests are **stopped, autostart-disabled and have every virtual NIC disconnected**. No applications, backups, ISO attachments, public port forwarding or host-network changes are performed. Resource values are initial lab sizing, not production capacity acceptance. Naming/time and coordinator/relay roles on the services bridge still need guest firewall and exposure policy before activation; VM separation alone is not isolation.
+This gives four to eight VM shells, rather than the older six application VMs. After shell allocation, all guests are **stopped, autostart-disabled and have every virtual NIC disconnected**. Shell allocation performs no applications, backups, ISO attachments, public port forwarding or host-network changes. The subsequent OPNsense checkpoint explicitly attaches installation media and starts only that VM. Resource values are initial lab sizing, not production capacity acceptance. Naming/time and coordinator/relay roles on the services bridge still need guest firewall and exposure policy before activation; VM separation alone is not isolation.
+
+## Guided OPNsense installation
+
+After shell allocation choose `opnsense`. The submenu shows the exact host, node and VM ID, fixed media version, download size, private cache and next checkpoint. Opening the submenu does not fetch software or contact Proxmox. Every action has its own preview and uppercase confirmation; cancellation returns without executing it.
+
+| Checkpoint | What it does and where it stops |
+|---|---|
+| `prepare` | Downloads/decompresses the pinned OPNsense DVD image on the preparation computer; verifies its size and SHA-256. No API credentials needed. |
+| `upload` | Uploads to selected existing ISO-capable storage (default `local`), using a unique filename and server-side SHA-256 verification; retains the successful task receipt. |
+| `attach` | Checks active owned VM configuration, rejects pending changes and checks disconnected NICs, then attaches the verified ISO with installer-first boot. VM remains stopped. |
+| `start` | Starts the isolated installer VM and waits for an observed running state. **The operator still performs OS installation in Proxmox Console.** |
+| `finish` | Requires operator confirmation that installation and a new private root password are complete, and observes that the guest was shut down. Removes the ISO and selects disk-only boot. |
+| `boot` | Starts and observes disk-only VM execution. This alone does not verify OS identity or login. |
+| `confirm` | Records the operator's name, observed OPNsense version and successful console login, after checking a running disk-only VM. This is explicitly **operator-attested**, not an automated OS probe. |
+| `status` | Reads current configuration/power state; retains pending requests and separates current observations from historical checkpoints. |
+| `exit` | Returns to the main connectivity menu with progress retained. |
+
+All four OPNsense NICs remain disconnected and autostart remains disabled throughout. No public management interface is activated, no field device is asked to trust a self-signed certificate, and no certificates are issued here. The future activation adapter must prepare publicly trusted endpoints and verified policy first. Linux shells and application services remain untouched.
+
+Console procedure: open the selected VM's Proxmox console; start the vendor installer using `installer` / `opnsense`; install to that VM's sole 20 GiB disk; set a new private root password; then shut down from inside the guest. Never paste the root password into this wizard. After `finish` and `boot`, check the installed version and console login before choosing `confirm`. Follow the [vendor installation procedure](https://docs.opnsense.org/manual/install.html); the wizard does not automate console keystrokes or infer success from the installer starting.
+
+The current pin is OPNsense 26.7 DVD amd64, 494,298,945 compressed bytes, SHA-256 `95cafedda6d5b22ce832e249dc2309110fbee19f813ad78cf28bb3d387186bfb`. On 2026-09-27 it matched the [vendor checksum](https://pkg.opnsense.org/releases/26.7/OPNsense-26.7-checksums-amd64.sha256) and [separate vendor release announcement](https://github.com/opnsense/changelog/blob/master/community/26.7/26.7). This adapter uses that repository-pinned checksum; it does not implement the vendor's separate OpenSSL signature procedure or automatically select newer releases. Patch/update acceptance before production use remains outstanding.
+
+In addition to shell privileges, review `VM.PowerMgmt` on the edge VM, `VM.Config.CDROM` and `VM.Config.Options` for attachment/boot changes, and `Datastore.Audit` plus `Datastore.AllocateTemplate` on ISO storage. VM-image storage such as `local-lvm` normally does not hold ISO files. The API token is not a browser console login: the operator also needs independent Proxmox console access with suitable permissions.
+
+The private `provisioning/edge.json` journal is bound to the allocation settings and media pin. `provisioning/media/` holds the local verified image. The allocation journal records that guest installation has begun; a missing guest journal cannot silently reset the workflow. From then on, use the OPNsense checkpoints instead of `check`/`allocate`, which manage blank shells only. Retain the entire workspace together.
+
+Uploads, configuration changes and starts record intent before submission and retain returned task IDs. Unknown uploads are blocked even if a similarly sized ISO exists. Known tasks must succeed before progress can advance. An unknown attachment/removal/start can reconcile only if the exact intended owned configuration/power state is observed; otherwise inspect the task/console manually. No automatic stop, reinstall, rollback or remote media deletion is performed. Uploaded media is trusted through the successful checksum-checked task and matching volume/size; it is not cryptographically read back on each later check. Proxmox administration/storage must remain trusted.
 
 ## Host prerequisites and permissions
 
@@ -105,4 +134,4 @@ Exit code 0 means the workflow saved planning/progress and exited; it is not a d
 
 Tests simulate Proxmox responses, ownership, capacity, permission errors, partial allocation, lost responses, stale plans and resume/cancellation. They are not a new live-host result. The earlier lab report verified the old allocator on nested VE 9.2.20; the new variable-role allocator still requires its own lab acceptance. No lab host was accessed during this implementation.
 
-Next: guest installation and safe OPNsense/bootstrap network configuration, followed by Headscale/DERP activation, real field-device enrollment, partner exchange and domestic outage exercises. Services remain separately initiated and backups remain outside this milestone. See the [design](superpowers/specs/2026-09-27-connectivity-foundation-design.md).
+Next: Linux guest installation and safe OPNsense/bootstrap network configuration, followed by Headscale/DERP activation, real field-device enrollment, partner exchange and domestic outage exercises. Services remain separately initiated and backups remain outside this milestone. See the [design](superpowers/specs/2026-09-27-connectivity-foundation-design.md).

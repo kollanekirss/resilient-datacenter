@@ -11,8 +11,8 @@ Services are installed separately. This workflow does not install chat, files, S
 Prerequisites: supported clean Proxmox, independent console/management access, networking,
 prepared domains/public certificates, and any selected external servers.
 Process: plan, review changes, execute a supported stage, verify, then continue or save and exit.
-Current version: planning, read-only host checks and stopped VM shell allocation. Guest OS installation and network activation are not implemented.
-No servers are contacted or changed by launching this wizard. API credentials are requested only for a selected host operation; no software is downloaded.
+Current version: planning, read-only host checks and stopped VM shell allocation. Guided OPNsense installation is available; Linux installation and network activation remain outstanding.
+No servers are contacted or changed by launching this wizard. API credentials are requested only for a selected host operation. Pinned software downloads require the separate prepare checkpoint.
 Choose Start planning, Resume connectivity installation, or Exit.'''
 
 
