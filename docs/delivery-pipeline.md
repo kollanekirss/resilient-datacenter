@@ -1,5 +1,7 @@
 # Institutional crisis networks: delivery priorities
 
+Historical priorities for the earlier service toolkit. The proposed first release of the new networking appliance is defined in the [11 October 2026 two port specification](superpowers/specs/2026-10-11-two-port-network-appliance-v1-design.md). Its acceptance is separate from the evidence below.
+
 Updated 26 September 2026 from the user's explicit scope clarification. This
 priority order supersedes the earlier recovery-first order and the ordering in
 older component roadmaps. Recovery is useful later work, not the primary product.
