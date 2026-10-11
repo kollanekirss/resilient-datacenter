@@ -10,6 +10,7 @@ from contextlib import contextmanager
 import bz2
 import fcntl
 import hashlib
+import http.client
 import io
 import os
 from pathlib import Path
@@ -285,7 +286,7 @@ def prepare_component(component: dict, cache: Path) -> Path:
                         _publish(_Expanded(stream), expanded, component["expanded"], directory_fd)
                 name = expanded
             return folder / name
-    except (OSError, EOFError, ValueError) as error:
+    except (OSError, EOFError, ValueError, http.client.HTTPException) as error:
         if isinstance(error, ApplianceError):
             raise
         raise ApplianceError("media-preparation") from None

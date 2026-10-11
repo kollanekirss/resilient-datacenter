@@ -1,6 +1,7 @@
 """Synthetic byte fixtures; these do not qualify a release or boot vendor media."""
 import bz2
 import hashlib
+import http.client
 import io
 import os
 from pathlib import Path
@@ -122,6 +123,28 @@ def test_interrupted_download_retains_no_partial_and_can_retry(tmp_path, monkeyp
     cache = tmp_path / "cache"
     with pytest.raises(ApplianceError):
         media.prepare_component(record, cache)
+    assert not list(cache.glob(".partial-*"))
+    network(monkeypatch, record)
+    assert media.prepare_component(record, cache).read_bytes() == PAYLOAD
+
+
+@pytest.mark.parametrize("interrupted", ["checksum", "artifact"])
+def test_incomplete_http_read_is_controlled_and_cleans_unpublished_bytes(tmp_path, monkeypatch, interrupted):
+    record = component()
+    class Incomplete(io.BytesIO):
+        def read(self, *args):
+            raise http.client.IncompleteRead(b"PRIVATE_PARTIAL_BYTES", 100)
+    def open_url(url):
+        is_checksum = url == record["provenance"]["url"]
+        if is_checksum == (interrupted == "checksum"):
+            return Incomplete()
+        return io.BytesIO(checksum(record) if is_checksum else PAYLOAD)
+    monkeypatch.setattr(media, "_open_https", open_url)
+    cache = tmp_path / "cache"
+    with pytest.raises(ApplianceError, match="media-preparation") as error:
+        media.prepare_component(record, cache)
+    assert "PRIVATE_PARTIAL_BYTES" not in str(error.value)
+    assert not list(cache.glob("*.artifact"))
     assert not list(cache.glob(".partial-*"))
     network(monkeypatch, record)
     assert media.prepare_component(record, cache).read_bytes() == PAYLOAD

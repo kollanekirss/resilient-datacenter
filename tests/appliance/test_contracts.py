@@ -19,6 +19,43 @@ def test_valid_base_plan_is_copied_and_canonical(site, release):
     assert site["ports"]["management"]["driver"] == "igc"
 
 
+@pytest.mark.parametrize("driver", ["virtio_net", "bnxt_en"])
+def test_linux_driver_names_with_underscores_are_supported(site, release, driver):
+    _, plan = modules()
+    site["ports"]["management"]["driver"] = driver
+    assert plan.validate_site(site, release)["ports"]["management"]["driver"] == driver
+
+
+@pytest.mark.parametrize("driver", ["", "bad driver", "../driver", "a" * 65, None])
+def test_malformed_driver_names_are_rejected(site, release, driver):
+    contracts, plan = modules()
+    site["ports"]["wan"]["driver"] = driver
+    with pytest.raises(contracts.ApplianceError, match="invalid-driver"):
+        plan.validate_site(site, release)
+
+
+@pytest.mark.parametrize("by_id", ["/dev/disk/by-id/.", "/dev/disk/by-id/.."])
+def test_disk_directory_is_not_a_stable_identity(site, release, by_id):
+    contracts, plan = modules()
+    site["target"]["by_id"] = by_id
+    with pytest.raises(contracts.ApplianceError, match="unstable-disk-identity"):
+        plan.validate_site(site, release)
+
+
+@pytest.mark.parametrize("serial,wwn", [(" ", ""), ("", "   "), (" ", " ")])
+def test_blank_disk_identifiers_are_rejected(site, release, serial, wwn):
+    contracts, plan = modules()
+    site["target"].update(serial=serial, wwn=wwn)
+    with pytest.raises(contracts.ApplianceError, match="unstable-disk-identity"):
+        plan.validate_site(site, release)
+
+
+def test_wwn_can_supply_the_independent_disk_identity(site, release):
+    _, plan = modules()
+    site["target"].update(serial="", wwn="0x5000c50012345678")
+    assert plan.validate_site(site, release)["target"] == site["target"]
+
+
 @pytest.mark.parametrize("fault,code", [
     ("schema", "unsupported-schema"), ("extra", "unknown-field"),
     ("ipv6", "ipv4-required"), ("overlay", "subnet-overlap"),

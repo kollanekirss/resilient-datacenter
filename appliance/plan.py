@@ -14,6 +14,7 @@ ZONES = {"router": {"management", "wan", "infrastructure", "workload", "relay"},
          "probe": {"workload"}, "connector": {"infrastructure"},
          "headscale": {"infrastructure"}, "derp": {"relay"}}
 _NAME = re.compile(r"[a-z][a-z0-9-]{0,62}\Z")
+_DRIVER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}\Z")
 _MAC = re.compile(r"(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\Z")
 _HASH = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -26,6 +27,11 @@ def _text(value, *, maximum=256):
 
 def _name(value):
     require(type(value) is str and _NAME.fullmatch(value) is not None, "invalid-name")
+    return value
+
+
+def _driver(value):
+    require(type(value) is str and _DRIVER.fullmatch(value) is not None, "invalid-driver")
     return value
 
 
@@ -159,10 +165,12 @@ def validate_site(plan: Json, release: Json) -> Json:
     require(plan["release_id"] == release["release_id"], "release-mismatch")
     target = plan["target"]
     fields(target, {"by_id", "serial", "wwn", "size_bytes", "model", "transport"})
-    require(type(target["by_id"]) is str and re.fullmatch(r"/dev/disk/by-id/[A-Za-z0-9_.:+-]+", target["by_id"]),
+    require(type(target["by_id"]) is str
+            and re.fullmatch(r"/dev/disk/by-id/[A-Za-z0-9_.:+-]+", target["by_id"])
+            and target["by_id"].rsplit("/", 1)[-1] not in (".", ".."),
             "unstable-disk-identity")
     require(type(target["serial"]) is str and type(target["wwn"]) is str
-            and bool(target["serial"] or target["wwn"]), "unstable-disk-identity")
+            and bool(target["serial"].strip() or target["wwn"].strip()), "unstable-disk-identity")
     for key in ("serial", "wwn"):
         require(len(target[key]) <= 256 and all(32 <= ord(c) < 127 for c in target[key]), "unstable-disk-identity")
     integer(target["size_bytes"], 1, 1024**5)
@@ -178,7 +186,7 @@ def validate_site(plan: Json, release: Json) -> Json:
         require(mac not in macs and port["pci_path"] not in pci, "duplicate-port")
         macs.add(mac)
         pci.add(port["pci_path"])
-        _name(port["driver"])
+        _driver(port["driver"])
     fields(plan["networks"], {"management", "infrastructure", "workload"}, {"relay"})
     networks, assigned = {}, {}
     for zone, settings in plan["networks"].items():
