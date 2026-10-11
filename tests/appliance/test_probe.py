@@ -49,13 +49,13 @@ class SeedTools:
     def __init__(self): self.files={}; self.calls=[]; self.bad=False
     def run(self,argv,**kwargs):
         self.calls.append(argv)
-        if '-outdev' in argv:
-            for i,arg in enumerate(argv):
-                if arg=='-map': self.files[argv[i+2]]=Path(argv[i+1]).read_bytes()
-            Path(argv[argv.index('-outdev')+1]).write_bytes(b'fixture-only-seed-iso')
-        elif '-extract' in argv:
-            i=argv.index('-extract');Path(argv[i+2]).write_bytes(b'bad' if self.bad else self.files[argv[i+1]])
-        else: pytest.fail(argv)
+        if argv[0] == '/usr/bin/genisoimage':
+            for item in argv[argv.index('-graft-points')+1:]:
+                name,path=item.split('=',1); self.files['/'+name]=Path(path).read_bytes()
+            Path(argv[argv.index('-o')+1]).write_bytes(b'fixture-only-seed-iso')
+        elif argv[0] == '/usr/bin/isoinfo':
+            return CompletedProcess(argv,0,b'bad' if self.bad else self.files[argv[-1]],b'')
+        else: pytest.fail(str(argv))
         return CompletedProcess(argv,0,b'',b'')
 
 

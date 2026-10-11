@@ -141,3 +141,46 @@ def test_configuration_render_never_overwrites_existing_output(inputs, tmp_path)
     result = run('network', 'render', str(site), '--ports', str(ports), '--output', str(output), '--release', str(release))
     assert result.returncode == 2
     assert (output / 'keep').read_text() == 'untouched'
+
+
+def test_isolated_router_recovery_cli_requires_explicit_destination(tmp_path):
+    from appliance.cli import parser
+    with pytest.raises(SystemExit):
+        parser().parse_args(['repair', 'router-clone', '--opened-export', str(tmp_path)])
+    args = parser().parse_args(['repair', 'router-clone', '--opened-export', str(tmp_path),
+                               '--vmid', '901', '--work', str(tmp_path / 'private-recovery')])
+    assert args.clone_vmid == 901 and args.work == tmp_path / 'private-recovery'
+    assert args.opened_export == tmp_path
+    args = parser().parse_args(['repair', 'reconcile-router', '--vmid', '901'])
+    assert args.clone_vmid == 901
+
+
+def test_router_clone_recovery_refuses_the_preparation_workstation(tmp_path):
+    result = run('repair', 'router-clone', '--opened-export', str(tmp_path),
+                 '--vmid', '901', '--work', str(tmp_path / 'private-recovery'))
+    assert result.returncode == 2
+    assert json.loads(result.stdout)['code'] in ('installed-host-required', 'root-required')
+
+
+def test_router_clone_cli_routes_only_after_installed_guard(tmp_path, site, release, monkeypatch):
+    from appliance import operations, router_recovery, state
+    from appliance.cli import parser
+    private = tmp_path / 'private'; private.mkdir(mode=0o700)
+    monkeypatch.setattr(operations, 'PRIVATE', private)
+    state.write(tmp_path / 'build.json', {'build_id': 'b'*64})
+    monkeypatch.setattr(operations, '_installed', lambda: (site, release, {'complete': True}))
+    seen = []
+    def restore(plan, opened, vmid, runner, state_dir, **kwargs):
+        seen.append((plan, opened, vmid, state_dir, kwargs))
+        return {'state': 'verified', 'clone_vmid': vmid}
+    monkeypatch.setattr(router_recovery, 'restore_router_isolated', restore)
+    args = parser().parse_args(['repair', 'router-clone', '--opened-export', str(tmp_path / 'opened'),
+                               '--vmid', '901', '--work', str(tmp_path / 'recovery')])
+    result, code = operations.execute_operation(args)
+    assert code == 0 and result['clone_vmid'] == 901
+    assert seen[0][:4] == (site, tmp_path / 'opened', 901, private)
+    assert seen[0][4]['dvd'] == tmp_path / 'media/opnsense-dvd'
+    assert seen[0][4]['build'] == {'build_id': 'b'*64}
+    monkeypatch.setattr(router_recovery, 'reconcile_router_recovery', lambda vmid, runner, root: {'state': 'inspection-required'})
+    args = parser().parse_args(['repair', 'reconcile-router', '--vmid', '901'])
+    assert operations.execute_operation(args)[1] == 2

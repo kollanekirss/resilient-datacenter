@@ -1,44 +1,54 @@
-# Disposable appliance boot lab
+# Disposable appliance acceptance lab
 
-The lab command is read-only unless `--execute` is present. Execution is currently
-limited to one real console scenario: `boot-menu-cancel`, included in
-`media-gate` and `all`. No physical machine or QEMU guest has been qualified by
-the implementation's unit tests.
+The software now includes concrete adapters for every nonphysical V1 acceptance
+case. Actual Linux/KVM execution is still **NOT RUN**; unit tests and localhost
+protocol tests do not qualify the installer or the appliance. Physical USB boot,
+real cabling, and the operator exercise remain separate work for a test machine.
+
+Preview performs read-only prerequisite checks. Execution requires `--execute`
+and both opt-in configuration sections below:
 
 ```text
-python3 scripts/ci_appliance_base.py --suite media-gate --lab-config /absolute/path/lab.json
-python3 scripts/ci_appliance_base.py --suite media-gate --lab-config /absolute/path/lab.json --execute
+python3 scripts/ci_appliance_base.py --suite automated --lab-config /absolute/path/lab.json
+python3 scripts/ci_appliance_base.py --suite automated --lab-config /absolute/path/lab.json --execute
 ```
 
-Every current suite exits **2**, including a successful boot-menu observation.
-That observation covers only a small part of the media gate. It cannot turn
-offline installation, network policy, recovery, or physical tests into a pass.
-Unsupported suites do not launch a guest.
+`automated` requests every nonphysical case. Individual suites are `media-gate`,
+`host-network`, `offline-install`, `router-policy`, `base-operations`, and `repair`.
+`all` also requests `physical-operator`, which this harness always marks NOT RUN.
+Exit 0 requires every exact requested assertion and its evidence to pass; exit 1
+means failure, and exit 2 means missing or unrun coverage. Even a fully passing
+virtual suite leaves hardware qualification NOT RUN.
 
 ## Owned execution profile
 
-Use a dedicated x86-64 Linux machine with accessible KVM, a pinned QEMU binary,
-and matching OVMF CODE/VARS files. The driver requires a private, already existing
-0700 workspace owned by the invoking user. It will not create its ownership
-marker or adopt an arbitrary directory. Create the marker deliberately as a
-0600 regular file named `.rdc-appliance-lab.json`, containing:
+Use a dedicated x86-64 Linux machine with KVM, nested virtualization enabled,
+user and network namespace support, `/dev/net/tun`, and matching OVMF CODE/VARS.
+The outer guest needs 16–64 GiB RAM and 4–16 virtual CPUs to host Proxmox, the
+router, and the neutral probe. Provision enough physical RAM for that allocation
+and enough free storage for retained per-case image copies. No cloud account,
+live bridge, host block device, public network, or existing router is used.
+
+Create a dedicated 0700 workspace owned by the invoking user. The runner never
+adopts an arbitrary directory. Its existing 0600 regular ownership marker,
+`.rdc-appliance-lab.json`, must contain:
 
 ```json
 {"schema":1,"owner_id":"my-disposable-appliance-lab"}
 ```
 
-The configuration keeps the original schema-1 preflight fields and adds explicit
-execution limits and pinned metadata. Every `path` below is an absolute path to
-an existing regular, single-link file inside that workspace. Supply actual hashes
-and the actual built-ISO receipt; the example names are placeholders.
+The complete configuration uses absolute paths and actual hashes. All images and
+metadata below must be regular, single-link files within that private workspace.
+Tool paths may name trusted system executables; they are independently pinned.
+The placeholders below must be replaced before preview or execution:
 
 ```json
 {
   "schema": 1,
   "workspace": "/absolute/path/to/private-lab",
   "owner_id": "my-disposable-appliance-lab",
-  "build_id": "COPY_THE_BUILT_ISO_RECEIPT_BUILD_ID",
-  "spec_id": "SHA256_OF_THE_SPEC_FILE",
+  "build_id": "BUILT_ISO_RECEIPT_BUILD_ID",
+  "spec_id": "SPEC_FILE_SHA256",
   "images": {
     "installer": {"path": "/absolute/path/to/private-lab/candidate.iso", "sha256": "ACTUAL_SHA256"},
     "target": {"path": "/absolute/path/to/private-lab/target-seed.raw", "sha256": "ACTUAL_SHA256"},
@@ -49,94 +59,118 @@ and the actual built-ISO receipt; the example names are placeholders.
   "build_receipt": {"path": "/absolute/path/to/private-lab/candidate.iso.json", "sha256": "ACTUAL_SHA256"},
   "plan": {"path": "/absolute/path/to/private-lab/site.json", "sha256": "ACTUAL_SHA256"},
   "spec": {"path": "/absolute/path/to/private-lab/spec.md", "sha256": "ACTUAL_SHA256"},
-  "qemu_sha256": "SHA256_OF_THE_DETECTED_QEMU_EXECUTABLE",
-  "execution": {"enabled": true, "timeout_seconds": 300, "memory_mib": 4096, "vcpus": 2}
+  "qemu_sha256": "DETECTED_QEMU_BINARY_SHA256",
+  "execution": {"enabled": true, "timeout_seconds": 7200, "memory_mib": 16384, "vcpus": 4},
+  "acceptance": {
+    "enabled": true,
+    "case_timeout_seconds": 7200,
+    "tools": {
+      "openssl": {"path": "/usr/bin/openssl", "sha256": "ACTUAL_SHA256"},
+      "ssh": {"path": "/usr/bin/ssh", "sha256": "ACTUAL_SHA256"},
+      "ssh-keygen": {"path": "/usr/bin/ssh-keygen", "sha256": "ACTUAL_SHA256"}
+    }
+  }
 }
 ```
 
-The QEMU executable is discovered as `qemu-system-x86_64` on the process PATH;
-its exact regular-file bytes must match `qemu_sha256`. Metadata and image hashes,
-the ISO sidecar's build identity, image size/hash, approved installer adapter and
-upstream source revision must match. The sidecar's runtime identity must match
-the complete current appliance source manifest. Rebuild the ISO after changing
-package code or units. The pinned plan is recorded for traceability; this
-scenario does not submit it to installation or claim it was applied.
+The QEMU executable is discovered as `qemu-system-x86_64` on PATH. The build
+receipt must match the ISO and the complete current package source manifest.
+Rebuild the candidate ISO after changing package code or units. Both timeout
+values are bounded at 30–7200 seconds. The case timeout covers the whole case,
+including setup and all its actions, with separately bounded process cleanup.
 
-Execution accepts 30–900 seconds of guest observation, 1024–8192 MiB of guest
-memory, and 1–4 virtual CPUs. Inputs are bounded at 128 GiB each and metadata at
-1 MiB. Regular files and safe ancestors are checked again through descriptors
-before mutation. Block devices, symlinks, hard links, writable inherited
-directories, changed hashes, ambiguous ownership, and a busy workspace stop the
-run. No downloads or host networking setup occurs.
+The pinned site plan must describe this exact disposable hardware profile:
+`RDC-LAB-TARGET` and `RDC-LAB-CANARY` disk serials, management MAC
+`52:54:00:77:00:01` at PCI address 0x5, and WAN MAC `52:54:00:77:00:02` at 0x6.
+Use the complete stable identities reported by the pinned QEMU/installer,
+including target capacity, by-id path, PCI path, and driver. The driver does not
+silently rewrite a mismatching plan. The plan uses DHCP upstream with one
+nonoverlapping private lab CIDR and has no optional Headscale/DERP roles selected.
+Its target seed must satisfy the release's storage budget. All image inputs are
+bounded at 128 GiB each and metadata at 1 MiB.
 
-## What execution does
+Preflight validates all configuration, ownership, hashes, source/build identity,
+tools, KVM, and resource constraints before creating a run. Symlinks, hard links,
+block devices, unsafe ancestors, changed pins, or a busy workspace stop it. A
+missing kernel namespace capability stops the worker before any network setup;
+there is no fallback to the machine's network namespace.
 
-The runner exclusively locks the workspace and creates a new 0700
-`run-<random-id>` child. It copies the raw target seed, canary seed, and OVMF
-variables there, checks their hashes, and keeps all outputs private. It never
-reuses an existing writable guest disk. Firmware CODE and the installer image
-are read-only; only the newly created copies can be written by QEMU. Explicit
-raw formats prevent a seed from naming a QCOW backing file outside the run.
+## What the driver executes
 
-QEMU receives already opened regular-file descriptors, KVM acceleration, bounded
-memory/CPU settings, a serial pipe, no display or monitor server, and two
-disconnected virtual Ethernet devices. `-nic none` disables implicit networking.
-There is no user-mode networking, NAT, port forwarding, tap, bridge, socket
-network backend, host directory export, or PCI passthrough. This tests ISO/UEFI
-boot behavior inside a VM; it does not test physical USB boot or live WAN traffic.
+Each case gets a fresh worker, a new Linux user/network namespace, and private
+regular-file copies of target, canary, and UEFI variables. QEMU receives held
+file descriptors with explicit raw formats. It cannot open a backing image or
+host disk through a supplied image path. The installer and firmware CODE remain
+read-only. Repeated refusal variants retire only their own stopped copies after
+recording their final hashes; final case copies and evidence remain available.
 
-The console scenario performs only these actions:
+Two TAP endpoints exist only in the new namespace. They represent the physical
+management and WAN ports. Controlled peers provide DHCP, DNS, NTP, verified TLS,
+nonce listeners, and DHCP/IPv6-RA capture controls. They have no uplink, NAT, or
+host bridge. Network captures start before QEMU starts. The Proxmox guest creates
+its internal bridges through the production installer. Temporary internal probe
+namespaces exist only inside that disposable guest and are removed before host
+audits.
 
-1. Observe the closed GRUB menu and select its serial-console setup entry.
-2. Observe the appliance menu, send an empty selection, and require its explicit
-   “No action selected” response and return to the menu.
-3. Select the explicit local recovery console, observe its prompt, send `exit`,
-   and require the menu to return.
-4. Stop QEMU, then compare the complete target and canary disk hashes. Both must
-   be unchanged. Firmware-variable changes are recorded and allowed.
+The source-pinned serial protocol verifies the fresh QEMU SMBIOS UUID and
+`RDC Disposable Acceptance` marker. Frames have request sequence and token
+bindings, explicit size bounds, and noncanonical terminal input so a large plan
+cannot be silently truncated. It invokes the production installer, network
+confirmation, router gates, probe, export, repair, and clone-recovery APIs.
+Management confirmation uses an actual SSH/logind session from the management
+peer, with the host key pinned from the local console.
 
-It never selects `Install`, enters a target identifier, submits an erase
-confirmation, mounts a disk, or sends an installation plan. Prerequisite and
-prelaunch failures leave the case `NOT RUN`. Once a real QEMU process launches,
-missing prompts, unsupported console behavior, early exit, timeouts, cleanup
-errors, and observed content changes make the case and report `FAIL`. Simulated
-process boundaries always remain `NOT RUN`. Blank-menu cancellation does
-not satisfy the separate `erase-refusals` case, which needs its own assertions.
+The scenarios cover:
 
-The single-threaded process driver terminates the whole QEMU process group,
-escalates to a kill after five seconds, and closes descriptors. On Linux, QEMU
-also receives a parent-death signal before execution so an abruptly killed
-harness does not leave it running. The race before signal registration is
-checked. An interrupted or incomplete evidence directory is not acceptance;
-retain it for inspection rather than replaying it.
+- Closed boot-menu cancellation, offline installation, disk-only boot, retained
+  USB boot, installation resource observations, and erase refusal variants.
+- Stable port identities, changed names with fail-closed boot and explicit USB
+  repair, replacement NIC and wrong-cable refusal, and independent management
+  rollback after timeout, process death, and reboot.
+- Host WAN address exposure from early boot; physical DHCP/RA absence with live
+  capture controls; router and host administration boundaries; DNS/NTP/HTTPS and
+  cross-zone policy with working source and destination controls.
+- Router-down management, no-WAN startup, first and renewed overlapping WAN
+  leases, fresh explicit transit gates, and withdrawal of an already established
+  TLS connection together with actual router state-table observations.
+- Eight real interruption boundaries, durable journals, refusal to repeat unsafe
+  work, encrypted export, wrong-key/corruption refusal, numeric-address management
+  repair, and automatic isolated cloned-router recovery.
 
-## Evidence and remaining cases
+The OPNsense setup uses the pinned DVD's installer in a private GPT/UFS guest,
+then verifies its console bootstrap and disk boot before opening product gates.
+DVD remastering uses Proxmox's bundled `genisoimage`; no extra package download is
+needed. Clone recovery uses a separate private DVD and a disk-only proof, leaves
+the clone stopped with no network bridge attachments, and keeps the original
+router stopped. See [router recovery](router-recovery.md) for its layout limits.
 
-Each run preserves `launch.json`, `serial.log`, `qemu.log`, and `result.json`
-alongside its disposable image copies. The result includes:
+The export key is generated and held by the controller. The guest receives it
+only for the requested sealing or inspection operation, removes its temporary
+credential file afterward, and reports its digest and actual removal. Private
+login keys and passwords are ephemeral lab data. Action evidence redacts them;
+serial logging stops before credential and protocol exchange. Retain the whole
+workspace as private because guest disk copies and private run files contain
+lab credentials and exported configuration.
 
-- Build, plan, specification, exact lab configuration, current package source,
-  built-ISO receipt and QEMU identities.
-- Raw console and QEMU diagnostic file hashes, process cleanup outcome, and
-  individual observed assertions.
-- Initial/final hashes for each original image and each writable copy; source
-  replacement or source-code drift prevents verification.
-- Separate `NOT RUN` entries for every requested unsupported case.
+## Evidence and execution limits
 
-A supported real observation may have case state `verified`, status `OBSERVED`,
-and method `real-execution`. The overall status is still `PARTIAL` and
-`qualification` remains `NOT RUN`. The driver never accepts a supplied result
-JSON as evidence that it executed a guest. Its private test seams force method
-`unit-fixture`, unknown case state and `NOT RUN`, even if a fake process emits
-all expected prompts. `evaluate_results` remains an evidence-integrity helper,
-not an authenticity check or a qualification authority.
+Each run preserves `result.json`, a readable `report.txt`, per-case action
+records with hashes, boot-console observations, worker diagnostics, and owned
+image copies. Every accepted observation is bound to the run, plan, build,
+specification, source, and current host boot identity. Assertions evaluate raw
+commands, packet bytes, kernel state, and real receipts. A caller-supplied PASS
+label or result JSON is never accepted as proof of execution. Test substitutes
+are irreversibly marked `unit-fixture` and NOT RUN.
 
-Offline installation, target-selection and erase refusals, WAN DHCP/IPv6
-exposure, installed-host management, router policy, interruption/reboot recovery,
-export/repair, and the physical operator exercise still need real dedicated
-scenarios. OVMF/serial behavior, QEMU seccomp support, the complete process-death
-path, and actual media boot remain unqualified until this driver runs on the
-owned Linux lab with the locked inputs.
+A real QEMU launch is reported immediately, before waiting for boot prompts.
+A subsequent timeout, early exit, failed assertion, or cleanup error is FAIL.
+Prerequisites that stop execution before launch are NOT RUN. The runner stops
+its owned process groups and verifies cleanup; parent-death signals bound abrupt
+controller loss. Original image hashes and package source identity are checked
+again before completing the report.
 
-The storage, network and sandbox switches follow the
-[QEMU invocation documentation](https://qemu-project.gitlab.io/qemu/system/invocation.html).
+The implementation has been exercised with unit tests and local PTY/socket/TLS
+protocol tests. The first owned Linux run must still confirm actual OVMF/KVM
+boot, the pinned installer and OPNsense release behavior, nested virtualization,
+real timing and memory budgets, and end-to-end recovery. Software test success
+does not replace those observations or the later physical operator exercise.

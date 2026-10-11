@@ -84,3 +84,46 @@ def test_transit_has_explicit_cross_zone_blocks_and_narrow_host_updates(site):
 
 def test_xml_entities_are_rejected_without_expansion(site):
     assert audit_router(site,b'<!DOCTYPE x [<!ENTITY x "xx">]><opnsense>&x;</opnsense>',{})==["router-xml"]
+
+
+def test_generated_web_certificate_reference_preserves_managed_system_audit(site):
+    creds=credentials(site);doc=ET.fromstring(render_router(site,creds))
+    web=doc.find('system/webgui');ET.SubElement(web,'ssl-certref').text='69aa001122334'
+    cert=ET.SubElement(doc,'cert');ET.SubElement(cert,'refid').text='69aa001122334'
+    ET.SubElement(cert,'crt').text=base64.b64encode(b'-----BEGIN CERTIFICATE-----\n'+base64.b64encode(b'0'+b'x'*128)+b'\n-----END CERTIFICATE-----\n').decode()
+    xml=ET.tostring(doc);rt=runtime(site,xml,creds)
+    assert audit_router(site,xml,rt)==[]
+    web.find('interfaces').text='wan'
+    assert 'router-config-system' in audit_router(site,ET.tostring(doc),rt)
+
+
+@pytest.mark.parametrize('fault',['missing-cert','missing-crt','duplicate-reference','duplicate-cert','invalid-pem'])
+def test_web_certificate_exception_does_not_accept_unbound_or_ambiguous_references(site,fault):
+    creds=credentials(site);doc=ET.fromstring(render_router(site,creds));web=doc.find('system/webgui')
+    ET.SubElement(web,'ssl-certref').text='69aa001122334'
+    cert=ET.SubElement(doc,'cert');ET.SubElement(cert,'refid').text='69aa001122334'
+    ET.SubElement(cert,'crt').text=base64.b64encode(b'-----BEGIN CERTIFICATE-----\n'+base64.b64encode(b'0'+b'x'*128)+b'\n-----END CERTIFICATE-----\n').decode()
+    if fault=='missing-cert':doc.remove(cert)
+    if fault=='missing-crt':cert.remove(cert.find('crt'))
+    if fault=='duplicate-reference':ET.SubElement(web,'ssl-certref').text='69aa001122334'
+    if fault=='duplicate-cert':doc.append(copy.deepcopy(cert))
+    if fault=='invalid-pem':cert.find('crt').text=base64.b64encode(b'not a certificate').decode()
+    xml=ET.tostring(doc)
+    assert 'router-config-system' in audit_router(site,xml,runtime(site,xml,creds))
+
+
+def test_empty_firmware_registration_metadata_is_allowed_but_plugins_are_not(site):
+    creds=credentials(site);doc=ET.fromstring(render_router(site,creds))
+    firmware=ET.SubElement(doc.find('system'),'firmware')
+    ET.SubElement(firmware,'plugins');ET.SubElement(firmware,'type')
+    xml=ET.tostring(doc)
+    assert audit_router(site,xml,runtime(site,xml,creds))==[]
+    firmware.find('plugins').text='os-unknown'
+    xml=ET.tostring(doc)
+    assert 'router-config-system' in audit_router(site,xml,runtime(site,xml,creds))
+    firmware.find('plugins').text=None;firmware.find('type').text='devel'
+    xml=ET.tostring(doc)
+    assert 'router-config-system' in audit_router(site,xml,runtime(site,xml,creds))
+    firmware.find('type').text=None;ET.SubElement(firmware,'mirror').text='https://untrusted.example'
+    xml=ET.tostring(doc)
+    assert 'router-config-system' in audit_router(site,xml,runtime(site,xml,creds))

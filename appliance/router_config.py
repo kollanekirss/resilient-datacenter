@@ -173,6 +173,27 @@ def audit_router(plan,config_xml,runtime):
         credentials={"root_password_hash":doc.findtext("system/user/password"),"management_public_key":public,
             "interface_map":runtime.get("interface_map"),"stage":runtime.get("stage")}
         expected=ET.fromstring(render_router(plan,credentials))
+        # OPNsense creates a TLS certificate on first HTTPS boot and persists
+        # its reference under webgui. Accept only a single backed PEM reference;
+        # listener policy and every other managed system value still compare.
+        references=doc.findall("system/webgui/ssl-certref")
+        if len(references)==1:
+            reference=references[0].text or ""
+            matches=[cert for cert in doc.findall("cert") if cert.findtext("refid")==reference]
+            if re.fullmatch(r"[A-Za-z0-9_-]{1,64}",reference) and len(matches)==1 and len(matches[0].findall("crt"))==1:
+                try:
+                    pem=base64.b64decode(matches[0].findtext("crt", ""),validate=True).decode("ascii")
+                    match=re.fullmatch(r"-----BEGIN CERTIFICATE-----\n([A-Za-z0-9+/=\r\n]+)\n-----END CERTIFICATE-----\s*",pem)
+                    der=base64.b64decode("".join(match[1].split()),validate=True) if match else b""
+                    if 128<=len(der)<=65536 and der[:1]==b"\x30":
+                        _node(expected.find("system/webgui"),"ssl-certref",reference)
+                except (ValueError,UnicodeError):pass
+        # The pinned community release's firmware/register.php sync adds only
+        # empty plugins/type metadata when no optional plugins are selected.
+        firmware=doc.findall("system/firmware")
+        if len(firmware)==1:
+            empty=ET.Element("firmware");_node(empty,"plugins");_node(empty,"type")
+            if _tree(firmware[0])==_tree(empty):expected.find("system").append(empty)
         # Compare every managed subtree, including default deny and service binds.
         for node in expected:
             if len(doc.findall(node.tag))!=1 or _tree(doc.find(node.tag))!=_tree(node):problems.append("router-config-"+node.tag)

@@ -1,6 +1,6 @@
 # Appliance development commands
 
-The appliance now includes a USB image builder, guarded live installer, installed-host networking/rollback, owned router VM operations and private configuration export/repair. **Boot, guest networking and physical acceptance remain NOT RUN.** The code is a development candidate, not a production release.
+The appliance now includes a USB image builder, guarded live installer, installed-host networking/rollback, owned router VM operations, private configuration export/repair, isolated cloned-router recovery and the complete disposable acceptance driver. **Boot, guest networking and physical acceptance remain NOT RUN.** The code is a development candidate, not a production release.
 
 Start with the [installation guide](install.md), [router console setup](router-console.md), [host network controls](host-network.md) and [repair guide](repair.md). The [implementation evidence](implementation-progress.md) distinguishes local checks from remaining runtime qualification.
 
@@ -42,4 +42,4 @@ To inspect host configuration offline, create a ports JSON mapping the observed 
 
 This writes a new directory of proposed files without applying them. Installed mutations require Linux, root and the staged appliance identity. `status`, `diagnose`, `resume` and archive inspection never silently retry an uncertain operation. The menu is usable without Internet access; the installed local console requires login.
 
-Use `--json` before the subcommand for structured output. A zero exit confirms only the named operation. `configured`, `assembled` and content-integrity `verified` are deliberately distinct from hardware or packet acceptance. The ordinary CI workflow runs software checks only; `scripts/ci_appliance_base.py` defaults to read-only checks and offers an explicit disposable boot/cancel observation; see [lab setup](lab.md). It cannot certify an unexecuted scenario or complete suite.
+Use `--json` before the subcommand for structured output. A zero exit confirms only the named operation. `configured`, `assembled` and content-integrity `verified` are deliberately distinct from hardware or packet acceptance. The ordinary CI workflow runs software checks only; `scripts/ci_appliance_base.py` defaults to read-only checks and offers explicit disposable installation, packet, interruption and recovery scenarios; see [lab setup](lab.md). It cannot certify an unexecuted scenario or complete suite.

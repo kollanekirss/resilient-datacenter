@@ -135,7 +135,10 @@ def inspect_execution(config, platform_record):
     else:
         if execution['enabled'] is not True:
             reasons.append('execution-not-authorized')
-        for key,low,high in (('timeout_seconds',30,900),('memory_mib',1024,8192),('vcpus',1,4)):
+        full = type(config.get('acceptance')) is dict and config['acceptance'].get('enabled') is True
+        bounds = (('timeout_seconds',30,7200),('memory_mib',16384,65536),('vcpus',4,16)) if full else (
+            ('timeout_seconds',30,900),('memory_mib',1024,8192),('vcpus',1,4))
+        for key,low,high in bounds:
             if type(execution[key]) is not int or not low <= execution[key] <= high:
                 reasons.append('execution-'+key.replace('_','-')+'-invalid')
     values = {}
@@ -335,7 +338,7 @@ def _observe(console,logs,assertions,timeout):
 
 def _case(case,config):
     return {'case_id':case,'build_id':config.get('build_id'),'spec_id':config.get('spec_id'),
-            'state':'unknown','status':'NOT RUN','reasons':['scenario-runner-not-implemented'],
+            'state':'unknown','status':'NOT RUN','reasons':['full-acceptance-profile-required'],
             'assertions':[],'evidence':[]}
 
 
@@ -380,6 +383,10 @@ def execute_lab(config,suite,*,config_sha256,_platform=None,_process_factory=Non
     """
     require(suite in SUITES,'lab-suite-invalid')
     config = config if type(config) is dict else {}
+    if 'acceptance' in config:
+        from .lab_acceptance_runner import execute_full_lab
+        return execute_full_lab(config, suite, config_sha256=config_sha256, _platform=_platform,
+                                _legacy_process_factory=_process_factory)
     platform_record = collect_platform() if _platform is None else _platform
     synthetic = _platform is not None or _process_factory is not None
     factory = QemuConsole if _process_factory is None else _process_factory
@@ -395,7 +402,7 @@ def execute_lab(config,suite,*,config_sha256,_platform=None,_process_factory=Non
         return result
     case = next((case for case in result['cases'] if case['case_id'] == CASE),None)
     if case is None:
-        result['reasons'] = ['requested-scenarios-not-implemented']
+        result['reasons'] = ['full-acceptance-profile-required']
         return result
     case.update(reasons=[],method='unit-fixture' if synthetic else 'real-execution',environment='nested-kvm')
     work = Path(config['workspace'])

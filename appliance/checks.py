@@ -83,6 +83,12 @@ def attachment(plan):
 
 
 def base_release_allowed(results, *, physical, now=None):
+    """All case assertions and evidence bytes must agree with one fresh run.
+
+    Acceptance receipts have a 24-hour review window; five-minute capability
+    freshness is deliberately not reused for a multi-hour destructive suite.
+    This is an integrity prerequisite, not authenticity or release publication.
+    """
     now = int(time.time()) if now is None else now
     if type(results) is not list or not results or type(physical) is not bool:
         return False
@@ -92,15 +98,22 @@ def base_release_allowed(results, *, physical, now=None):
     names = [item.get('capability') for item in results]
     if any(type(name) is not str for name in names) or len(set(names)) != len(names) or set(names) != required:
         return False
-    builds, plans = set(), set()
+    builds, plans, contexts = set(), set(), set()
     for item in results:
         build, plan = item.get('build_id'), item.get('plan_id')
         if not all(type(v) is str and re.fullmatch(r'[0-9a-f]{64}', v) for v in (build, plan)):
             return False
         if (item.get('test_only') is not False or item.get('source') != 'acceptance-runner'
+                or item.get('method') != 'real-execution'
                 or item.get('environment') not in ({'physical'} if physical else {'nested', 'physical'})
-                or not current(item, item.get('dependencies'), now=now)):
+                or item.get('case_id') != item.get('capability')):
+            return False
+        from .acceptance import required_assertions
+        from .acceptance_report import case_problems
+        if case_problems(item, required_assertions(item['case_id']), now=now):
             return False
         builds.add(build)
         plans.add(plan)
-    return len(builds) == len(plans) == 1
+        dependencies = item['dependencies']
+        contexts.add(tuple(dependencies[key] for key in ('run', 'spec', 'source')))
+    return len(builds) == len(plans) == len(contexts) == 1

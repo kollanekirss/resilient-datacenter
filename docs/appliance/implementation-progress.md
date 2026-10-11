@@ -10,8 +10,8 @@ Work is on the isolated `feat/appliance-v1` branch, separate from the earlier se
 | B4: host network | Exactly two physical port roles, virtual guest bridges, no host WAN address/forwarding, IPv6 disabled, early host guard, PVE activation gate, fresh-SSH confirmation and timed/boot rollback | Kernel/PVE rule behavior, physical port mapping, wire captures and recovery timing |
 | B6/B7: OPNsense | Owned disconnected VM installation, DVD removal/disk boot, deterministic bootstrap/transit configuration, pinned restricted SSH channel, console attestation, live checks before WAN, lease/boot guard | Console import, OPNsense-generated configuration compatibility, helper persistence, actual lease transitions and positive/negative packet probes |
 | B8: operations | Local menu/commands, observed host/router status, explicit unknown states for unmeasured capabilities, bounded local startup, public virtual-network metadata | Live DNS/NTP/HTTPS/isolation evidence; no-WAN and returning-WAN operation |
-| B9: export/repair | Encrypted Restic export with content restore proof, separate password, private archive inspection, exact owned mounted-root management repair, stable disk re-resolution and NIC remapping | Physical recovery, unrelated-disk canaries and isolated router configuration reimport; whole-site restore and automatic cloned-router recovery are not provided |
-| B10: evidence | Private neutral probe seed/import and guarded workload attachment; unit-only CI, strict case membership/freshness gate, disposable boot/cancel runner and operator guides | All named complete acceptance scenarios, physical operator exercise and measured supported hardware |
+| B9: export/repair | Encrypted export and inspection, owned mounted-root repair, stable disk/NIC remapping, automatic isolated clone/import/disk-boot verification and observation-only reconciliation | Actual PVE copy, FreeBSD recovery boot, canary preservation and physical repair; whole-site restoration is outside this path |
+| B10: evidence | Concrete isolated Linux/KVM driver, all 11 automated scenarios, real protocol clients and controls, eight process-interruption boundaries, strict assertion/evidence gate, private reports and operator guides | Actual execution of automated cases, physical operator exercise and measured supported hardware |
 | R1–R6 | Explicitly unavailable in this base | Connector joining, independently eligible Headscale/DERP hosting and complete V1 qualification |
 
 ## Evidence actually obtained
@@ -32,8 +32,55 @@ The implementation keeps configuration evidence distinct from packet proof. A ro
 
 No USB was written, physical disk erased, host installed, live host networking changed, guest booted, role enrolled or release published in this workspace. The first hardware execution must use a disposable machine and the [acceptance checklist](evidence.md).
 
-## Final verification
+## Previous base verification
 
 On 11 October 2026, the final integrated check completed successfully: **1,333 tests passed**, all playbook syntax checks passed, and the infrastructure/independent/join host and task listings passed without target connections. The dynamic inventory-group warnings are expected because those groups are selected at runtime. `git diff --check` and the appliance documentation's relative-file link check also passed.
 
-All eight confirmed independent-review findings were corrected and covered by regression tests before that run. The native Restic round trip described above separately passed. Actual Linux ISO assembly, ISO boot, guest packets and physical recovery remain **NOT RUN**; complete acceptance-scenario automation and automatic cloned-router recovery are also outstanding. These results establish a software-tested development base, not an accepted V1 release.
+All eight confirmed independent-review findings were corrected and covered by regression tests before that run. The native Restic round trip described above separately passed. Actual Linux ISO assembly, ISO boot, guest packets and physical recovery remain **NOT RUN**; the subsequent continuation below implements acceptance-scenario automation and automatic cloned-router recovery. These results establish a software-tested development base, not an accepted V1 release.
+
+
+## Acceptance and isolated recovery continuation
+
+The full acceptance profile now launches a fresh Linux user/network namespace and
+private disk copies for each case. Controlled peers provide DHCP, RA, DNS, time
+and TLS traffic. Scenarios cover installation/refusals, port remapping, host and
+router exposure, transit/isolation, no-WAN operation, lease return/overlap,
+interrupted operations and encrypted export/repair. Local protocol tests use
+actual loopback sockets, temporary certificates and Unix serial sockets; they do
+not simulate a successful physical qualification.
+
+The recovery command imports an inspected configuration into a copy of a stopped
+owned router, checks it through private serial challenges, boots the copy with
+its DVD removed, and leaves it stopped. Every NIC is disconnected on an owned
+empty bridge, which is removed after shutdown. It supports the documented GPT/UFS
+layout and never promotes the copied identity. The original disk is required;
+the export is not a whole-machine backup.
+
+The full driver and automatic router provisioning are software implementations,
+with actual PVE/OPNsense execution still NOT RUN. First-boot model migration
+compatibility is deliberately checked by the strict configuration audit; unknown
+vendor-generated defaults cause an explicit refusal until reviewed. No release
+qualification or supported-hardware claim follows from local tests.
+
+
+## Final continuation verification — 11 October 2026
+
+After the independent review and integration corrections, `scripts/check_local.py`
+completed successfully: **1,522 tests passed**, all Ansible syntax checks passed,
+and the infrastructure/independent/join task and host listings passed without
+connecting to targets. The final appliance-only run separately passed 590 tests.
+The suite includes real local PTY requests larger than 16 KiB, DNS/NTP/HTTP/TLS
+socket exchanges, a CA-signed persistent TLS connection and Unix serial
+handshakes, alongside explicitly synthetic hypervisor boundary tests.
+
+Review corrections covered serial framing, fresh disks for interrupted cases,
+observed response schemas, certificate preservation and trust, cold-boot probe
+state, interface-name recovery, controller-held export credentials, direct WAN
+frames to the selected physical NIC and accurate launch/failure classification.
+The final scoped independent review reported no remaining blockers. Staged
+whitespace checks and appliance documentation links passed.
+
+Actual Linux ISO assembly, UEFI boot, PVE/OPNsense execution and packet behavior,
+FreeBSD model migration compatibility, resource measurements and the physical
+operator exercise remain **NOT RUN**. Those require the later disposable test
+machine. No hardware was modified, and no release was published.

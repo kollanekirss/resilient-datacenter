@@ -33,6 +33,7 @@ SUITES = {
     "repair": ("export-repair",),
 }
 SUITES["all"] = tuple(dict.fromkeys(case for cases in SUITES.values() for case in cases)) + ("physical-operator",)
+SUITES['automated'] = tuple(case for case in SUITES['all'] if case != 'physical-operator')
 
 
 def _sha256(value):

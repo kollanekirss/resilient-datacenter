@@ -103,17 +103,17 @@ def build_seed(plan, output: Path, runner, *, password_hash: str, ssh_public_key
         require(not output.exists() and not output.with_suffix('.iso.json').exists(),'probe-seed-exists')
         with tempfile.TemporaryDirectory(prefix='.probe-seed-',dir=output.parent) as temporary:
             work=Path(temporary); candidate=work/'seed.iso'
-            command=['/usr/bin/xorriso','-outdev',str(candidate),'-volid','CIDATA','-joliet','on',
-                     '-rockridge','on','-volume_date','uuid','2026101100000000',
-                     '-volume_date','all_file_dates','2026101100000000','-iso_nowtime','2026101100000000',
-                     '-uid','0','-gid','0','-preparer_id','rdc-appliance-probe-v1']
+            # genisoimage/isoinfo are shipped with the pinned PVE installation
+            # (qemu-server dependency); xorriso is only a USB build prerequisite.
+            command=['/usr/bin/genisoimage','-o',str(candidate),'-V','CIDATA','-J','-R',
+                     '-uid','0','-gid','0','-input-charset','utf-8',
+                     '-p','rdc-appliance-probe-v1','-graft-points']
             for name,raw in sorted(files.items()):
-                path=work/name; _write_new(path,raw); command += ['-map',str(path),'/'+name]
-            runner.run(command+['-commit','-end'],timeout_s=120)
+                path=work/name; _write_new(path,raw); command += [name+'='+str(path)]
+            runner.run(command,timeout_s=120)
             for name,raw in files.items():
-                check=work/('readback-'+name)
-                runner.run(['/usr/bin/xorriso','-osirrox','on','-indev',str(candidate),'-extract','/'+name,str(check)],timeout_s=60)
-                require(check.read_bytes()==raw,'probe-seed-readback')
+                check=runner.run(['/usr/bin/isoinfo','-R','-i',str(candidate),'-x','/'+name],timeout_s=60)
+                require(check.returncode==0 and check.stdout==raw,'probe-seed-readback')
             image=file_record(candidate); require(image['size_bytes']<=8*1024*1024,'probe-seed-size')
             receipt={'schema':1,'plan_id':identity(plan),'ownership':spec['ownership'],'image':image,
                      'files':{k:hashlib.sha256(v).hexdigest() for k,v in files.items()},'qualification':'not-run'}

@@ -195,6 +195,23 @@ def test_cli_never_turns_preflight_into_boot_qualification(lab, tmp_path):
     output = json.loads(result.stdout)
     assert result.returncode != 0
     assert output["status"] == "NOT RUN"
-    assert "scenario-runner-not-implemented" in output["reasons"]
+    assert "execution-not-requested" in output["reasons"]
     assert all(case["state"] == "unknown" for case in output["cases"])
     assert before == {p.name: digest(p) for p in Path(config["workspace"]).iterdir()}
+
+
+def test_cli_text_report_is_allowlisted_and_keeps_unrun_cases(tmp_path):
+    result = subprocess.run([sys.executable, str(ROOT / 'scripts/ci_appliance_base.py'),
+                             '--suite', 'all', '--format', 'text'], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 2
+    assert 'Appliance acceptance: NOT RUN' in result.stdout
+    assert 'physical-operator: NOT RUN' in result.stdout
+
+
+def test_duplicate_configuration_fields_are_rejected(tmp_path):
+    path = tmp_path / 'duplicate.json'
+    path.write_text('{"schema":1,"schema":2}')
+    result = subprocess.run([sys.executable, str(ROOT / 'scripts/ci_appliance_base.py'),
+                             '--lab-config', str(path)], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 2
+    assert 'lab-config-unreadable' in json.loads(result.stdout)['reasons']

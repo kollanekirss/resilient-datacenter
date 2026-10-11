@@ -60,6 +60,8 @@ def test_release_requires_all_cases_and_rejects_fixture_evidence():
         for case in checks().BASE_CASES]
     assert not checks().base_release_allowed(records, physical=True, now=100)
     for record in records: record['test_only'] = False
-    assert checks().base_release_allowed(records, physical=True, now=100)
+    # A label with no case assertions, runtime identities or captured evidence
+    # is not acceptance, even if its author removes the fixture marker.
+    assert not checks().base_release_allowed(records, physical=True, now=100)
     records[0]['state'] = 'unknown'
     assert not checks().base_release_allowed(records, physical=True, now=100)

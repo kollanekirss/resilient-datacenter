@@ -68,6 +68,12 @@ def add_commands(commands, default_release):
     sub.add_parser('inspect'); sub.add_parser('local-management')
     restore = sub.add_parser('restore-management'); restore.add_argument('--opened-export', type=Path, required=True)
     restore.add_argument('--target-id', required=True)
+    clone = sub.add_parser('router-clone', help='Import and check an isolated router copy, then leave it stopped')
+    clone.add_argument('--opened-export', type=Path, required=True)
+    clone.add_argument('--vmid', dest='clone_vmid', type=int, required=True)
+    clone.add_argument('--work', type=Path, required=True, help='Private workspace for the recovery image and evidence')
+    reconcile = sub.add_parser('reconcile-router', help='Inspect an interrupted isolated router recovery without replaying it')
+    reconcile.add_argument('--vmid', dest='clone_vmid', type=int, required=True)
 
 
 def _installed():
@@ -263,6 +269,15 @@ def execute_operation(args):
             files = collect_base(plan, PRIVATE, xml)
             return seal(files, args.output, args.password_file, runner, binary=binary, release=release), 0
     if args.command == 'repair':
+        if args.action in ('router-clone', 'reconcile-router'):
+            from .router_recovery import restore_router_isolated, reconcile_router_recovery
+            if args.action == 'reconcile-router':
+                result = reconcile_router_recovery(args.clone_vmid, runner, PRIVATE)
+            else:
+                result = restore_router_isolated(plan, args.opened_export, args.clone_vmid, runner, PRIVATE,
+                    dvd=PRIVATE.parent / 'media/opnsense-dvd', work=args.work, release=release,
+                    build=load_json(PRIVATE.parent / 'build.json'))
+            return result, 0 if result.get('state') in ('verified', 'configured', 'inspected') else 2
         from .rollback import restore_known_good
         restore_known_good(Path('/'), runner, now=now)
         return {'state': 'configured', 'scope': 'local-management-recovery'}, 0

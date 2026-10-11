@@ -280,3 +280,19 @@ def test_loaded_guard_requires_explicit_labels_on_lan_and_each_guest():
 
 def test_helper_has_no_global_state_flush():
     assert b"'-F', 'states'" not in router.HELPER_SOURCE.read_bytes()
+
+
+def test_policy_transition_preserves_https_identity_without_restoring_old_policy():
+    output = _php(r'''
+        $current=['system'=>['hostname'=>'old','webgui'=>['ssl-certref'=>'generated-id','protocol'=>'http']],
+            'cert'=>[['refid'=>'generated-id','crt'=>base64_encode('-----BEGIN CERTIFICATE-----test'),'prv'=>'private']],
+            'ca'=>[['refid'=>'issuer']], 'filter'=>['old']];
+        $policy=['system'=>['hostname'=>'new','webgui'=>['protocol'=>'https','interfaces'=>'lan']], 'filter'=>['new']];
+        $after=rdc_preserve_web_identity($current,$policy);
+        $rejected=false;$current['cert']=[];
+        try { rdc_preserve_web_identity($current,$policy); } catch(Throwable $e) { $rejected=true; }
+        echo json_encode(['after'=>$after,'rejected'=>$rejected]);
+    ''')
+    assert output['after']['system'] == {'hostname': 'new', 'webgui': {'protocol': 'https', 'interfaces': 'lan', 'ssl-certref': 'generated-id'}}
+    assert output['after']['filter'] == ['new'] and output['after']['cert'][0]['prv'] == 'private'
+    assert output['after']['ca'] == [{'refid': 'issuer'}] and output['rejected'] is True

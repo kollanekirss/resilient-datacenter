@@ -55,7 +55,7 @@ Enter the challenge at its prompt. Confirmation checks the actual login session,
 rdc-appliance router install
 ```
 
-This allocates only the planned owned VM, attaches the locally staged ISO and starts with **every virtual NIC disconnected**. Use the Proxmox VM console to complete the OPNsense installer onto its virtual disk. Shut the guest down after installation, then:
+This allocates only the planned owned VM, attaches the locally staged ISO and starts with **every virtual NIC disconnected**. Use the Proxmox VM console to complete the OPNsense installer onto its virtual disk. Select the GPT/UFS installation layout for V1 automatic cloned-router recovery; ZFS recovery is outside that path. Shut the guest down after installation, then:
 
 ```sh
 rdc-appliance router disk-boot
@@ -76,7 +76,7 @@ Management activation requires explicit console attestation bound to the current
 
 ## Prepare a neutral test guest
 
-The [probe guide](probe.md) prepares a unique private seed and imports the pinned Ubuntu test image already staged on the host. Start the probe disconnected, inspect its console, and attach only its workload interface after the router's fresh transit checks pass. No role enrollment or Internet download is part of this preparation. The [disposable lab guide](lab.md) covers later boot/cancel observations; complete routing acceptance remains a separate exercise.
+The [probe guide](probe.md) prepares a unique private seed and imports the pinned Ubuntu test image already staged on the host. Start the probe disconnected, inspect its console, and attach only its workload interface after the router's fresh transit checks pass. No role enrollment or Internet download is part of this preparation. The [disposable lab guide](lab.md) covers the automated install, routing, failure and recovery scenarios. These still require execution on a disposable Linux/KVM machine.
 
 ## Interrupted work and recovery
 
