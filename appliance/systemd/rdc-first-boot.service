@@ -1,0 +1,17 @@
+[Unit]
+Description=Verify appliance staging and restore safe local management
+DefaultDependencies=no
+After=local-fs.target systemd-remount-fs.service
+Before=network-pre.target networking.service ssh.service pveproxy.service pvedaemon.service pve-guests.service
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=PYTHONPATH=/usr/lib/rdc-appliance
+Environment=PYTHONNOUSERSITE=1
+ExecStart=/usr/bin/python3 -m appliance.installer.first_boot
+TimeoutStartSec=180
+
+[Install]
+WantedBy=network-pre.target

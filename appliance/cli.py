@@ -1,4 +1,4 @@
-"""Local preparation commands. No host installation is currently enabled."""
+"""Preparation and local appliance commands; hardware qualification is separate."""
 from __future__ import annotations
 
 import argparse
@@ -18,7 +18,7 @@ DEFAULT_RELEASE = Path(__file__).resolve().parent / "releases" / "v1.lock.json"
 
 
 def parser():
-    result = argparse.ArgumentParser(description="Prepare the two-port network appliance. Installation is not enabled yet.")
+    result = argparse.ArgumentParser(description="Build and operate the two-port appliance development candidate.")
     result.add_argument("--json", action="store_true", help="Emit structured results")
     result.add_argument("--version", action="version", version=__version__)
     commands = result.add_subparsers(dest="command", required=True)
@@ -52,23 +52,37 @@ def parser():
         cmd.add_argument("--output", type=Path, required=True)
         if name == "prepare":
             cmd.add_argument("--cache", type=Path, required=True)
-    commands.add_parser("install", help="Report why destructive installation remains disabled")
+    install = commands.add_parser("install", help="Install only inside the guarded live USB session")
+    install.add_argument("--plan", type=Path)
+    install.add_argument("--bundle", type=Path)
+    install.add_argument("--confirmation")
+    install.add_argument("--boot-id")
+    from .operations import add_commands
+    add_commands(commands, DEFAULT_RELEASE)
     return result
 
 
 def execute(args):
     if args.command == "status":
-        return {"schema": 1, "version": __version__, "state": "preparation-only",
-                "installer": "not-implemented", "boot_qualification": "not-run",
+        from .operations import status_if_installed
+        installed = status_if_installed()
+        if installed is not None: return installed, 0
+        return {"schema": 1, "version": __version__, "state": "development-candidate",
+                "installer": "implemented-unqualified", "boot_qualification": "not-run",
                 "destructive_actions_enabled": False,
-                "available": ["release-check", "preview", "preflight", "media", "bundle"],
-                "next_action": "Implement and qualify the live-media adapter on a disposable x86-64 Linux/KVM machine."}, 0
+                "available": ["release-check", "preview", "preflight", "media", "bundle", "iso", "network", "router", "probe", "menu", "export", "repair"],
+                "next_action": "Assemble and qualify a development image on disposable x86-64 Linux; hardware acceptance is pending."}, 0
     if args.command == "inspect":
         return {"schema": 1, "scope": "build-platform-only", "platform": collect_platform(),
                 "disk_inspection": "not-performed", "destructive_actions_enabled": False}, 0
     if args.command == "install":
-        raise ApplianceError("installer-adapter-unqualified",
-                             "Installation is disabled. The live-media adapter and boot tests are not complete.")
+        if not all((args.plan, args.bundle, args.confirmation, args.boot_id)):
+            raise ApplianceError("installer-adapter-unqualified", "Use the guarded live USB menu; no workstation installation is allowed.")
+        from .operations import install_live
+        return install_live(args), 0
+    if args.command not in {"release-check", "preview", "preflight", "media", "bundle"}:
+        from .operations import execute_operation
+        return execute_operation(args)
     release = load_json(args.release)
     if args.command in ("preview", "preflight"):
         site = load_json(args.plan)

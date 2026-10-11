@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Read-only preflight. Real KVM scenarios and physical qualification are NOT RUN.
+"""Read-only preflight by default; --execute enables an isolated disposable run.
 
-See appliance.lab for the explicit owned-workspace profile. A future runner
-must boot pinned media, enforce isolated switches and bounded scenario timeouts,
-capture serial/network evidence, and compare disk hashes for refusal cases.
-This command deliberately cannot create images, launch QEMU or modify networks.
+Only a bounded boot-menu/cancel observation is implemented. Other KVM scenarios
+and physical qualification remain NOT RUN. No current suite can exit with PASS.
 """
 import argparse
 from datetime import datetime, timezone
@@ -21,6 +19,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--suite", choices=SUITES, default="all")
     parser.add_argument("--lab-config", type=Path)
+    parser.add_argument("--execute",action="store_true",help="Run supported observations using new disposable image copies")
     args = parser.parse_args(argv)
     config = {}
     reasons = []
@@ -40,7 +39,14 @@ def main(argv=None):
         config = {}
         reasons.append("lab-config-unreadable")
     observed = collect_platform()
+    if args.execute:
+        from appliance.lab_runner import execute_lab
+        report = execute_lab(config,args.suite,config_sha256=config_digest)
+        report['reasons'] = list(dict.fromkeys(reasons + report['reasons']))
+        print(json.dumps(report,sort_keys=True))
+        return 2  # A partial console observation is never full-suite acceptance.
     reasons.extend(inspect_lab(config, observed))
+    reasons.append("execution-not-requested")
     reasons.append("scenario-runner-not-implemented")
     print(json.dumps({"schema": 1, "status": "NOT RUN", "qualification": "NOT RUN",
                       "scope": "read-only-preflight", "suite": args.suite,
@@ -50,7 +56,7 @@ def main(argv=None):
                       "reasons": list(dict.fromkeys(reasons)),
                       "cases": [{"case_id": case, "state": "unknown", "status": "NOT RUN"}
                                 for case in SUITES[args.suite]],
-                      "next_action": "Provide an owned x86-64 Linux/KVM lab and implement real bounded scenarios; do not infer boot qualification from preflight."}, sort_keys=True))
+                      "next_action": "Use --execute with a pinned, owned Linux/KVM profile for the boot-menu/cancel observation. Other scenarios and physical qualification remain NOT RUN."}, sort_keys=True))
     return 2
 
 

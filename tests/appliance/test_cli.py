@@ -9,6 +9,31 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def test_installed_status_is_allowlisted_and_does_not_claim_packet_evidence(site,tmp_path,monkeypatch):
+    from appliance import operations, host_network, router, state
+    from appliance.contracts import ApplianceError
+    monkeypatch.setattr(host_network,'collect_host',lambda *args:{'secret':'never-publish'})
+    monkeypatch.setattr(host_network,'audit_host',lambda *args:[])
+    monkeypatch.setattr(router,'collect_router',lambda *args:{'config_xml':'PRIVATE-XML', 'checks':[],
+        'upstream':{'cidrs':['192.0.2.0/24'],'gateway':'192.0.2.1'},'stage':'transit'})
+    monkeypatch.setattr(router,'router_ready',lambda *args:{'checks_passed':True,'state':'configured','packet_tests':'not-performed'})
+    monkeypatch.setattr(router,'_upstream',lambda *args:None)
+    state.write(tmp_path/'network/pending.json',{'phase':'pending','transaction_id':'t','challenge':'PRIVATE-CHALLENGE'})
+    report=operations.installed_status(site,{'build_id':'b'*64},object(),private=tmp_path)
+    assert report['capabilities']['router']['state']=='configured'
+    assert report['capabilities']['upstream']['state']=='configured'
+    assert report['capabilities']['dns']['state']=='unknown'
+    assert report['pending_network_transaction']=='t'
+    text=json.dumps(report)
+    assert 'PRIVATE' not in text and 'never-publish' not in text
+    assert 'verified' not in text
+    def unavailable(*args):raise ApplianceError('router-channel-file')
+    monkeypatch.setattr(router,'collect_router',unavailable)
+    report=operations.installed_status(site,{'build_id':'b'*64},object(),private=tmp_path)
+    assert report['capabilities']['management']['state']=='configured'
+    assert report['capabilities']['router']['state']=='blocked'
+
+
 def run(*args):
     return subprocess.run([sys.executable, "-m", "appliance", "--json", *args],
                           cwd=ROOT, capture_output=True, text=True, timeout=10)
@@ -51,7 +76,7 @@ def test_status_reports_incomplete_delivery():
     result = run("status")
     assert result.returncode == 0
     data = json.loads(result.stdout)
-    assert data["installer"] == "not-implemented"
+    assert data["installer"] == "implemented-unqualified"
     assert data["boot_qualification"] == "not-run"
     assert data["destructive_actions_enabled"] is False
 
@@ -86,3 +111,33 @@ def test_readiness_does_not_call_itself_hardware_inventory():
     result = run("inspect")
     assert result.returncode == 0
     assert json.loads(result.stdout)["scope"] == "build-platform-only"
+
+
+def test_menu_can_exit_without_a_network_or_installed_host():
+    result = subprocess.run([sys.executable, '-m', 'appliance', 'menu'], cwd=ROOT,
+                            input='q\n', capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0
+    assert 'Exit' in result.stdout
+
+
+def test_installed_mutation_is_refused_on_preparation_computer():
+    result = run('router', 'allocate')
+    assert result.returncode == 2
+    assert json.loads(result.stdout)['code'] in ('installed-host-required', 'root-required')
+
+
+def test_attachment_uses_declared_virtual_zones(inputs):
+    site, release = inputs
+    result = run('attachment', str(site), '--release', str(release))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert set(json.loads(result.stdout)['zones']) == {'infrastructure', 'workload'}
+
+
+def test_configuration_render_never_overwrites_existing_output(inputs, tmp_path):
+    site, release = inputs
+    ports = tmp_path / 'ports.json'; ports.write_text(json.dumps({'management': 'enp1s0', 'wan': 'enp2s0'}))
+    output = tmp_path / 'rendered'; output.mkdir()
+    (output / 'keep').write_text('untouched')
+    result = run('network', 'render', str(site), '--ports', str(ports), '--output', str(output), '--release', str(release))
+    assert result.returncode == 2
+    assert (output / 'keep').read_text() == 'untouched'

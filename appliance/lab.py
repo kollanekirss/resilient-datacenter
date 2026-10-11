@@ -1,10 +1,12 @@
-"""Read-only lab preflight and evidence-integrity checks, not a boot runner.
+"""Read-only lab preflight and evidence-integrity checks.
 
 A lab config has schema=1, workspace, owner_id, build_id, spec_id (SHA256),
 and images mapping installer/target/canary/uefi_code/uefi_vars to absolute
 path + sha256 records. The pre-existing dedicated workspace must contain
 .rdc-appliance-lab.json with schema=1 and the same owner_id. Nothing here
 creates that marker, changes a file, launches a VM, or authorizes erasure.
+The separate lab_runner module requires explicit execution opt-in and additional
+pinned build/source/plan inputs before creating disposable regular-file copies.
 
 Real qualification still requires the bounded KVM scenarios and physical
 operator exercises in the V1 specification. A supplied result's file hashes
@@ -23,7 +25,7 @@ import stat
 
 IMAGE_ROLES = ("installer", "target", "canary", "uefi_code", "uefi_vars")
 SUITES = {
-    "media-gate": ("offline-install", "erase-refusals", "wan-exposure"),
+    "media-gate": ("boot-menu-cancel", "offline-install", "erase-refusals", "wan-exposure"),
     "host-network": ("port-mapping", "wan-exposure", "router-down-management"),
     "offline-install": ("offline-install", "no-wan-boot"),
     "router-policy": ("routed-policy", "wan-exposure"),

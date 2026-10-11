@@ -1,12 +1,14 @@
-"""Non-destructive preflight for the earliest future live-media entry.
+"""Read-only preflight and guarded installation in the custom live entry.
 
 Passing a pure gate is not an authorization to run an installer. A live
-adapter must collect fresh trustworthy inventory itself, suppress initial
-networking and pass the real boot qualification before it can be shipped.
+adapter collects fresh inventory itself and suppresses initial networking.
+The implementation remains a qualification candidate until boot tests pass.
 """
 from __future__ import annotations
 
 import copy
+import os
+from pathlib import Path
 
 from appliance.contracts import ApplianceError, identity, require
 from appliance.plan import resource_requirements, validate_site
@@ -40,6 +42,7 @@ def live_gate(plan, current, confirmed_identity):
     require(type(current["storage_conflicts"]) is list, "inventory-incomplete")
     require(not current["storage_conflicts"], "non-target-storage-conflict")
     require(current["supported"] is True, "unsupported-hardware")
+    require(current.get('unselected_active', False) is False, 'unselected-interface-active')
     require(type(current["link_checks"]) is dict
             and all(current["link_checks"].get(role) is True for role in ("management", "wan")),
             "port-identification-incomplete")
@@ -65,9 +68,79 @@ def preflight(plan, release, observed):
             problems.append(reason)
     if release["budgets"]["qualification"] != "qualified":
         problems.append("resource-budgets-unqualified")
-    # A mutable input field cannot qualify an adapter that does not exist.
+    # A mutable input field cannot qualify an adapter without boot evidence.
     problems.append("installer-adapter-unqualified")
     return problems
+
+
+def live_environment(*, root=Path('/')) -> bool:
+    """Strict actual-live check; a JSON preview cannot grant host mutations."""
+    from appliance.state import read
+    try:
+        if root != Path('/') or os.geteuid() != 0:
+            return False
+        flags = (root / 'proc/cmdline').read_text().split()
+        if 'rdc.appliance=1' not in flags or 'ipv6.disable=1' not in flags:
+            return False
+        pid1 = (root / 'proc/1/cmdline').read_bytes()
+        if not any(path in pid1.split(b'\0') for path in (b'/sbin/unconfigured.sh', b'/usr/sbin/unconfigured.sh')):
+            return False
+        boot_id = (root / 'proc/sys/kernel/random/boot_id').read_text().strip()
+        context = read(root / 'run/rdc-appliance/live.json')
+        return context.get('boot_id') == boot_id and context.get('schema') == 1
+    except (ApplianceError,OSError):
+        return False
+
+
+def install_site(plan, bundle: Path, confirmation: str, runner, *, password_hash: str,
+                 consent_boot_id: str, root=Path('/')) -> dict:
+    """Only the interactive live session can authorize this guarded handoff."""
+    from appliance.state import lock, read
+    from appliance.installer.inventory import inventory
+    from appliance.installer.payload import verify_install_payload
+    from appliance.installer.adapters import pve
+    require(live_environment(root=root),'live-environment-required')
+    require(bundle == Path('/cdrom/rdc-appliance'),'live-payload-location')
+    release,build = verify_install_payload(bundle)
+    plan = validate_site(plan,release)
+    context = read(root / 'run/rdc-appliance/live.json')
+    require(context.get('build_id') == identity(build),'live-build-mismatch')
+    require(consent_boot_id == context['boot_id'],'erase-session-changed')
+    directory = root / 'run/rdc-appliance'
+    with lock(directory / 'install-lock'):
+        require(not (directory / 'install-started.json').exists(),'installation-needs-inspection')
+        observed = inventory(runner,root=root,plan=plan)
+        live_gate(plan,observed,confirmation)
+        require(observed['boot_id'] == consent_boot_id,'erase-session-changed')
+        problems = preflight(plan,release,observed)
+        # User explicitly chose this unqualified local installer candidate.
+        # Only the two qualification labels may be deferred; hardware safety
+        # and resource observations remain mandatory before any disk write.
+        require(not set(problems) - {'resource-budgets-unqualified','installer-adapter-unqualified'}, 'installer-preflight')
+        disk = next(d for d in observed['disks'] if d['identity'] == plan['target'])
+        answer = pve.answer_bytes(plan,password_hash,disk_path=disk['path'],management_name=observed['port_names']['management'])
+        pve.verify_upstream_selection(runner,disk_path=disk['path'],management_name=observed['port_names']['management'],root=root)
+        # The pinned auto-installer parses and validates the TOML before
+        # spawning its low-level installer. The builder's separate assistant
+        # is not required in the live filesystem. Keep answers only in RAM.
+        import tomllib
+        require(tomllib.loads(answer.decode())['network']['source'] == 'from-answer','installer-answer')
+        refreshed = inventory(runner,root=root,plan=plan)
+        live_gate(plan,refreshed,confirmation)
+        require(refreshed['boot_id'] == consent_boot_id and refreshed['port_names'] == observed['port_names']
+                and next(d['path'] for d in refreshed['disks'] if d['identity'] == plan['target']) == disk['path'],
+                'installer-inventory-changed')
+        from appliance.state import write
+        write(directory / 'install-started.json',{'schema':1,'plan_id':identity(plan),'boot_id':consent_boot_id,'phase':'pending'})
+        # No automatic retry on any failure after this intent.
+        receipt = pve.install(answer,runner,disk_path=disk['path'],management_name=observed['port_names']['management'],root=root,
+                              prepared=True)
+        receipt.update(target=plan['target'],plan_id=identity(plan),build_id=identity(build))
+        staged = pve.stage_target(receipt,bundle,plan,runner)
+        write(directory / 'install-started.json',{'schema':1,'plan_id':identity(plan),'boot_id':consent_boot_id,
+                                                 'phase':'complete','build_id':staged['build_id']})
+        return {'schema':1,'state':'staged','plan_id':identity(plan),'build_id':staged['build_id'],
+                'qualification':'not-run','next_action':'Remove USB and boot the internal disk; keep router links disconnected.'}
 
 
 def preview(plan, release):

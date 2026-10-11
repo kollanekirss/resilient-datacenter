@@ -1,0 +1,8 @@
+[Unit]
+Description=Refuse unprovisioned appliance roles
+After=rdc-router-start.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/rdc-appliance start-roles
+TimeoutStartSec=30
