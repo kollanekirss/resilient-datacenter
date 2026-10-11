@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "qualification": "not-run",
+  "base_sha256": "6a81c37564db9b1ee84e141922625e1d7c5b389b99bb3c572e0243607d5bb4d2",
+  "binaries": {
+    "tailscale": {
+      "version": "1.104.1",
+      "filename": "tailscale",
+      "sha256": "64aed443d6454865bdcabb40030b052c4b89cf9a4436c499d41afc502c0ec28d",
+      "size_bytes": 34323303,
+      "max_bytes": 34323303
+    },
+    "tailscaled": {
+      "version": "1.104.1",
+      "filename": "tailscaled",
+      "sha256": "8b16e5cb5c480f58ae6325d036e7b7a2362e8df07fb9cfbf31d16e2b6c7df76c",
+      "size_bytes": 43464671,
+      "max_bytes": 43464671
+    },
+    "headscale": {
+      "version": "0.29.4",
+      "filename": "headscale_0.29.4_linux_amd64",
+      "sha256": "212ed0a884c0d3541e094c4bebbe94397df6f4e01bd3d7f059c520cb55e0d757",
+      "size_bytes": 52457634,
+      "max_bytes": 52457634
+    },
+    "derper": {
+      "version": "1.104.1",
+      "filename": "derper",
+      "sha256": "5187d3a7f0110f2e38e28824a8e618045765058da28b9a20ad0e5e5278e54bf0",
+      "size_bytes": 25810277,
+      "max_bytes": 25810277
+    }
+  },
+  "derper_build": {
+    "go": "1.27.1",
+    "toolchain_module": "golang.org/toolchain@v0.0.1-go1.27.1.darwin-amd64",
+    "toolchain_sum": "h1:0klAae3mIYfNIjR4ucgObyW53gWhHe7Pi8Rctm5uraY=",
+    "module": "tailscale.com/cmd/derper@v1.104.1",
+    "module_sum": "h1:9GNOm9Izqll9RH5jA5NWcLiCzXi/WtqY4EHQY2Dy2zk=",
+    "source_commit": "9a522a9786c97eb7910c01ccb7bd66557b04c910",
+    "flags": [
+      "-trimpath",
+      "-buildvcs=false",
+      "-ldflags=-buildid= -X tailscale.com/version.longStamp=1.104.1 -X tailscale.com/version.shortStamp=1.104.1 -X tailscale.com/version.gitCommitStamp=9a522a9786c97eb7910c01ccb7bd66557b04c910"
+    ],
+    "environment": {
+      "GOOS": "linux",
+      "GOARCH": "amd64",
+      "CGO_ENABLED": "0"
+    },
+    "binary_execution": "not-run"
+  },
+  "packages": [],
+  "package_manifest": {},
+  "package_provenance": {},
+  "notes": [
+    "Role binaries downloaded/hashed or cross-compiled on 2026-10-11; no Linux binary was executed on this host.",
+    "Packages must be resolved from the pinned Ubuntu base and signed distro repositories on a disposable Linux image builder. Record exact complete dpkg manifest plus all added .deb checksums and signed index hashes.",
+    "The missing package closure deliberately blocks image assembly; this is not a derived image lock or hardware qualification."
+  ]
+}

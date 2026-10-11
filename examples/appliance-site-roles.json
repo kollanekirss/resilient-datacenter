@@ -1,0 +1,203 @@
+{
+  "schema": 1,
+  "site_id": "pilot",
+  "revision": 1,
+  "release_id": "appliance-v1-base-20261011",
+  "target": {
+    "by_id": "/dev/disk/by-id/ata-REPLACE_WITH_DISK_ID",
+    "serial": "REPLACE_WITH_DISK_SERIAL",
+    "wwn": "",
+    "size_bytes": 137438953472,
+    "model": "Example only; replace with actual disk",
+    "transport": "sata"
+  },
+  "ports": {
+    "management": {
+      "permanent_mac": "02:aa:00:00:00:01",
+      "pci_path": "0000:01:00.0",
+      "driver": "igc"
+    },
+    "wan": {
+      "permanent_mac": "02:aa:00:00:00:02",
+      "pci_path": "0000:02:00.0",
+      "driver": "igc"
+    }
+  },
+  "networks": {
+    "management": {
+      "bridge": "vmbr0",
+      "cidr": "10.77.0.0/24",
+      "gateway": "10.77.0.1",
+      "allocation": "static",
+      "host_ip": "10.77.0.2",
+      "admin_ip": "10.77.0.3"
+    },
+    "infrastructure": {
+      "bridge": "vmbr2",
+      "cidr": "10.77.1.0/24",
+      "gateway": "10.77.1.1",
+      "allocation": "static"
+    },
+    "workload": {
+      "bridge": "vmbr3",
+      "cidr": "10.77.2.0/24",
+      "gateway": "10.77.2.1",
+      "allocation": "reservation"
+    },
+    "relay": {
+      "bridge": "vmbr4",
+      "cidr": "203.0.113.0/29",
+      "gateway": "203.0.113.1",
+      "allocation": "static"
+    }
+  },
+  "upstream": {
+    "mode": "dhcp",
+    "cidrs": [
+      "192.168.1.0/24"
+    ]
+  },
+  "overlay_cidrs": [
+    "100.64.0.0/10"
+  ],
+  "vms": {
+    "router": {
+      "role": "router",
+      "vmid": 101,
+      "name": "pilot-router",
+      "memory_mib": 4096,
+      "vcpus": 2,
+      "disk_gib": 16,
+      "storage": "local-lvm",
+      "nics": [
+        {
+          "zone": "management",
+          "mac": "02:bb:00:00:00:01",
+          "connected": false
+        },
+        {
+          "zone": "wan",
+          "mac": "02:bb:00:00:00:02",
+          "connected": false
+        },
+        {
+          "zone": "infrastructure",
+          "mac": "02:bb:00:00:00:03",
+          "connected": false
+        },
+        {
+          "zone": "workload",
+          "mac": "02:bb:00:00:00:04",
+          "connected": false
+        },
+        {
+          "zone": "relay",
+          "mac": "02:bb:00:00:00:06",
+          "connected": false
+        }
+      ]
+    },
+    "probe": {
+      "role": "probe",
+      "vmid": 102,
+      "name": "pilot-probe",
+      "memory_mib": 1024,
+      "vcpus": 1,
+      "disk_gib": 8,
+      "storage": "local-lvm",
+      "nics": [
+        {
+          "zone": "workload",
+          "mac": "02:bb:00:00:00:05",
+          "connected": false,
+          "address": "10.77.2.10"
+        }
+      ]
+    },
+    "connector": {
+      "role": "connector",
+      "vmid": 103,
+      "name": "pilot-connector",
+      "memory_mib": 1024,
+      "vcpus": 1,
+      "disk_gib": 8,
+      "storage": "local-lvm",
+      "nics": [
+        {
+          "zone": "infrastructure",
+          "mac": "02:bb:00:00:00:07",
+          "connected": false,
+          "address": "10.77.1.10"
+        }
+      ]
+    },
+    "headscale": {
+      "role": "headscale",
+      "vmid": 104,
+      "name": "pilot-headscale",
+      "memory_mib": 1024,
+      "vcpus": 1,
+      "disk_gib": 8,
+      "storage": "local-lvm",
+      "nics": [
+        {
+          "zone": "infrastructure",
+          "mac": "02:bb:00:00:00:08",
+          "connected": false,
+          "address": "10.77.1.11"
+        }
+      ]
+    },
+    "derp": {
+      "role": "derp",
+      "vmid": 105,
+      "name": "pilot-derp",
+      "memory_mib": 1024,
+      "vcpus": 1,
+      "disk_gib": 8,
+      "storage": "local-lvm",
+      "nics": [
+        {
+          "zone": "relay",
+          "mac": "02:bb:00:00:00:09",
+          "connected": false,
+          "address": "203.0.113.2"
+        }
+      ]
+    }
+  },
+  "roles": {
+    "connector": {
+      "selected": true,
+      "controller": "https://existing-controller.example.org"
+    },
+    "headscale": {
+      "selected": true,
+      "authority": "school",
+      "hostname": "control.example.org",
+      "public_ipv4": "198.51.100.10",
+      "certificate_ref": "school-controller",
+      "exposure": "upstream-dnat",
+      "upstream_owner": "network-team"
+    },
+    "derp": {
+      "selected": true,
+      "hostname": "relay.example.org",
+      "public_ipv4": "203.0.113.2",
+      "certificate_ref": "school-relay",
+      "region_id": 901,
+      "controller_url": "https://control.example.org",
+      "routed_prefix": "203.0.113.0/29",
+      "gateway": "203.0.113.1",
+      "upstream_owner": "network-team"
+    }
+  },
+  "probe_endpoint": {
+    "id": "external-probe",
+    "host_id": "independent-host",
+    "admin_id": "independent-team",
+    "appliance_host_id": "pilot-host",
+    "appliance_admin_id": "school-team",
+    "key_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  }
+}

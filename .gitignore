@@ -1,4 +1,5 @@
 .venv/
+.venv
 .work/
 .cache/
 .pytest_cache/

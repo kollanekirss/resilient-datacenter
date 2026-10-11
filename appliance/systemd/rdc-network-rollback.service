@@ -1,0 +1,16 @@
+[Unit]
+Description=Restore an expired unconfirmed appliance network change
+After=local-fs.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+User=root
+Environment=PYTHONPATH=/usr/lib/rdc-appliance
+Environment=PYTHONNOUSERSITE=1
+ExecStart=/usr/bin/python3 -m appliance.rollback recover
+TimeoutStartSec=110
+# A caller may still hold the network lock when the independent timer fires.
+# Retry without extending the deadline stored in the private journal.
+Restart=on-failure
+RestartSec=2

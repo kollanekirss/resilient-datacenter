@@ -1,0 +1,14 @@
+[Unit]
+Description=Start the owned appliance router without upstream activation
+After=pve-cluster.service pvedaemon.service rdc-first-boot.service rdc-host-policy.service
+Requires=rdc-first-boot.service rdc-host-policy.service
+Before=rdc-role-start.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/rdc-appliance start-local
+TimeoutStartSec=125
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

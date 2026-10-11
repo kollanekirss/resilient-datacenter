@@ -1,0 +1,19 @@
+[Unit]
+Description=Authenticated local appliance operations console
+After=multi-user.target
+Conflicts=getty@tty2.service
+
+[Service]
+Type=simple
+ExecStart=/sbin/agetty --noclear tty2 linux
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty2
+TTYReset=yes
+TTYVHangup=yes
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

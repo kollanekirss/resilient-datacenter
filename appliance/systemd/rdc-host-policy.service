@@ -1,0 +1,17 @@
+[Unit]
+Description=Verify host firewall before activating WAN and guest bridges
+Requires=rdc-first-boot.service networking.service pve-cluster.service
+After=rdc-first-boot.service networking.service pve-cluster.service
+Before=pve-guests.service rdc-router-start.service rdc-role-start.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Environment=PYTHONPATH=/usr/lib/rdc-appliance
+Environment=PYTHONNOUSERSITE=1
+ExecStart=/usr/bin/python3 -m appliance.rollback policy
+TimeoutStartSec=110
+
+[Install]
+WantedBy=multi-user.target

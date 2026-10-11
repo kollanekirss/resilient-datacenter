@@ -1,0 +1,15 @@
+[Unit]
+Description=Recover interrupted appliance role snapshots after identity binding
+Requires=rdc-guest.service
+After=rdc-guest.service tailscaled.service headscale.service derper.service
+ConditionPathExists=/var/lib/rdc-guest/binding.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/rdc-guest/recover-snapshots
+UMask=0077
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target

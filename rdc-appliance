@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+appliance_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -x "$appliance_root/.venv/bin/python" ]; then
+    appliance_python="$appliance_root/.venv/bin/python"
+else
+    appliance_python=python3
+fi
+cd "$appliance_root"
+exec "$appliance_python" -m appliance "$@"

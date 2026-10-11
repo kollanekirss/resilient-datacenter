@@ -1,5 +1,7 @@
 # Portable crisis node: Proxmox reference architecture
 
+This is the earlier application-inclusive architecture. The proposed networking-only first release now uses two physical ports, management and Internet, with staff access deferred; see the [11 October 2026 specification](../superpowers/specs/2026-10-11-two-port-network-appliance-v1-design.md).
+
 Status: accepted project direction, incrementally implemented in the 0.4 development profile; not implemented by the older 0.3 installer. This document records the user's agreed modular topology and the engineering decisions needed to implement it. It extends the earlier Ubuntu service-product scope without changing existing deployments.
 
 ## Outcome

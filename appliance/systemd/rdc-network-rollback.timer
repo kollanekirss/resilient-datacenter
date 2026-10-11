@@ -1,0 +1,7 @@
+[Unit]
+Description=Independent 120-second appliance network confirmation deadline
+
+[Timer]
+OnActiveSec=120
+AccuracySec=1
+Unit=rdc-network-rollback.service

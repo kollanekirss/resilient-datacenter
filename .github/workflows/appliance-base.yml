@@ -1,0 +1,31 @@
+name: Appliance base software checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  offline-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Prepare test environment
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+      - name: Test appliance software without target connections
+        run: .venv/bin/python -m pytest tests/appliance -q
+      - name: Validate pinned inputs and illustrative topology
+        run: |
+          ./rdc-appliance release-check
+          ./rdc-appliance preview examples/appliance-site.json
+      - name: Record qualification boundary
+        run: |
+          echo 'Software checks do not qualify USB boot, networking, firmware, recovery, or a physical appliance.'
+          echo 'Hardware acceptance remains NOT RUN until an explicitly configured disposable lab executes it.'

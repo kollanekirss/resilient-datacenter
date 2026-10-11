@@ -1,0 +1,19 @@
+[Unit]
+Description=Appliance connector Tailscale daemon
+After=network-online.target rdc-guest.service
+Requires=rdc-guest.service
+ConditionPathExists=/var/lib/rdc-guest/connector/config.json
+
+[Service]
+ExecStart=/usr/sbin/tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/run/tailscale/tailscaled.sock
+RuntimeDirectory=tailscale
+StateDirectory=tailscale
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=5
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target
