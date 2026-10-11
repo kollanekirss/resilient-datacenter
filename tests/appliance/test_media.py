@@ -358,3 +358,21 @@ def test_redirected_download_still_requires_locked_artifact_hash(tmp_path, monke
     with pytest.raises(ApplianceError, match="media-digest"):
         media.prepare_component(record, tmp_path / "cache")
     assert not list((tmp_path / "cache").glob("*.artifact"))
+
+
+def test_reviewed_headscale_release_redirect_allows_only_vendor_asset_host():
+    source='https://github.com/juanfont/headscale/releases/download/v0.29.4/headscale_0.29.4_linux_amd64'
+    policy=media._ArtifactRedirect(source)
+    request=media.urllib.request.Request(source,headers={'Authorization':'private'})
+    redirected=policy.redirect_request(request,None,302,'Found',{},ASSET_URL)
+    assert redirected is not None and redirected.get_header('Authorization') is None
+    bad=media._ArtifactRedirect(source.replace('juanfont','other'))
+    assert bad.redirect_request(media.urllib.request.Request(bad.source_url),None,302,'Found',{},ASSET_URL) is None
+
+
+def test_tailscale_single_digest_requires_exact_artifact_checksum_url():
+    record={'url':'https://pkgs.tailscale.com/stable/tailscale_1.104.1_amd64.tgz','sha256':'a'*64,
+            'provenance':{'url':'https://pkgs.tailscale.com/stable/tailscale_1.104.1_amd64.tgz.sha256'}}
+    media._checksum_document(b'a'*64,record,'tailscale_1.104.1_amd64.tgz')
+    record['provenance']['url']='https://pkgs.tailscale.com/stable/other.sha256'
+    with pytest.raises(ApplianceError):media._checksum_document(b'a'*64,record,'tailscale_1.104.1_amd64.tgz')

@@ -12,7 +12,10 @@ Work is on the isolated `feat/appliance-v1` branch, separate from the earlier se
 | B8: operations | Local menu/commands, observed host/router status, explicit unknown states for unmeasured capabilities, bounded local startup, public virtual-network metadata | Live DNS/NTP/HTTPS/isolation evidence; no-WAN and returning-WAN operation |
 | B9: export/repair | Encrypted export and inspection, owned mounted-root repair, stable disk/NIC remapping, automatic isolated clone/import/disk-boot verification and observation-only reconciliation | Actual PVE copy, FreeBSD recovery boot, canary preservation and physical repair; whole-site restoration is outside this path |
 | B10: evidence | Concrete isolated Linux/KVM driver, all 11 automated scenarios, real protocol clients and controls, eight process-interruption boundaries, strict assertion/evidence gate, private reports and operator guides | Actual execution of automated cases, physical operator exercise and measured supported hardware |
-| R1–R6 | Explicitly unavailable in this base | Connector joining, independently eligible Headscale/DERP hosting and complete V1 qualification |
+| R1: Linux roles | Pinned binary/image recipe, offline builder, stopped/disconnected VM import, fixed stdin-only guest API, runtime/identity checks and no automatic replay | Linux package preparation/image assembly, real guest-agent and boot execution |
+| R2: joining | Explicit owner-approved enrollment, TLS identity checked before credential use, fixed no-route client policy, persistent identity, registered-key external challenges and controlled collectors | Actual NAT/relay path, restart/WAN-return and independent endpoint execution |
+| R3/R4: hosting | Separate Headscale/DERP prerequisites, endpoint collision checks, real TLS validation, persistent authorities, narrow policy, routed/no-NAT relay and fail-closed verifier | Actual public profiles, client/relay protocol behavior, source preservation and new-session admission exercises |
+| R5/R6: role export/release | Stopped-service private captures, bounded hashed transfer, encrypted readback, independent-case/resource/provenance release gate and operator documentation | Real daemon/database capture and recovery, full operator run; remaining DERP wire/fault acceptance adapter |
 
 ## Evidence actually obtained
 
@@ -84,3 +87,43 @@ Actual Linux ISO assembly, UEFI boot, PVE/OPNsense execution and packet behavior
 FreeBSD model migration compatibility, resource measurements and the physical
 operator exercise remain **NOT RUN**. Those require the later disposable test
 machine. No hardware was modified, and no release was published.
+
+## Joining and independent hosting continuation
+
+The connector, Headscale and DERP now have separate guest provisioning,
+configuration and inspection paths. Enrollment requires owner approval and
+verified controller TLS before using a single-use credential. Existing node,
+authority and relay identities survive reconnection; uncertain mutations are
+queried or reconciled without automatic replay. Headscale and DERP eligibility
+are evaluated independently. Public hosting requires registered external probe
+evidence in addition to local configuration.
+
+The role image recipe pins the reviewed Tailscale and Headscale binaries and an
+actually cross-built Linux DERP executable. Linux package preparation, offline
+image assembly and boot remain unexecuted. The image builder records its actual
+output digest and runtime-source receipt rather than using a placeholder hash.
+
+Independent review corrected disconnected guest initialization, read-only
+inspection accidentally blocking enrollment, unrelated-peer enrollment proofs,
+snapshot failure/interruption recovery and compatibility between role exports
+and isolated router repair. Targeted regression tests reproduce those failures.
+
+The real native Restic binary on this Mac also encrypted and independently
+restored nine synthetic private components, including all three role archives.
+Every recovered byte matched; a wrong password published no output. No restored
+identity was activated, and production Linux binary pins were unchanged.
+
+The role acceptance preflight correctly reports every case **NOT RUN**. Complete
+machine orchestration, the DERP wire-session and verifier-fault adapters, and
+actual public-network qualification remain outstanding as detailed in the
+[qualification record](qualification.md). The implementation is a development
+candidate, not a qualified V1 release.
+
+Final verification on 11 October 2026: `scripts/check_local.py` passed **1,696
+tests**, all Ansible syntax checks and all read-only infrastructure/independent/
+join host/task listings. The final scoped independent review found no remaining
+confirmed blockers in the corrected code. Appliance documentation links resolve,
+the role example previews without enabling destructive actions, and the role
+preflight leaves all eight acceptance cases NOT RUN. Native Restic role-archive
+encryption/readback passed separately as described above. No machine was
+installed, joined or published during this continuation.

@@ -1,6 +1,13 @@
 # Configuration export and management repair
 
-The base export contains site/release/build records, owned VM definitions, known-good host policy and fresh router XML. It does not include virtual disks, application data or optional role identities. Keep it private. Restic encrypts it; the password must be a separate private file, at least 16 non-whitespace characters, outside captured material and the destination.
+The base export contains site/release/build records, owned VM definitions, known-good host policy and fresh router XML. When network roles are selected, it additionally requires their consistent private state captures; a missing role capture blocks publication. Each original service is paused in turn, captured with configuration/keys/database sidecars, and restarted even if capture fails. Files travel in bounded hashed chunks over the private guest agent. Virtual disks and application data remain outside this export. Keep it private. Restic encrypts it; the password must be a separate private file, at least 16 non-whitespace characters, outside captured material and the destination.
+
+Interrupted guest captures restart the original service on the next guest boot
+and discard incomplete staging. Decryption validates role manifests without
+starting any copied identity. Full controller reconstruction and promotion are
+outside V1; never activate a recovered enrollment or authority while the original
+is active. See the [role workflow](roles.md) for the maintenance pause and size
+limits. Actual daemon/database capture still requires machine qualification.
 
 On an installed host with the pinned router channel working:
 

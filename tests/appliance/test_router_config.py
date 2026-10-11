@@ -8,6 +8,59 @@ import pytest
 
 from appliance.contracts import ApplianceError, identity
 from appliance.router_config import render_router, audit_router
+from hosting_fixtures import hosting_site
+
+
+def test_hosted_controller_is_only_private_destination_nat_and_relay_is_routed(site):
+    site = hosting_site(site)
+    creds = credentials(site); creds['stage'] = 'transit'
+    doc = ET.fromstring(render_router(site, creds))
+    redirects = doc.findall('nat/rule')
+    assert len(redirects) == 1
+    assert redirects[0].findtext('target') == '10.77.1.11'
+    assert redirects[0].findtext('destination/network') == 'wanip'
+    assert redirects[0].findtext('destination/port') == '443'
+    assert redirects[0].findtext('natreflection') == 'disable'
+    assert all(rule.findtext('source/network') != 'opt3' for rule in doc.findall('nat/outbound/rule'))
+    wan = [r for r in doc.findall('filter/rule') if r.findtext('interface') == 'wan']
+    assert {(r.findtext('destination/address'), r.findtext('protocol'), r.findtext('destination/port'))
+            for r in wan if r.findtext('protocol') != 'icmp'} == {
+                ('10.77.1.11', 'tcp', '443'), ('8.8.8.2', 'tcp', '443'),
+                ('8.8.8.2', 'tcp', '80'), ('8.8.8.2', 'udp', '3478')}
+    assert all(r.findtext('destination/address') not in ('10.77.0.1', '10.77.0.2') for r in wan)
+
+
+def test_relay_verifier_exception_is_narrow_before_zone_isolation(site):
+    site = hosting_site(site)
+    creds = credentials(site); creds['stage'] = 'transit'
+    rules = ET.fromstring(render_router(site, creds)).findall('filter/rule')
+    relays = [r for r in rules if r.findtext('interface') == 'opt3']
+    exceptions = [r for r in relays if r.findtext('descr') == 'RDC relay controller verification']
+    assert len(exceptions) == 1
+    rule = exceptions[0]
+    assert (rule.findtext('source/address'), rule.findtext('destination/address'),
+            rule.findtext('protocol'), rule.findtext('destination/port')) == ('8.8.8.2', '10.77.1.11', 'tcp', '443')
+    assert relays.index(rule) < next(i for i,r in enumerate(relays) if r.findtext('descr') == 'RDC zone isolation')
+    assert any(r.findtext('type') == 'block' and r.findtext('destination/address') == '10.77.0.0/24' for r in relays)
+
+
+def test_bootstrap_publishes_no_hosting_endpoints(site):
+    site = hosting_site(site)
+    doc = ET.fromstring(render_router(site, credentials(site)))
+    assert not doc.findall('nat/rule')
+    assert not [r for r in doc.findall('filter/rule') if r.findtext('interface') == 'wan']
+
+
+def test_ineligible_optional_hosting_preserves_base_transit(site):
+    site = hosting_site(site)
+    site['roles']['headscale']['public_ipv4'] = '192.168.5.5'
+    site['roles']['derp']['public_ipv4'] = '192.168.5.6'
+    creds = credentials(site); creds['stage'] = 'transit'
+    doc = ET.fromstring(render_router(site, creds))
+    assert not doc.findall('nat/rule')
+    assert not [r for r in doc.findall('filter/rule') if r.findtext('interface') == 'wan']
+    assert any(r.findtext('descr') == 'RDC HTTPS updates' for r in doc.findall('filter/rule'))
+    assert doc.findtext('rdcappliance/stage') == 'transit'
 
 
 def credentials(site):

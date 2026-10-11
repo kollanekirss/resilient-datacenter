@@ -31,6 +31,6 @@ For later execution, capture the exact build/ISO digests, firmware and hardware 
 - Export decrypts with an independently held credential; mounted-root repair preserves unrelated disks; copied router identity is never activated on the live network.
 - An unfamiliar operator follows only the guide on a real two-port machine, and measured memory/storage budgets replace provisional allocations.
 
-Current hardware and guest-packet acceptance is **NOT RUN**. Optional network-role provisioning and complete V1 qualification remain in the separate roles plan.
+Current hardware and guest-packet acceptance is **NOT RUN**. Optional network-role provisioning, separate hosting eligibility and signed independent challenges are implemented in the [role workflow](roles.md). The [whole-product qualification boundary](qualification.md) lists the additional required cases and remaining machine/public-endpoint work. A generic HTTPS proof cannot qualify unmeasured relay admission behavior.
 
 The [neutral probe](probe.md) now has a private NoCloud seed, pinned offline image import, explicit disconnected startup and a console/runtime gate before its sole workload connection. Probe provisioning is software-tested; its actual cloud-init behavior and traffic probes remain NOT RUN.

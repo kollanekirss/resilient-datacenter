@@ -83,6 +83,25 @@ def _https(value):
         raise ApplianceError("https-url-required") from None
 
 
+def _controller(value):
+    _https(value)
+    parsed = urlsplit(value)
+    require(parsed.path in ('', '/'), 'controller-origin-required')
+    _hostname(parsed.hostname)
+
+
+def _hostname(value):
+    require(type(value) is str and len(value) <= 253 and value == value.lower()
+            and '.' in value and not value.endswith('.')
+            and all(re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', part)
+                    for part in value.split('.')), 'invalid-hostname')
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return value
+    raise ApplianceError('hostname-required')
+
+
 def require_disjoint(networks):
     for index, left in enumerate(networks):
         for right in networks[index + 1:]:
@@ -158,11 +177,21 @@ def validate_release(lock: Json, *, production: bool) -> Json:
 def validate_site(plan: Json, release: Json) -> Json:
     validate_release(release, production=False)
     fields(plan, {"schema", "site_id", "revision", "release_id", "target", "ports", "networks",
-                  "upstream", "overlay_cidrs", "vms", "roles"})
+                  "upstream", "overlay_cidrs", "vms", "roles"}, {'probe_endpoint'})
     require(type(plan["schema"]) is int and plan["schema"] == 1, "unsupported-schema")
     _name(plan["site_id"])
     integer(plan["revision"], 1, 2**31 - 1)
     require(plan["release_id"] == release["release_id"], "release-mismatch")
+    if 'probe_endpoint' in plan:
+        probe = plan['probe_endpoint']
+        fields(probe, {'id', 'host_id', 'admin_id', 'appliance_host_id', 'appliance_admin_id', 'key_sha256'})
+        for key, value in probe.items():
+            if key == 'key_sha256':
+                require(type(value) is str and _HASH.fullmatch(value), 'probe-key-identity')
+            else:
+                require(type(value) is str and re.fullmatch(r'[A-Za-z0-9_.:-]{1,128}', value), 'probe-identity')
+        require(probe['host_id'] != probe['appliance_host_id'] and
+                probe['admin_id'] != probe['appliance_admin_id'], 'probe-not-independent')
     target = plan["target"]
     fields(target, {"by_id", "serial", "wwn", "size_bytes", "model", "transport"})
     require(type(target["by_id"]) is str
@@ -222,21 +251,36 @@ def validate_site(plan: Json, release: Json) -> Json:
     require_disjoint([*networks.values(), *upstream_networks, *map(_network, plan["overlay_cidrs"])])
     fields(plan["roles"], ROLES)
     fields(plan["vms"], {"router", "probe"}, ROLES)
-    role_fields = {"controller", "hostname", "authority", "public_ipv4", "certificate_ref",
-                   "region_id", "controller_url", "routed_prefix", "gateway"}
+    role_fields = {
+        'connector': {'controller'},
+        'headscale': {'hostname', 'authority', 'public_ipv4', 'certificate_ref', 'exposure', 'upstream_owner'},
+        'derp': {'hostname', 'public_ipv4', 'certificate_ref', 'region_id', 'controller_url',
+                 'routed_prefix', 'gateway', 'upstream_owner'},
+    }
+    required_settings = {
+        'connector': {'controller'},
+        'headscale': {'hostname', 'authority', 'public_ipv4', 'certificate_ref'},
+        'derp': role_fields['derp'],
+    }
     for role, settings in plan["roles"].items():
-        fields(settings, {"selected"}, role_fields)
+        fields(settings, {"selected"}, role_fields[role])
         require(type(settings["selected"]) is bool, "invalid-selection")
         for key, value in settings.items():
             if key == "selected":
                 continue
             if key == "region_id": integer(value, 1, 65535)
-            elif key in {"controller", "controller_url"}: _https(value)
+            elif key in {"controller", "controller_url"}: _controller(value)
             elif key in {"public_ipv4", "gateway"}: _address(value)
             elif key == "routed_prefix": _network(value)
+            elif key == 'hostname': _hostname(value)
+            elif key == 'exposure': require(value in ('direct', 'upstream-dnat'), 'unsupported-exposure')
+            elif key in {'authority', 'certificate_ref'}: _name(value)
             else: _text(value)
         if settings["selected"]:
             require(role in plan["vms"], "selected-role-missing-vm")
+            require(required_settings[role] <= set(settings), 'role-settings-missing')
+            if role == 'headscale' and settings.get('exposure') == 'upstream-dnat':
+                require('upstream_owner' in settings, 'upstream-owner-required')
     vmids = set()
     disk_gib = release["budgets"]["host"]["disk_gib"]
     for role, vm in plan["vms"].items():

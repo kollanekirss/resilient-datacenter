@@ -1,0 +1,16 @@
+[Unit]
+Description=Bind private appliance guest identity
+After=cloud-config.service
+Before=qemu-guest-agent.service tailscaled.service headscale.service derper.service
+ConditionPathExists=/etc/rdc-guest.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/rdc-guest/initialize
+RemainAfterExit=yes
+UMask=0077
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target

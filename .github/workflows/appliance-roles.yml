@@ -1,0 +1,31 @@
+name: Appliance network-role software checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  role-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Prepare software tests
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+      - name: Check role contracts and integration
+        run: .venv/bin/python -m pytest tests/appliance -q
+      - name: Validate illustrative role topology
+        run: ./rdc-appliance preview examples/appliance-site-roles.json
+      - name: Check honest deferred qualification
+        run: |
+          set +e
+          .venv/bin/python scripts/ci_appliance_roles.py --suite all --format text
+          result=$?
+          test "$result" -eq 2

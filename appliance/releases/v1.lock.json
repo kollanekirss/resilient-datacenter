@@ -16,7 +16,9 @@
         "url": "https://enterprise.proxmox.com/iso/SHA256SUMS",
         "sha256": "45859bdf9ea269c3834fd443e2d56a8fdae9e86419e319e6b33c7784529f9f7f"
       },
-      "required_for": ["base"],
+      "required_for": [
+        "base"
+      ],
       "source": "https://git.proxmox.com/"
     },
     {
@@ -38,7 +40,9 @@
         "url": "https://pkg.opnsense.org/releases/mirror/OPNsense-26.7-checksums-amd64.sha256",
         "sha256": "bea53e8a8407be97f16561b9ee7f0333b492f8f531327dde6397a0729879fff9"
       },
-      "required_for": ["base"],
+      "required_for": [
+        "base"
+      ],
       "source": "https://github.com/opnsense"
     },
     {
@@ -54,7 +58,9 @@
         "url": "https://cloud-images.ubuntu.com/releases/noble/release-20260926/SHA256SUMS",
         "sha256": "cd8934d937d1509d047798e6a5acfb839c0a2d29f3e5fc87b8ec7096ffe587ca"
       },
-      "required_for": ["base"],
+      "required_for": [
+        "base"
+      ],
       "source": "https://cloud-images.ubuntu.com/releases/noble/release-20260926/"
     },
     {
@@ -70,7 +76,11 @@
         "url": "https://cloud-images.ubuntu.com/releases/noble/release-20260926/SHA256SUMS",
         "sha256": "cd8934d937d1509d047798e6a5acfb839c0a2d29f3e5fc87b8ec7096ffe587ca"
       },
-      "required_for": ["connector", "headscale", "derp"],
+      "required_for": [
+        "connector",
+        "headscale",
+        "derp"
+      ],
       "source": "https://cloud-images.ubuntu.com/releases/noble/release-20260926/"
     },
     {
@@ -92,25 +102,64 @@
         "url": "https://github.com/restic/restic/releases/download/v0.19.1/SHA256SUMS",
         "sha256": "fb520966ee01d2a3d4219c66762c66efa56300833b6f639f36082b7462f91cb8"
       },
-      "required_for": ["base"],
+      "required_for": [
+        "base"
+      ],
       "source": "https://github.com/restic/restic/tree/v0.19.1"
+    },
+    {
+      "id": "tailscale",
+      "version": "1.104.1",
+      "url": "https://pkgs.tailscale.com/stable/tailscale_1.104.1_amd64.tgz",
+      "filename": "tailscale_1.104.1_amd64.tgz",
+      "sha256": "108d1d96ecf410d305571e173516f27038f870919a9b89c914a167c6d33a4528",
+      "size_bytes": 41130123,
+      "max_bytes": 41130123,
+      "provenance": {
+        "kind": "official-checksum",
+        "url": "https://pkgs.tailscale.com/stable/tailscale_1.104.1_amd64.tgz.sha256",
+        "sha256": "13f1ec01b38a86d2384c4ba055cf72fc27c138afc8c700ebecf7e0c4f994702d"
+      },
+      "required_for": [
+        "connector"
+      ],
+      "source": "https://github.com/tailscale/tailscale/tree/v1.104.1"
+    },
+    {
+      "id": "headscale",
+      "version": "0.29.4",
+      "url": "https://github.com/juanfont/headscale/releases/download/v0.29.4/headscale_0.29.4_linux_amd64",
+      "filename": "headscale_0.29.4_linux_amd64",
+      "sha256": "212ed0a884c0d3541e094c4bebbe94397df6f4e01bd3d7f059c520cb55e0d757",
+      "size_bytes": 52457634,
+      "max_bytes": 52457634,
+      "provenance": {
+        "kind": "official-checksum",
+        "url": "https://github.com/juanfont/headscale/releases/download/v0.29.4/checksums.txt",
+        "sha256": "35e449d87ebec62543aeb7f8a56cebe0d59678538dfa4984e4e49dfaab2a697b"
+      },
+      "required_for": [
+        "headscale"
+      ],
+      "source": "https://github.com/juanfont/headscale/tree/v0.29.4"
     }
   ],
   "missing_components": [
     {
-      "id": "tailscale",
-      "required_for": ["connector"],
-      "reason": "Role binary and complete offline provisioning inputs have not been reviewed and pinned."
-    },
-    {
-      "id": "headscale",
-      "required_for": ["headscale"],
-      "reason": "Role binary and complete offline provisioning inputs have not been reviewed and pinned."
-    },
-    {
       "id": "derper",
-      "required_for": ["derp"],
-      "reason": "A reproducible role binary and complete offline provisioning inputs have not been reviewed and pinned."
+      "required_for": [
+        "derp"
+      ],
+      "reason": "Linux binary cross-compiled and digest pinned in role-image.inputs.json; derived image closure and guest qualification are still pending."
+    },
+    {
+      "id": "role-image",
+      "required_for": [
+        "connector",
+        "headscale",
+        "derp"
+      ],
+      "reason": "Offline role image recipe implemented; signed distro package closure, derived image digest and disposable guest boot validation need the Linux image builder."
     }
   ],
   "profile": {
@@ -122,12 +171,35 @@
     "qualification": "unqualified"
   },
   "budgets": {
-    "host": {"memory_mib": 2048, "disk_gib": 16},
-    "router": {"memory_mib": 4096, "disk_gib": 16, "vcpus": 2},
-    "probe": {"memory_mib": 1024, "disk_gib": 8, "vcpus": 1},
-    "connector": {"memory_mib": 1024, "disk_gib": 8, "vcpus": 1},
-    "headscale": {"memory_mib": 1024, "disk_gib": 8, "vcpus": 1},
-    "derp": {"memory_mib": 1024, "disk_gib": 8, "vcpus": 1},
+    "host": {
+      "memory_mib": 2048,
+      "disk_gib": 16
+    },
+    "router": {
+      "memory_mib": 4096,
+      "disk_gib": 16,
+      "vcpus": 2
+    },
+    "probe": {
+      "memory_mib": 1024,
+      "disk_gib": 8,
+      "vcpus": 1
+    },
+    "connector": {
+      "memory_mib": 1024,
+      "disk_gib": 8,
+      "vcpus": 1
+    },
+    "headscale": {
+      "memory_mib": 1024,
+      "disk_gib": 8,
+      "vcpus": 1
+    },
+    "derp": {
+      "memory_mib": 1024,
+      "disk_gib": 8,
+      "vcpus": 1
+    },
     "qualification": "unqualified"
   },
   "notes": [

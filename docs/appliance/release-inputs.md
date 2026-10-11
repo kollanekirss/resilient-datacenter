@@ -21,7 +21,7 @@ OPNsense has additional verification evidence. Its [official 26.7 changelog](htt
 
 The complete offline input bundle was assembled at `.work/appliance-inputs` on 11 October. Every Proxmox, expanded OPNsense, Ubuntu probe and expanded Linux Restic file matched its locked size and SHA256. Its release identity is `70a22f7292b7f8b689dc2c747c13493a6f0e74c4abdf2e1917e30e9072efa951`. This directory is not a bootable ISO. Verified downloads are cached in Git-ignored `.cache/appliance-media/`; cache reuse rehashes them. No guest software was booted. The lock's initial review notes record earlier observations; this document records the later complete downloads.
 
-Restic's canonical GitHub download and checksum URLs redirect to GitHub's release asset service. The media downloader implements a single permitted HTTPS hop from the fixed `github.com/restic/restic/releases/download/` path to `release-assets.githubusercontent.com`, with response checks and the final locked digest still mandatory. Other redirect routes fail closed. Do not pin an expiring signed CDN query URL, disable TLS, or broaden this route to arbitrary origins.
+Restic and Headscale canonical GitHub download and checksum URLs redirect to GitHub's release asset service. The media downloader implements a single permitted HTTPS hop from the reviewed `github.com/restic/restic/releases/download/` and `github.com/juanfont/headscale/releases/download/` paths to `release-assets.githubusercontent.com`, with response checks and the final locked digest still mandatory. Other redirect routes fail closed. Do not pin an expiring signed CDN query URL, disable TLS, or broaden this route to arbitrary origins.
 
 ## Probe and Linux role base
 
@@ -31,7 +31,7 @@ The [Ubuntu package manifest](https://cloud-images.ubuntu.com/releases/noble/rel
 
 Qualify offline console login, actual virtual disk geometry, DNS queries, explicit NTP service checks, HTTPS validation and known listening endpoints. Time synchronization alone does not prove that an NTP server is reachable or correct. The probe must start without role provisioning or an Internet download. Its disposable disk must contain no persistent client/controller/relay identity. Seed/provisioning contract tests now exist; real guest startup and packet checks remain outstanding.
 
-The `tailscale`, `headscale` and `derper` role binaries and their complete offline provisioning inputs remain explicitly missing. Role builds must refuse those capabilities until actual reviewed inputs are added. Their absence does not justify fabricating hashes, silently installing the latest package, or calling the base candidate complete V1.
+Tailscale 1.104.1 and Headscale 0.29.4 official Linux artifacts have now been downloaded and verified against their official checksum documents. DERP 1.104.1 was cross-compiled for Linux amd64 with Go 1.27.1; its actual output digest, source commit and build inputs are pinned separately. See [role image preparation](role-image.md) for exact sizes, provenance and the automatic signed-package preparation and offline image assembly commands. The derived image remains unbuilt and unqualified; it is deliberately missing from the vendor release lock. A private local build receipt supplies its digest only after assembly. No Linux role binary or guest was executed here.
 
 ## Exact ISO adapter
 

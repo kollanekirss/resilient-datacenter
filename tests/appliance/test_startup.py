@@ -29,7 +29,11 @@ def test_router_start_does_not_start_ordinary_guests(site, tmp_path, monkeypatch
     assert result[0]['state'] != 'verified'
 
 
-def test_role_start_refuses_unimplemented_enrollment(site, tmp_path):
+def test_role_start_reports_unprovisioned_role_without_enrolling(site, tmp_path, monkeypatch):
     site['roles']['connector']['selected'] = True
-    with pytest.raises(ApplianceError, match='role-provisioning-unavailable'):
-        module().start_roles(site, NeverRunner(), state=tmp_path)
+    from appliance import role_operations
+    def not_ready(*args): raise ApplianceError('guest-not-provisioned')
+    monkeypatch.setattr(role_operations, 'start_role', not_ready)
+    result = module().start_roles(site, NeverRunner(), state=tmp_path)
+    assert result == [{'role': 'connector', 'state': 'blocked', 'code': 'guest-not-provisioned',
+                       'next_action': 'Inspect this role locally. Its identity has been retained.'}]

@@ -66,7 +66,9 @@ def authorized_key(plan,public_key):
 def _rule(parent,interface,action,source,destination,*,protocol="any",port=None,description=""):
     rule=_node(parent,"rule")
     _values(rule,{"type":action,"interface":interface,"ipprotocol":"inet","direction":"in","quick":"1","protocol":protocol,"descr":description})
-    src=_node(rule,"source");_node(src,"address",source)
+    src=_node(rule,"source")
+    if source=="any":_node(src,"any")
+    else:_node(src,"address",source)
     dst=_node(rule,"destination")
     if destination=="any":_node(dst,"any")
     else:_node(dst,"address",destination)
@@ -76,6 +78,9 @@ def _rule(parent,interface,action,source,destination,*,protocol="any",port=None,
 
 def render_router(plan,credentials):
     nics=_credentials(plan,credentials);zones=zone_interfaces(plan);stage=credentials.get("stage","bootstrap")
+    from .hosting import prerequisites
+    hosting={role:stage=="transit" and plan["roles"][role]["selected"] and not prerequisites(plan,role)
+             for role in ("headscale","derp")}
     doc=ET.Element("opnsense");system=_node(doc,"system")
     _values(system,{"hostname":plan["site_id"]+"-router","domain":"internal","timezone":"Etc/UTC","dnsallowoverride":"1" if plan["upstream"]["mode"]=="dhcp" else "0"})
     group=_node(system,"group");_values(group,{"name":"admins","description":"System Administrators","scope":"system","gid":"1999","member":"0","priv":"page-all"})
@@ -114,7 +119,7 @@ def render_router(plan,credentials):
                 host=_node(dns,"hosts",uuid=str(uuid.uuid5(uuid.NAMESPACE_URL,identity(plan)+":"+nic["mac"])))
                 _values(host,{"host":vm["name"],"domain":"internal","ip":nic["address"],"hwaddr":nic["mac"],"local":"1"})
     _values(_node(doc,"ntpd"),{"interface":",".join(["lan",*guest_ifs]),"prefer":"0.opnsense.pool.ntp.org","ispool":"0.opnsense.pool.ntp.org,1.opnsense.pool.ntp.org"})
-    nat=_node(_node(doc,"nat"),"outbound");_node(nat,"mode","advanced")
+    nat_root=_node(doc,"nat");nat=_node(nat_root,"outbound");_node(nat,"mode","advanced")
     if stage=="transit":
         for zone in ("infrastructure","workload"):
             rule=_node(nat,"rule");_values(rule,{"interface":"wan","ipprotocol":"inet","descr":"RDC NAT "+zone})
@@ -123,6 +128,28 @@ def render_router(plan,credentials):
         _node(_node(rule,"source"),"address",plan["networks"]["management"]["host_ip"]+"/32")
         _node(_node(rule,"destination"),"any")
     filters=_node(doc,"filter")
+    if stage=="transit":
+        # Failed optional hosting prerequisites withhold only those public
+        # rules; local management and joining must keep their own transit.
+        if hosting["headscale"]:
+            address=plan["vms"]["headscale"]["nics"][0]["address"]
+            # 26.7's DNat model remains mounted at /nat/rule+. Use its
+            # current manual-pass field and disable implicit reflection.
+            rule=_node(nat_root,"rule",uuid=str(uuid.uuid5(uuid.NAMESPACE_URL,identity(plan)+":headscale-dnat")))
+            _values(rule,{"sequence":"1","interface":"wan","ipprotocol":"inet","protocol":"tcp",
+                          "target":address,"local-port":"443","natreflection":"disable",
+                          "descr":"RDC Headscale HTTPS"})
+            _node(_node(rule,"source"),"network","any")
+            destination=_node(rule,"destination");_values(destination,{"network":"wanip","port":"443"})
+            _node(rule,"pass")
+            _rule(filters,"wan","pass","any",address,protocol="tcp",port=443,description="RDC Headscale HTTPS")
+        if hosting["derp"]:
+            address=plan["roles"]["derp"]["public_ipv4"]
+            for protocol,port in (("tcp",443),("tcp",80),("udp",3478)):
+                _rule(filters,"wan","pass","any",address,protocol=protocol,port=port,description="RDC routed relay")
+            for kind in ("echoreq","unreach","timex"):
+                rule=_rule(filters,"wan","pass","any",address,protocol="icmp",description="RDC relay ICMP")
+                _node(rule,"icmptype",kind)
     mgmt=plan["networks"]["management"]
     for address in (mgmt["host_ip"],mgmt["admin_ip"]):
         for port in (22,443):_rule(filters,"lan","pass",address,mgmt["gateway"],protocol="tcp",port=port,description="RDC administration")
@@ -132,12 +159,25 @@ def render_router(plan,credentials):
         network=plan["networks"][zone];interface=zones[zone]
         for protocol,port in (("tcp",53),("udp",53),("udp",123)):
             _rule(filters,interface,"pass",network["cidr"],network["gateway"],protocol=protocol,port=port,description="RDC local DNS/time")
+        if hosting["derp"] and zone=="relay":
+            from .derp import derp_config
+            binding=derp_config(plan)["verifier_host_binding"]
+            if binding:
+                _rule(filters,interface,"pass",plan["roles"]["derp"]["public_ipv4"],binding["address"],
+                      protocol="tcp",port=443,description="RDC relay controller verification")
         for cidr in protected:_rule(filters,interface,"block",network["cidr"],cidr,description="RDC zone isolation")
         if stage=="transit" and zone=="management":
             for port in (80,443):
                 _rule(filters,interface,"pass",mgmt["host_ip"],"any",protocol="tcp",port=port,description="RDC host updates")
         if stage=="transit" and zone in ("infrastructure","workload"):
             _rule(filters,interface,"pass",network["cidr"],"any",protocol="tcp",port=443,description="RDC HTTPS updates")
+        if stage=="transit" and zone=="infrastructure" and plan["roles"]["connector"]["selected"]:
+            address=plan["vms"]["connector"]["nics"][0]["address"]
+            for port in (3478,41641):
+                _rule(filters,interface,"pass",address,"any",protocol="udp",port=port,description="RDC connector transport")
+        if hosting["derp"] and zone=="relay":
+            _rule(filters,interface,"pass",plan["roles"]["derp"]["public_ipv4"],"any",protocol="tcp",port=443,
+                  description="RDC relay HTTPS verification and updates")
         _rule(filters,interface,"block",network["cidr"],"any",description="RDC default deny")
     model=_node(doc,"OPNsense");settings=_node(_node(model,"Interfaces"),"settings",version="1.0.0")
     _values(settings,{"disablechecksumoffloading":"1","disablesegmentationoffloading":"1","disablelargereceiveoffloading":"1","disableipv6":"1"})

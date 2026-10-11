@@ -82,4 +82,8 @@ The [probe guide](probe.md) prepares a unique private seed and imports the pinne
 
 `status`, `diagnose` and `resume` are inspections; they do not repeat installation or allocate another disk. After a lost VM command response, use `router reconcile`: it compares the actual owned VM with the saved intended result and clears the pending operation only on an exact match. A mismatch remains blocked for inspection. `router reconcile-policy` and `router reconcile-link <zone>` separately acknowledge only already completed policy/link outcomes after fresh inspection; they never replay the mutation.
 
-See [configuration export and repair](repair.md). Optional Headscale, DERP and connector provisioning remains the separate roles milestone. Do not describe this development base as a complete V1 or high-availability system.
+Continue with [joining and optional Headscale/DERP hosting](roles.md), then
+[configuration export and repair](repair.md). Each role has its own eligibility,
+identity and guest; no failed join creates a new controller. Image assembly,
+real role traffic and complete V1 qualification still need the later test
+machine and independent endpoint. This is not a high-availability system.

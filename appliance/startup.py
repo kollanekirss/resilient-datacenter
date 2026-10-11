@@ -36,5 +36,15 @@ def start_local(plan, runner, *, state=PRIVATE, timeout_s=120):
 
 
 def start_roles(plan, runner, *, state=PRIVATE):
-    require(not any(item.get('selected') for item in plan['roles'].values()), 'role-provisioning-unavailable')
-    return []
+    from .role_operations import start_role
+    results = []
+    # A local controller, when selected, starts before a relay using its verifier.
+    # Each role failure is independent; none triggers enrollment or a new authority.
+    for role in ('headscale', 'derp', 'connector'):
+        if not plan['roles'][role]['selected']: continue
+        try:
+            results.append(start_role(plan, role, runner, state))
+        except ApplianceError as error:
+            results.append({'role': role, 'state': 'blocked', 'code': error.code,
+                            'next_action': 'Inspect this role locally. Its identity has been retained.'})
+    return results

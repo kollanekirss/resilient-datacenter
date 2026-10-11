@@ -1,8 +1,9 @@
-"""Bounded private base-configuration export, separate from activation.
+"""Bounded private configuration and role-state export, separate from activation.
 
 Restic provides encryption. A package is published only after independently
 reading its exact snapshot back and verifying every captured byte. No VM disks,
-role identities, application data or whole-site recovery are claimed here.
+application data or whole-site recovery are claimed here. Selected role states
+are captured separately during a brief service pause, then encrypted together.
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from .contracts import ApplianceError, canonical, require
 from . import state
 
 COMPONENTS = {'site.json', 'release.lock.json', 'build.json', 'vms.json', 'router.xml', 'host.json'}
+ROLE_COMPONENTS = {'role-' + role + '.tar': role for role in ('connector', 'headscale', 'derp')}
 MAX_BYTES = 8 * 1024 * 1024
 
 
@@ -50,11 +52,34 @@ def _private_stream(fd, name, *, readonly=False):
                 == (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns), 'export-input-changed')
 
 
+def _components(files):
+    return type(files) is dict and COMPONENTS <= set(files) <= COMPONENTS | set(ROLE_COMPONENTS)
+
+
+def _role_material(content):
+    from .contracts import _unique, identity
+    from .role_export import unpack_role
+    try:
+        plan = json.loads(content['site.json'], object_pairs_hook=_unique)
+        require(type(plan) is dict, 'export-plan')
+        selected = {role for role, settings in plan.get('roles', {}).items() if settings.get('selected') is True}
+        supplied = {role for name, role in ROLE_COMPONENTS.items() if name in content}
+        require(supplied == selected, 'export-role-state-missing')
+        for name, role in ROLE_COMPONENTS.items():
+            if name not in content: continue
+            manifest, _ = unpack_role(content[name], role=role)
+            require(manifest.get('plan_id') == identity(plan), 'export-role-plan-mismatch')
+    except (ValueError, TypeError, AttributeError) as error:
+        if isinstance(error, ApplianceError): raise
+        raise ApplianceError('export-plan') from None
+
+
 def pack(files):
-    require(type(files) is dict and set(files) == COMPONENTS, 'export-components')
+    require(_components(files), 'export-components')
     content = {name: _private_bytes(path) for name, path in files.items()}
+    _role_material(content)
     require(sum(map(len, content.values())) <= MAX_BYTES - 65536, 'export-size')
-    manifest = {'schema': 1, 'kind': 'appliance-base-config', 'files': {
+    manifest = {'schema': 1, 'kind': 'appliance-role-config' if set(files) != COMPONENTS else 'appliance-base-config', 'files': {
         name: {'size_bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()} for name, raw in content.items()}}
     output = io.BytesIO()
     with tarfile.open(fileobj=output, mode='w', format=tarfile.USTAR_FORMAT) as archive:
@@ -70,13 +95,14 @@ def pack(files):
 def unpack(raw, manifest):
     require(type(raw) is bytes and len(raw) <= MAX_BYTES and len(raw) % 512 == 0, 'export-archive')
     require(type(manifest) is dict and set(manifest) == {'schema', 'kind', 'files'}
-            and manifest['schema'] == 1 and manifest['kind'] == 'appliance-base-config'
-            and type(manifest['files']) is dict and set(manifest['files']) == COMPONENTS, 'export-manifest')
+            and manifest['schema'] == 1 and manifest['kind'] in ('appliance-base-config', 'appliance-role-config')
+            and _components(manifest['files']) and
+            (manifest['kind'] == 'appliance-base-config') == (set(manifest['files']) == COMPONENTS), 'export-manifest')
     files, total = {}, 0
     try:
         with tarfile.open(fileobj=io.BytesIO(raw), mode='r:') as archive:
             for member in archive:
-                require(member.name in COMPONENTS and member.name not in files and member.isfile()
+                require(member.name in manifest['files'] and member.name not in files and member.isfile()
                         and member.mode == 0o600 and not member.pax_headers and 0 <= member.size <= MAX_BYTES, 'export-member')
                 total += member.size
                 require(total <= MAX_BYTES, 'export-size')
@@ -86,7 +112,8 @@ def unpack(raw, manifest):
                 files[member.name] = data
     except (tarfile.TarError, ValueError, OSError):
         raise ApplianceError('export-archive') from None
-    require(set(files) == COMPONENTS, 'export-components')
+    require(set(files) == set(manifest['files']), 'export-components')
+    _role_material(files)
     return files
 
 
@@ -244,3 +271,8 @@ def collect_base(plan, private, router_xml):
     with state._directory_fd(capture) as fd:
         for name, data in raw.items(): state._write_at(fd, name, data)
     return {name: capture / name for name in raw}
+
+
+def collect_roles(plan, runner, staging, *, private=Path('/var/lib/rdc-appliance/private')):
+    from .role_export import collect_roles as collect
+    return collect(plan, runner, staging, private=private)

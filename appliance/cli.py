@@ -70,7 +70,7 @@ def execute(args):
         return {"schema": 1, "version": __version__, "state": "development-candidate",
                 "installer": "implemented-unqualified", "boot_qualification": "not-run",
                 "destructive_actions_enabled": False,
-                "available": ["release-check", "preview", "preflight", "media", "bundle", "iso", "network", "router", "probe", "menu", "export", "repair"],
+                "available": ["release-check", "preview", "preflight", "media", "bundle", "iso", "network", "router", "probe", "roles", "menu", "export", "repair"],
                 "next_action": "Assemble and qualify a development image on disposable x86-64 Linux; hardware acceptance is pending."}, 0
     if args.command == "inspect":
         return {"schema": 1, "scope": "build-platform-only", "platform": collect_platform(),

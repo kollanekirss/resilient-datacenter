@@ -2,7 +2,7 @@
 
 The reviewed release lock supplies artifact digests and official checksum URLs.
 Checksum documents corroborate those pins; this module makes no signature claim.
-Redirects are denied except one HTTPS hop from a Restic GitHub release download
+Redirects are denied except one HTTPS hop from a reviewed Restic or Headscale GitHub release download
 to GitHub's exact release-assets host. That transport exception never changes
 the locked artifact digest or checksum binding; signed query URLs are not logged.
 """
@@ -90,7 +90,7 @@ class _ArtifactRedirect(urllib.request.HTTPRedirectHandler):
         except ApplianceError:
             return None
         if (source.hostname != "github.com" or source.query
-                or not re.fullmatch(r"/restic/restic/releases/download/[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*", source.path)
+                or not re.fullmatch(r"/(?:restic/restic|juanfont/headscale)/releases/download/[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*", source.path)
                 or target.hostname != "release-assets.githubusercontent.com"):
             return None
         self.target_url = newurl
@@ -214,6 +214,14 @@ def _checksum_document(raw, record, filename):
     except UnicodeError:
         raise ApplianceError("media-provenance") from None
     matches = []
+    # Tailscale publishes one bare digest at an artifact-specific .sha256 URL.
+    # Bind that exceptional format to the exact vendor artifact, never a
+    # generic checksum endpoint or caller-controlled filename.
+    url=record.get("url", "")
+    if (len(lines)==1 and re.fullmatch(r"[a-f0-9]{64}",lines[0])
+            and re.fullmatch(r"https://pkgs\.tailscale\.com/stable/tailscale_[0-9.]+_amd64\.tgz",url)
+            and url.rsplit("/",1)[-1]==filename and record["provenance"]["url"]==url+".sha256"):
+        matches.append(lines[0])
     for line in lines:
         match = re.fullmatch(r"([a-fA-F0-9]{64}) [ *](.+)", line)
         if match and match[2] == filename:

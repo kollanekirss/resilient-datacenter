@@ -18,6 +18,8 @@ PRIVATE = Path('/var/lib/rdc-appliance/private')
 
 
 def add_commands(commands, default_release):
+    from .role_operations import add_commands as add_roles
+    add_roles(commands)
     commands.add_parser('menu', help='Open the local operations menu')
     for name in ('diagnose', 'resume', 'start-local', 'start-roles', 'host-policy', 'rollback', 'first-boot'):
         commands.add_parser(name)
@@ -120,8 +122,8 @@ def installed_status(plan, staged, runner, *, private=PRIVATE):
                 capabilities['upstream'] = {'state':'blocked','code':error.code}
     except ApplianceError as error:
         capabilities['router'] = {'state':'blocked','code':error.code}
-    for role in ('connector','headscale','derp'):
-        capabilities[role] = {'state':'unavailable' if plan['roles'][role]['selected'] else 'not-selected'}
+    from .role_operations import role_status
+    capabilities.update(role_status(plan, staged, runner, private))
     report = {'schema':1,'state':'inspected','site_id':plan['site_id'], 'build_id':staged['build_id'],
               'plan_id':identity(plan),'management_ip':plan['networks']['management']['host_ip'],
               'capabilities':capabilities,'qualification':'not-run', 'mutations':False}
@@ -207,6 +209,10 @@ def execute_operation(args):
         target['confirmed'] = True
         return repair_host(target, args.opened_export, runner), 0
     plan, release, staged = _installed()
+    if args.command == 'roles':
+        from .role_operations import execute
+        result = execute(args, plan, release, staged, runner, PRIVATE)
+        return result, 2 if result.get('state') in ('blocked', 'unknown') else 0
     now = int(time.monotonic())
     if args.command in ('diagnose', 'resume'):
         return installed_status(plan, staged, runner), 0
@@ -258,7 +264,7 @@ def execute_operation(args):
         return {'state':'configured','vmid':plan['vms']['probe']['vmid'],
                 'running':observed.get('running') is True,'packet_tests':'not-performed'}, 0
     if args.command == 'export':
-        from .export import collect_base, seal, inspect_export
+        from .export import collect_base, collect_roles, seal, inspect_export
         binary = PRIVATE.parent / 'media/restic'
         if args.action == 'inspect':
             return inspect_export(args.source, args.password_file, args.output, runner, binary=binary, release=release), 0
@@ -267,6 +273,7 @@ def execute_operation(args):
             xml = Path(temporary) / 'router.xml'
             _new_file(xml, export_router(plan, runner))
             files = collect_base(plan, PRIVATE, xml)
+            files.update(collect_roles(plan, runner, Path(temporary) / 'roles', private=PRIVATE))
             return seal(files, args.output, args.password_file, runner, binary=binary, release=release), 0
     if args.command == 'repair':
         if args.action in ('router-clone', 'reconcile-router'):

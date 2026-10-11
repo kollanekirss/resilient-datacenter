@@ -101,8 +101,15 @@ class RecoveryPve:
 
 
 @pytest.fixture
-def prepared(site, release, tmp_path, monkeypatch):
+def prepared(site, release, tmp_path, monkeypatch, request):
     module = recovery()
+    if getattr(request, 'param', None) == 'connector':
+        vm = copy.deepcopy(site['vms']['probe'])
+        vm.update(role='connector', vmid=103, name='pilot-connector')
+        vm['nics'] = [{'zone':'infrastructure', 'mac':'02:bb:00:00:00:06',
+                       'address':'10.77.1.10', 'connected':False}]
+        site['vms']['connector'] = vm
+        site['roles']['connector'] = {'selected':True, 'controller':'https://control.example.org'}
     release = copy.deepcopy(release); release.pop('test_only')
     dvd=tmp_path/'dvd.iso'; dvd.write_bytes(b'pinned DVD')
     release['components']=[dict(id=name,version='26.7' if name=='opnsense-dvd' else '1',
@@ -132,6 +139,40 @@ def prepared(site, release, tmp_path, monkeypatch):
     arguments=dict(dvd=dvd,work=tmp_path/'work',release=release,build=build,
                    console_factory=Console,lock_directory=lockdir)
     return module,runner,private,export,arguments
+
+
+def role_archive(site, export, *, plan_id=None):
+    from appliance.role_export import pack_role
+    raw = b'private-connector-state'
+    manifest = {'schema':1, 'role':'connector', 'snapshot_id':'capture-one',
+        'identity_id':'a'*64, 'versions':{'tailscale':'1.104.1'}, 'checked_at':123,
+        'capture_error':None, 'restart_error':None, 'plan_id':plan_id or identity(site),
+        'files':{'tailscale/tailscaled.state':{'size_bytes':len(raw), 'sha256':hashlib.sha256(raw).hexdigest()}}}
+    with state._directory_fd(export) as fd:
+        state._write_at(fd, 'role-connector.tar', pack_role(manifest, {'tailscale/tailscaled.state':raw}))
+
+
+@pytest.mark.parametrize('prepared', ['connector'], indirect=True)
+def test_role_export_restores_only_router_clone(site, prepared):
+    module,runner,private,export,arguments=prepared
+    role_archive(site, export)
+    before=(export/'role-connector.tar').read_bytes()
+    result=module.restore_router_isolated(site,export,901,runner,private,**arguments)
+    assert result['state']=='verified' and result['activation']=='forbidden'
+    assert (export/'role-connector.tar').read_bytes()==before
+    assert set(runner.configs)=={101,901} and not runner.running
+
+
+@pytest.mark.parametrize('prepared', ['connector'], indirect=True)
+@pytest.mark.parametrize('fault', ['missing','foreign-plan','unexpected','corrupt'])
+def test_role_export_must_match_selected_plan_before_router_mutation(site, prepared, fault):
+    module,runner,private,export,arguments=prepared
+    if fault!='missing':role_archive(site,export,plan_id='f'*64 if fault=='foreign-plan' else None)
+    if fault=='unexpected':state.write(export/'unexpected.json',{})
+    if fault=='corrupt':(export/'role-connector.tar').write_bytes(b'corrupted')
+    with pytest.raises(ApplianceError):
+        module.restore_router_isolated(site,export,901,runner,private,**arguments)
+    assert not runner.mutations
 
 
 def test_restores_only_bridge_free_clone_and_stops_it(site,prepared):

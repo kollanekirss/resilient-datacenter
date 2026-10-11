@@ -21,7 +21,7 @@ import time
 
 from . import proxmox, state
 from .contracts import ApplianceError, canonical, identity, integer, require
-from .export import COMPONENTS, _private_bytes
+from .export import COMPONENTS, ROLE_COMPONENTS, _private_bytes
 from .media import verify_file
 from .plan import validate_release, validate_site
 from .router_config import audit_router, parse_xml, zone_interfaces
@@ -62,10 +62,17 @@ def _bound_export(plan, export, release, build, private):
     validate_release(release, production=True); validate_site(plan, release)
     export = Path(export)
     with state._directory_fd(export): pass
-    require({p.name for p in export.iterdir()} == COMPONENTS, 'recovery-export-components')
+    roles = {name: role for name, role in ROLE_COMPONENTS.items() if plan['roles'][role]['selected']}
+    require({p.name for p in export.iterdir()} == COMPONENTS | set(roles), 'recovery-export-components')
     require(state.read(export/'site.json') == plan, 'recovery-export-plan')
     require(state.read(export/'release.lock.json') == release, 'recovery-export-release')
     require(state.read(export/'build.json') == build, 'recovery-export-build')
+    # Validate archived identities without extracting or activating them. Router
+    # repair has authority only over its newly allocated, disconnected clone.
+    from .role_export import unpack_role
+    for name, role in roles.items():
+        manifest, _ = unpack_role(_private_bytes(export/name), role=role)
+        require(manifest.get('plan_id') == identity(plan), 'recovery-export-role-plan')
     source = proxmox.vm_spec(plan, 'router')
     receipt = proxmox._receipt(source['vmid'], private)
     exported = state.read(export/'vms.json').get(str(source['vmid']))
