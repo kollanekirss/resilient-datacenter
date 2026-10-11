@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "release_id": "appliance-v1-base-20261011",
+  "adapter_id": "pve-9-2-1",
+  "components": [
+    {
+      "id": "proxmox-iso",
+      "version": "9.2-1",
+      "url": "https://enterprise.proxmox.com/iso/proxmox-ve_9.2-1.iso",
+      "filename": "proxmox-ve_9.2-1.iso",
+      "sha256": "4e88fe416df9b527624a175f24c9aa07c714d3332afb1ee3dbf3879573ef2c6c",
+      "size_bytes": 1706178560,
+      "max_bytes": 1706178560,
+      "provenance": {
+        "kind": "official-checksum",
+        "url": "https://enterprise.proxmox.com/iso/SHA256SUMS",
+        "sha256": "45859bdf9ea269c3834fd443e2d56a8fdae9e86419e319e6b33c7784529f9f7f"
+      },
+      "required_for": ["base"],
+      "source": "https://git.proxmox.com/"
+    },
+    {
+      "id": "opnsense-dvd",
+      "version": "26.7",
+      "url": "https://pkg.opnsense.org/releases/mirror/OPNsense-26.7-dvd-amd64.iso.bz2",
+      "filename": "OPNsense-26.7-dvd-amd64.iso.bz2",
+      "sha256": "95cafedda6d5b22ce832e249dc2309110fbee19f813ad78cf28bb3d387186bfb",
+      "size_bytes": 494298945,
+      "max_bytes": 494298945,
+      "compression": "bz2",
+      "expanded": {
+        "sha256": "1efd5dc9fa12a1f93571183fe5e3823e22e332872de8417fafb5e4e4d48d5dcd",
+        "size_bytes": 2101714944,
+        "max_bytes": 2101714944
+      },
+      "provenance": {
+        "kind": "official-checksum",
+        "url": "https://pkg.opnsense.org/releases/mirror/OPNsense-26.7-checksums-amd64.sha256",
+        "sha256": "bea53e8a8407be97f16561b9ee7f0333b492f8f531327dde6397a0729879fff9"
+      },
+      "required_for": ["base"],
+      "source": "https://github.com/opnsense"
+    },
+    {
+      "id": "probe-image",
+      "version": "24.04-20260926",
+      "url": "https://cloud-images.ubuntu.com/releases/noble/release-20260926/ubuntu-24.04-server-cloudimg-amd64.img",
+      "filename": "ubuntu-24.04-server-cloudimg-amd64.img",
+      "sha256": "6a81c37564db9b1ee84e141922625e1d7c5b389b99bb3c572e0243607d5bb4d2",
+      "size_bytes": 625612288,
+      "max_bytes": 625612288,
+      "provenance": {
+        "kind": "official-checksum",
+        "url": "https://cloud-images.ubuntu.com/releases/noble/release-20260926/SHA256SUMS",
+        "sha256": "cd8934d937d1509d047798e6a5acfb839c0a2d29f3e5fc87b8ec7096ffe587ca"
+      },
+      "required_for": ["base"],
+      "source": "https://cloud-images.ubuntu.com/releases/noble/release-20260926/"
+    },
+    {
+      "id": "linux-base",
+      "version": "24.04-20260926",
+      "url": "https://cloud-images.ubuntu.com/releases/noble/release-20260926/ubuntu-24.04-server-cloudimg-amd64.img",
+      "filename": "ubuntu-24.04-server-cloudimg-amd64.img",
+      "sha256": "6a81c37564db9b1ee84e141922625e1d7c5b389b99bb3c572e0243607d5bb4d2",
+      "size_bytes": 625612288,
+      "max_bytes": 625612288,
+      "provenance": {
+        "kind": "official-checksum",
+        "url": "https://cloud-images.ubuntu.com/releases/noble/release-20260926/SHA256SUMS",
+        "sha256": "cd8934d937d1509d047798e6a5acfb839c0a2d29f3e5fc87b8ec7096ffe587ca"
+      },
+      "required_for": ["connector", "headscale", "derp"],
+      "source": "https://cloud-images.ubuntu.com/releases/noble/release-20260926/"
+    },
+    {
+      "id": "restic",
+      "version": "0.19.1",
+      "url": "https://github.com/restic/restic/releases/download/v0.19.1/restic_0.19.1_linux_amd64.bz2",
+      "filename": "restic_0.19.1_linux_amd64.bz2",
+      "sha256": "f415415624dcc452f2a02b8c33641791a8c6d6d3b65bbb3543fcf9a25151585c",
+      "size_bytes": 10107515,
+      "max_bytes": 10107515,
+      "compression": "bz2",
+      "expanded": {
+        "sha256": "20d4142678d0d95ec11a4759def1b73fd9190abc9ca19e4b62d067c0b387e639",
+        "size_bytes": 30941346,
+        "max_bytes": 30941346
+      },
+      "provenance": {
+        "kind": "official-checksum",
+        "url": "https://github.com/restic/restic/releases/download/v0.19.1/SHA256SUMS",
+        "sha256": "fb520966ee01d2a3d4219c66762c66efa56300833b6f639f36082b7462f91cb8"
+      },
+      "required_for": ["base"],
+      "source": "https://github.com/restic/restic/tree/v0.19.1"
+    }
+  ],
+  "missing_components": [
+    {
+      "id": "tailscale",
+      "required_for": ["connector"],
+      "reason": "Role binary and complete offline provisioning inputs have not been reviewed and pinned."
+    },
+    {
+      "id": "headscale",
+      "required_for": ["headscale"],
+      "reason": "Role binary and complete offline provisioning inputs have not been reviewed and pinned."
+    },
+    {
+      "id": "derper",
+      "required_for": ["derp"],
+      "reason": "A reproducible role binary and complete offline provisioning inputs have not been reviewed and pinned."
+    }
+  ],
+  "profile": {
+    "arch": "x86_64",
+    "firmware": "uefi",
+    "secure_boot": false,
+    "storage": "ext4-lvmthin",
+    "network": "ethernet-ipv4",
+    "qualification": "unqualified"
+  },
+  "budgets": {
+    "host": {"memory_mib": 2048, "disk_gib": 16},
+    "router": {"memory_mib": 4096, "disk_gib": 16, "vcpus": 2},
+    "probe": {"memory_mib": 1024, "disk_gib": 8, "vcpus": 1},
+    "connector": {"memory_mib": 1024, "disk_gib": 8, "vcpus": 1},
+    "headscale": {"memory_mib": 1024, "disk_gib": 8, "vcpus": 1},
+    "derp": {"memory_mib": 1024, "disk_gib": 8, "vcpus": 1},
+    "qualification": "unqualified"
+  },
+  "notes": [
+    "Reviewed official input metadata on 2026-10-11; this is not an appliance release or qualification receipt.",
+    "OPNsense and Restic compressed and expanded bytes were hashed locally. Proxmox and Ubuntu still require complete download and local digest verification.",
+    "The installer assistant source candidate and unqualified upstream integration are documented in docs/appliance/release-inputs.md.",
+    "The probe and Linux role base share immutable vendor bytes but require separate local seeds; no runtime probe or role readiness is implied.",
+    "All resource allocations are provisional; boot, disk safety, networking, physical hardware and redistribution review remain release gates."
+  ]
+}
