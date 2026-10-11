@@ -2,7 +2,7 @@
 
 Date: 11 October 2026
 
-Status: proposed version 1 specification for review. The two physical port boundary, joining an existing network, and optional Headscale/DERP hosting with separate eligibility checks are agreed. The detailed implementation choices below define the proposed first release. This specification does not claim that an installer or accepted appliance already exists.
+Status: approved by the project owner on 11 October 2026. The first release includes the two physical port boundary, joining an existing network, and optional Headscale/DERP hosting with separate eligibility checks. Implementation is planned in the [USB and router base plan](../plans/2026-10-11-appliance-v1-base.md), followed by the [network roles and release plan](../plans/2026-10-11-appliance-v1-roles-release.md). This specification does not claim that an installer or accepted appliance already exists.
 
 ## Product outcome
 

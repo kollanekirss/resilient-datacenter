@@ -1,6 +1,6 @@
 # Resilient Datacenter — toward portable crisis infrastructure
 
-**New version 1 design, 11 October 2026:** the proposed [two port network appliance](docs/superpowers/specs/2026-10-11-two-port-network-appliance-v1-design.md) focuses on USB installation of Proxmox, an OPNsense VM, separate management/Internet ports and virtual internal networks. Staff LAN and applications come later. The specification is for review; the implementation and evidence described below belong to the earlier service toolkit.
+**Approved version 1 design, 11 October 2026:** the [two port network appliance](docs/superpowers/specs/2026-10-11-two-port-network-appliance-v1-design.md) focuses on USB installation of Proxmox, an OPNsense VM, separate management/Internet ports and virtual internal networks. Staff LAN and applications come later. Start with the [USB and router implementation plan](docs/superpowers/plans/2026-10-11-appliance-v1-base.md), then the [network roles and release plan](docs/superpowers/plans/2026-10-11-appliance-v1-roles-release.md). These plans do not establish installer acceptance; the implementation and evidence described below belong to the earlier service toolkit.
 
 Run your own private network, chat and files, keep an encrypted recovery copy elsewhere, and optionally exchange approved services with other organisations. This project provides a guided command-line installer and checked operating procedures for **fresh Ubuntu 24.04 amd64 machines with systemd**. Use existing VMs, physical machines or VPSs; no custom ISO or Proxmox requirement.
 
